@@ -14,11 +14,14 @@
 // received a copy of the GNU Lesser General Public License along with
 // hpp-rbprm. If not, see <http://www.gnu.org/licenses/>.
 
+#include <hpp/util/debug.hh>
+# include <hpp/model/configuration.hh>
 #include <hpp/rbprm/rbprm-device.hh>
 
 namespace hpp {
   namespace model {
-
+    using model::displayConfig;
+    
       /*class rbprmexception : public std::exception
       {
       public:
@@ -69,25 +72,28 @@ namespace hpp {
 
     bool RbPrmDevice::currentConfiguration (ConfigurationIn_t configuration)
     {
-        // separate config and extra config :
-        size_type confSize = configSize() - extraConfigSpace().dimension();
-        hppDout(notice, "offset = "<<confSize);
-        ConfigurationPtr_t q(new Configuration_t(confSize));
-        for(size_type i = 0 ; i < confSize ; i++)
-          (*q)[1] = configuration[i];
-
-        // don't send extra config to robotRoms
         for(hpp::model::T_Rom::const_iterator cit = robotRoms_.begin();
             cit != robotRoms_.end(); ++cit)
         {
-            cit->second->currentConfiguration(*q);
+	  cit->second->currentConfiguration(configuration);
         }
         return Device::currentConfiguration(configuration);
+    }
+
+    void RbPrmDevice::setDimensionExtraConfigSpace (const size_type& dimension)
+    {
+      Device::setDimensionExtraConfigSpace(dimension); // call inherited method
+      // call method for each robotRoms :
+      for(hpp::model::T_Rom::const_iterator cit = robotRoms_.begin();
+          cit != robotRoms_.end(); ++cit){
+          cit->second->setDimensionExtraConfigSpace(dimension);
+        }
     }
 
     RbPrmDevice::RbPrmDevice (const std::string& name, const hpp::model::T_Rom &robotRoms)
         : Device(name)
         , robotRoms_(robotRoms)
+	, contactSize_ (vector_t(2))
         , weakPtr_()
     {
         /*if(robotTrunk->configSize() != robotRom->configSize())

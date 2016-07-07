@@ -14,6 +14,8 @@
 // received a copy of the GNU Lesser General Public License along with
 // hpp-rbprm. If not, see <http://www.gnu.org/licenses/>.
 
+#include <hpp/util/debug.hh>
+#include <hpp/core/collision-validation-report.hh>
 #include <hpp/rbprm/rbprm-shooter.hh>
 #include <hpp/model/collision-object.hh>
 #include <hpp/model/joint.hh>
@@ -21,7 +23,8 @@
 #include <hpp/fcl/BVH/BVH_model.h>
 #include <hpp/core/collision-validation.hh>
 #include <Eigen/Geometry>
-
+#include <hpp/model/configuration.hh>
+#include <hpp/rbprm/fullbodyBallistic/parabola-library.hh>
 
 namespace hpp {
 using namespace core;
@@ -97,29 +100,42 @@ namespace
             SampleRotationRec(config,jv,current);
     }
 
-    void SampleRotation(model::DevicePtr_t so3, ConfigurationPtr_t config, JointVector_t& jv)
+    void SampleRotation(model::DevicePtr_t so3, ConfigurationPtr_t config, JointVector_t& /*jv*/)
     {
-        std::size_t id = 1;
-        if(so3->rootJoint())
-        {
-            Eigen::Matrix <value_type, 3, 1> confso3;
-            id+=1;
-            model::JointPtr_t joint = so3->rootJoint();
-            for(int i =0; i <3; ++i)
-            {
-                joint->configuration()->uniformlySample (i, confso3);
-            }
-            Eigen::Quaterniond qt = Eigen::AngleAxisd(confso3(0), Eigen::Vector3d::UnitZ())
-              * Eigen::AngleAxisd(confso3(1), Eigen::Vector3d::UnitY())
-              * Eigen::AngleAxisd(confso3(2), Eigen::Vector3d::UnitX());
-            std::size_t rank = 3;
-            (*config)(rank+0) = qt.w();
-            (*config)(rank+1) = qt.x();
-            (*config)(rank+2) = qt.y();
-            (*config)(rank+3) = qt.z();
-        }
-        if(id < jv.size())
-            SampleRotationRec(config,jv,id);
+      size_t id = 0;
+      if(so3->rootJoint())
+      {
+          std::size_t rank = 3;
+          //so3->rootJoint()->configuration()->uniformlySample(rank,*config);
+          Eigen::Matrix <value_type, 3, 1> confso3;
+        
+          id+=1;
+          model::JointPtr_t joint = so3->rootJoint();
+          for(int i =0; i <3; ++i)
+          {
+             //hppDout(notice,"JOINT : name = "<<joint->name()<<" size = "<<joint->configSize());
+             //hppDout(notice,"JOINT : lower bound = "<<joint->lowerBound(0)<<"upper bound = "<<joint->upperBound(0));
+              joint->configuration()->uniformlySample (i, confso3);
+              if(i<2)
+                joint = joint->childJoint(0);
+          }
+          //std::cout<<confso3<<std::endl;
+          Eigen::Quaterniond qt = Eigen::AngleAxisd(confso3(0), Eigen::Vector3d::UnitZ())
+            * Eigen::AngleAxisd(confso3(1), Eigen::Vector3d::UnitY())
+            * Eigen::AngleAxisd(confso3(2), Eigen::Vector3d::UnitX());
+          //std::cout<<"quat = "<<qt.w()<<" , "<<qt.x()<<" , "<<qt.y()<<" , "<<qt.z()<<" , "<<std::endl;
+          (*config)(rank+0) = qt.w();
+          (*config)(rank+1) = qt.x();
+          (*config)(rank+2) = qt.y();
+          (*config)(rank+3) = qt.z();
+          //std::cout<<model::displayConfig(*config)<<std::endl;
+          
+      }
+     /* if(id < jv.size()){
+          std::cout<<"SampleRotationRec"<<std::endl;
+          SampleRotationRec(config,jv,id);
+      }   */
+        
     }
 
     model::DevicePtr_t initSo3()
@@ -161,6 +177,7 @@ namespace
             else
             {
                 current->upperBound(0, *cit);
+                
                 current = current->numberChildJoints() > 0 ? current->childJoint(0) : 0;
             }
         }
@@ -174,10 +191,16 @@ namespace
                                             const ObjectVector_t& geometries,
                                             const std::vector<std::string>& filter,
                                             const std::map<std::string, rbprm::NormalFilter>& normalFilters,
-                                            const std::size_t shootLimit, const std::size_t displacementLimit)
+                                            const std::size_t shootLimit, const std::size_t displacementLimit,
+					    const std::size_t nbFilterMatch)
     {
-        srand ((unsigned int)(time(NULL)));
-        RbPrmShooter* ptr = new RbPrmShooter (robot, geometries, filter, normalFilters, shootLimit, displacementLimit);
+       /* unsigned int seed = (unsigned int)(time(NULL));
+        srand (seed);
+        hppDout(notice,"&&&&&& SEED = "<<seed);
+*/
+     // srand (0);
+
+        RbPrmShooter* ptr = new RbPrmShooter (robot, geometries, filter, normalFilters, shootLimit, displacementLimit, nbFilterMatch);
         RbPrmShooterPtr_t shPtr (ptr);
         ptr->init (shPtr);
         return shPtr;
@@ -195,21 +218,27 @@ namespace
         seRotationtLimits(eulerSo3_, limitszyx);
     }
 
-// TODO: outward
+    // TODO: outward
 
     RbPrmShooter::RbPrmShooter (const model::RbPrmDevicePtr_t& robot,
-                              const ObjectVector_t& geometries,
-                              const std::vector<std::string>& filter,
-                              const std::map<std::string, rbprm::NormalFilter>& normalFilters,
-                              const std::size_t shootLimit,
-                              const std::size_t displacementLimit)
-    : shootLimit_(shootLimit)
-    , displacementLimit_(displacementLimit)
-    , filter_(filter)
-    , robot_ (robot)
-    , validator_(rbprm::RbPrmValidation::create(robot_, filter, normalFilters))
-    , eulerSo3_(initSo3())
+				const ObjectVector_t& geometries,
+				const std::vector<std::string>& filter,
+				const std::map<std::string, rbprm::NormalFilter>& normalFilters,
+				const std::size_t shootLimit,
+				const std::size_t displacementLimit,
+				const std::size_t nbFilterMatch)
+      : shootLimit_(shootLimit)
+      , displacementLimit_(displacementLimit)
+      , filter_(filter)
+      , robot_ (robot)
+      , validator_(rbprm::RbPrmValidation::create(robot_, filter, normalFilters, nbFilterMatch))
+      , eulerSo3_(initSo3())
+      , fullOrientationMode_ (false)
     {
+      hppDout (info, "constructor RbPrmShooter");
+      for (std::size_t i = 0; i < filter_.size (); i++) {
+      hppDout (info, "rbShooter filter= " << filter_[i]);
+    }
         for(hpp::core::ObjectVector_t::const_iterator cit = geometries.begin();
             cit != geometries.end(); ++cit)
         {
@@ -236,8 +265,7 @@ namespace
                 double weight = TriangleArea(tri);
                 sum += weight;
                 weights_.push_back(weight);
-                // TODO COMPUTE NORMALS
-                fcl::Vec3f normal = (tri.p3 - tri.p1).cross(tri.p2 - tri.p1);
+                fcl::Vec3f normal = (tri.p2 - tri.p1).cross(tri.p3 - tri.p1);
                 normal.normalize();
                 triangles_.push_back(std::make_pair(normal,tri));
             }
@@ -260,6 +288,7 @@ namespace
   const RbPrmShooter::T_TriangleNormal& RbPrmShooter::WeightedTriangle() const
   {
       double r = ((double) rand() / (RAND_MAX));
+      hppDout (info, "r= " << r);
       std::vector<T_TriangleNormal>::const_iterator trit = triangles_.begin();
       for(std::vector<double>::const_iterator wit = weights_.begin();
           wit != weights_.end();
@@ -272,16 +301,26 @@ namespace
 
 hpp::core::ConfigurationPtr_t RbPrmShooter::shoot () const
 {
+    const size_type extraDim = robot_->extraConfigSpace ().dimension ();
+    const size_type index = robot_->configSize() - extraDim;
+    const bool hasECS = extraDim >= 3;
     JointVector_t jv = robot_->getJointVector ();
     ConfigurationPtr_t config (new Configuration_t (robot_->Device::currentConfiguration()));
     std::size_t limit = shootLimit_;
     bool found(false);
-    while(limit >0 && !found)
+    CollisionValidationReport* report;
+    ValidationReportPtr_t reportShPtr(new CollisionValidationReport);
+    value_type thetaSample = 0;
+    Vec3f normal;
+    hppDout (info, "fullOrientationMode in shooter= " << fullOrientationMode_);
+    bool valid = false;
+    while(limit >0 && (!found || !valid))
     {
         // pick one triangle randomly
         const T_TriangleNormal* sampled(0);
         double r = ((double) rand() / (RAND_MAX));
-        if(r > 0.3)
+	hppDout (info, "r= " << r);
+        if(r > 0.5)
             sampled = &RandomPointIntriangle();
         else
             sampled = &WeightedTriangle();
@@ -291,57 +330,85 @@ hpp::core::ConfigurationPtr_t RbPrmShooter::shoot () const
         r1 = ((double) rand() / (RAND_MAX)); r2 = ((double) rand() / (RAND_MAX));
         Vec3f p = (1 - sqrt(r1)) * tri.p1 + (sqrt(r1) * (1 - r2)) * tri.p2
                 + (sqrt(r1) * r2) * tri.p3;
-
+	hppDout (info, "r1= " << r1);
+	hppDout (info, "r2= " << r2);
+	hppDout (info, "p= " << p);
+	// get normal even if not in collision...
+	normal = (tri.p2 - tri.p1).cross(tri.p3 - tri.p1);
+	normal.normalize();
+	hppDout (info, "normal= " << normal);
         //set configuration position to sampled point
         SetConfigTranslation(robot_,config, p);
-        SampleRotation(eulerSo3_, config, jv);
+	//hppDout (info, "config= " << displayConfig (*config));
+	if (hasECS && fullOrientationMode_) {
+	  if (!validator_->trunkValidation_->validate(*config, reportShPtr)) {
+	    report = static_cast<CollisionValidationReport*>(reportShPtr.get());
+	    Vec3f normal_test = triangles_[report->result.getContact(0).b2].first;
+	    hppDout (info, "normal_test= " << normal_test);
+	  }
+	  for (size_type i=0; i<3; i++) (*config) [index + i] = normal [i];
+	  thetaSample = 2 * M_PI * rand ()/RAND_MAX - M_PI;
+	  (*config) [index + 3] = thetaSample;
+	  *config = setOrientation (robot_, *config);
+	}
+	else {
+	  SampleRotation(eulerSo3_, config, jv);
+	  hppDout (info, "random rotation was sampled");
+	}
+	//hppDout (info, "config= " << displayConfig (*config));
         // rotate and translate randomly until valid configuration found or
         // no obstacle is reachable
-        CollisionValidationReport report;
-        CollisionValidationReport unusedreport;
         std::size_t limitDis = displacementLimit_;
-        Vec3f lastDirection(1,0,0);
+        Vec3f lastDirection = normal; // will be updated if necessary
         while(!found && limitDis >0)
         {
-            if(validator_->trunkValidation_->validate(*config, report)
-            && validator_->validateRoms(*config, filter_))
-            {
-                found = true;
-            }
-            else if(!report.result.isCollision())
+            valid = validator_->trunkValidation_->validate(*config, reportShPtr);
+            report = static_cast<CollisionValidationReport*>(reportShPtr.get());
+            found = valid && validator_->validateRoms(*config, filter_);
+            if(valid &!found)
             {
                 // try to rotate to reach rom
                 for(; limitDis>0 && !found; --limitDis)
                 {
-                    SampleRotation(eulerSo3_, config, jv);
-                    found = validator_->validate(*config, unusedreport, filter_);
+		  //SampleRotation(eulerSo3_, config, jv);
+		  if (hasECS && fullOrientationMode_) {
+		    thetaSample = 2 * M_PI * rand ()/RAND_MAX - M_PI;
+		    hppDout (info, "thetaSample= " << thetaSample);
+		    for (size_type i=0; i<3; ++i)
+		      (*config) [index + i] = normal [i];
+		    (*config) [index + 3] = thetaSample;
+		    *config = setOrientation (robot_, *config);
+		    hppDout (info, "normal= " << normal);
+		  } else {
+		    SampleRotation(eulerSo3_, config, jv);
+		    hppDout (info, "random rotation was sampled");
+		  }
+		  //hppDout (info, "config= " << displayConfig(*config));
+                    found = validator_->validate(*config, filter_);
                     if(!found)
                     {
                         Translate(robot_, config, -lastDirection *
                                   1 * ((double) rand() / (RAND_MAX)));
                     }
-                    found = validator_->validate(*config, unusedreport, filter_);
+                    found = validator_->validate(*config, filter_);
                 }
                 if(!found) break;
             }
-            else // move out of collision
+            else if (!valid)// move out of collision
             {
                 // retrieve Contact information
                 //lastDirection = -report.result.getContact(0).normal;
                 // mouve out by penetration depth
                 // v0 move away from normal
                 //get normal from collision tri
-                lastDirection = triangles_[report.result.getContact(0).b2].first;
-                Translate(robot_,config, -lastDirection *
-                          (std::abs(report.result.getContact(0).penetration_depth) +0.03));
+                lastDirection = triangles_[report->result.getContact(0).b2].first;
+                Translate(robot_,config, lastDirection *
+                          (std::abs(report->result.getContact(0).penetration_depth) +0.03));
                  limitDis--;
             }
         }
-
         // Shoot extra configuration variables
-        size_type extraDim = robot_->extraConfigSpace ().dimension ();
-        size_type offset = robot_->configSize () - extraDim;
-        for (size_type i=0; i<extraDim; ++i)
+        /*for (size_type i=0; i<extraDim; ++i)
         {
             value_type lower = robot_->extraConfigSpace ().lower (i);
             value_type upper = robot_->extraConfigSpace ().upper (i);
@@ -354,8 +421,18 @@ hpp::core::ConfigurationPtr_t RbPrmShooter::shoot () const
                 oss << i << ". min = " << ", max = " << upper << std::endl;
                 throw std::runtime_error (oss.str ());
             }
-            (*config) [offset + i] = (upper - lower) * rand ()/RAND_MAX;
+            (*config) [index + i] = (upper - lower) * rand ()/RAND_MAX + lower;
         }
+	*/
+        // save the normal (code from Mylène)
+        if(extraDim >= 3 ){
+	  hppDout (info, "lastDirection= " << lastDirection);
+          for (size_type i=0; i<3; ++i)
+            (*config) [index + i] = lastDirection [i];
+	  if (fullOrientationMode_)
+	    *config = setOrientation (robot_, *config);
+	  }
+	valid = validator_->trunkValidation_->validate(*config, reportShPtr);
         limit--;
     }
     if (!found) std::cout << "no config found" << std::endl;

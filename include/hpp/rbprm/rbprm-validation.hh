@@ -44,27 +44,21 @@ namespace hpp {
     public:
       static RbPrmValidationPtr_t create (const model::RbPrmDevicePtr_t& robot,
                                           const std::vector<std::string>& filter = std::vector<std::string>(),
-                                          const std::map<std::string, rbprm::NormalFilter>& normalFilters = std::map<std::string, rbprm::NormalFilter>());
+                                          const std::map<std::string, rbprm::NormalFilter>& normalFilters = std::map<std::string, rbprm::NormalFilter>(), std::size_t nbFilterMatch = 0);
 
       /// Compute whether the configuration is valid
       ///
       /// \param config the config to check for validity,
       /// \param throwIfInValid if true throw an exception if config is invalid.
       /// \return whether the whole config is valid.
-      virtual bool validate (const core::Configuration_t& config,
-                 bool throwIfInValid = false);
+      virtual bool validate (const core::Configuration_t& config);
 
       /// Compute whether the configuration is valid
       ///
       /// \param config the config to check for validity,
       /// \retval validationReport report on validation (used only for rom shape). This parameter will
       ///         dynamically cast into CollisionValidationReport type,
-      /// \param throwIfInValid if true throw an exception if config is invalid,
       /// \return whether the whole config is valid.
-      virtual bool validate (const core::Configuration_t& config,
-                 core::ValidationReport& validationReport,
-                 bool throwIfInValid = false);
-
       virtual bool validate (const core::Configuration_t& config,
                  core::ValidationReportPtr_t& validationReport);
 
@@ -73,14 +67,21 @@ namespace hpp {
       /// \param config the config to check for validity,
       /// \retval validationReport report on validation (used only for rom shape). This parameter will
       ///         dynamically cast into CollisionValidationReport type,
-      /// \param filter specify constraints on all roms required to be in contact, will return
-      /// false if all specified roms are not colliding
-      /// \param throwIfInValid if true throw an exception if config is invalid,
       /// \return whether the whole config is valid.
       virtual bool validate (const core::Configuration_t& config,
-                 core::ValidationReport& validationReport,
-                 const std::vector<std::string>& filter,
-                 bool throwIfInValid = false);
+                 const std::vector<std::string>& filter);
+
+      /// Compute whether the configuration is valid
+      ///
+      /// \param config the config to check for validity,
+      /// \retval validationReport report on validation (used only for rom shape). This parameter will
+      ///         dynamically cast into CollisionValidationReport type,
+      /// \param filter specify constraints on all roms required to be in contact, will return
+      /// false if all specified roms are not colliding
+      /// \return whether the whole config is valid.
+      virtual bool validate (const core::Configuration_t& config,
+                 core::ValidationReportPtr_t& validationReport,
+                 const std::vector<std::string>& filter);
 
       /// Add an obstacle
       /// \param object obstacle added
@@ -101,18 +102,35 @@ namespace hpp {
       /// \param config the config to check for validity,
       /// \param filter specify constraints on all roms required to be in contact, will return
       /// false if all specified roms are not colliding
-      /// \param throwIfInValid if true throw an exception if config is invalid,
+
+      /// Set the nbFilterMatch (number of filters that have to match 
+      /// for validation)
+      virtual void setSizeParameter(const std::size_t nbFilterMatch) {
+	nbFilterMatch_ = nbFilterMatch;
+      }
+
       /// \return whether the whole config is valid.
       bool validateRoms(const core::Configuration_t& config,
+                        const std::vector<std::string>& filter);
+
+      /// \return whether the whole config is valid,
+      /// and fill validation-report.
+      bool validateRoms(const core::Configuration_t& config,
                         const std::vector<std::string>& filter,
-                        bool throwIfInValid = false);
+			core::ValidationReportPtr_t& validationReport);
 
       /// Compute whether the roms configurations are valid
       /// \param config the config to check for validity,
-      /// \param throwIfInValid if true throw an exception if config is invalid,
       /// \return whether the whole config is valid.
-      bool validateRoms(const core::Configuration_t& config,
-                        bool throwIfInValid = false);
+      bool validateRoms(const core::Configuration_t& config);
+
+      /// \return whether the config is valid for the trunk only,
+      /// and fill validation-report.
+      bool validateTrunk(const core::Configuration_t& config,
+			 core::ValidationReportPtr_t& validationReport);
+
+      /// \return whether the config is valid for the trunk only
+      bool validateTrunk(const core::Configuration_t& config);
 
     public:
       /// CollisionValidation for the trunk
@@ -122,9 +140,14 @@ namespace hpp {
       const std::vector<std::string> defaultFilter_;
 
     protected:
+      /// Constructor
       RbPrmValidation (const model::RbPrmDevicePtr_t& robot,
                        const std::vector<std::string>& filter,
-                       const std::map<std::string, rbprm::NormalFilter>& normalFilters);
+                       const std::map<std::string, rbprm::NormalFilter>& normalFilters, const std::size_t nbFilterMatch);
+
+    private:
+      std::size_t nbFilterMatch_; // number of filters that have to match
+      core::ValidationReportPtr_t unusedReport_;
     }; // class RbPrmValidation
     /// \}
   } // namespace rbprm

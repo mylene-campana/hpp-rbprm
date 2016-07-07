@@ -30,7 +30,7 @@ SET(PROJECT_DESCRIPTION
 
 
 # Set to 1 for profiling
-#~ add_definitions(-DPROFILE)
+ add_definitions(-DPROFILE)
 
 # Where to compile shared objects
 SET(LIBRARY_OUTPUT_PATH ${PROJECT_BINARY_DIR}/lib)
@@ -46,7 +46,7 @@ SET(LIBRARY_OUTPUT_PATH ${PROJECT_BINARY_DIR}/lib)
 
 FIND_PACKAGE( OpenMP REQUIRED)
 find_package(Boost)
-find_package(Boost 1.54.0 COMPONENTS filesystem system REQUIRED)
+find_package(Boost 1.46.0 COMPONENTS filesystem system REQUIRED)
 
 if(OPENMP_FOUND)
     message("OPENMP FOUND")
@@ -64,14 +64,21 @@ SET(${PROJECT_NAME}_HEADERS
     include/hpp/rbprm/rbprm-device.hh
     include/hpp/rbprm/rbprm-fullbody.hh
     include/hpp/rbprm/rbprm-limb.hh
-    include/hpp/rbprm/rbprm-path-interpolation.hh
+    include/hpp/rbprm/interpolation/rbprm-path-interpolation.hh
+    include/hpp/rbprm/interpolation/limb-rrt-shooter.hh
+    include/hpp/rbprm/interpolation/limb-rrt-helper.hh
+    include/hpp/rbprm/interpolation/limb-rrt-path-validation.hh
+    include/hpp/rbprm/interpolation/limb-rrt-steering.hh
     include/hpp/rbprm/rbprm-shooter.hh
     include/hpp/rbprm/rbprm-state.hh
     include/hpp/rbprm/rbprm-validation.hh
+    include/hpp/rbprm/rbprm-validation-report.hh
+    include/hpp/rbprm/rbprm-path-validation.hh
     include/hpp/rbprm/rbprm-rom-validation.hh
     include/hpp/rbprm/sampling/sample.hh
-    include/hpp/rbprm/sampling/sample-container.hh
+    include/hpp/rbprm/sampling/sample-db.hh
     include/hpp/rbprm/sampling/heuristic.hh
+    include/hpp/rbprm/sampling/analysis.hh
     include/hpp/rbprm/stability/stability.hh
     include/hpp/rbprm/stability/support.hh
     include/hpp/rbprm/tools.hh
@@ -79,12 +86,31 @@ SET(${PROJECT_NAME}_HEADERS
     include/hpp/rbprm/rbprm-profiler.hh
     include/utils/Stdafx.hh
     include/utils/stop-watch.hh
+    include/hpp/rbprm/planner/dynamic-planner.hh
+    include/hpp/rbprm/planner/steering-dynamic.hh
+    include/hpp/rbprm/planner/parabola-path.hh
+    include/hpp/rbprm/fullbodyBallistic/timed-ballistic-path.hh
+    include/hpp/rbprm/planner/steering-method-parabola.hh
+    include/hpp/rbprm/planner/rbprm-node.hh
+    include/hpp/rbprm/planner/rbprm-roadmap.hh
+    include/hpp/rbprm/planner/prm-planner.hh
+    include/hpp/rbprm/projection-shooter.hh
+    include/hpp/rbprm/fullbodyBallistic/parabola-library.hh
+    include/hpp/rbprm/fullbodyBallistic/ballistic-interpolation.hh
+    include/hpp/rbprm/fullbodyBallistic/ballistic-path.hh
+    include/hpp/rbprm/fullbodyBallistic/ballistic-planner.hh
+    include/utils/algorithms.h
   )
 
 # Activate hpp-util logging if requested
 SET (HPP_DEBUG FALSE CACHE BOOL "trigger hpp-util debug output")
 IF (HPP_DEBUG)
   SET(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -DHPP_DEBUG")
+ENDIF()
+# Activate hpp-util logging if requested
+SET (HPP_BENCHMARK FALSE CACHE BOOL "trigger hpp-util benchmark output")
+IF (HPP_BENCHMARK)
+  SET(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -DHPP_ENABLE_BENCHMARK")
 ENDIF()
 
 ADD_SUBDIRECTORY(src)

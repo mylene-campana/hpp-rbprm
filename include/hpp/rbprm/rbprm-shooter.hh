@@ -60,13 +60,15 @@ namespace hpp {
         /// \param displacementLimit maximum number of local displacements allowed for a shot configuration to try to verify
         /// the reachability condition.
         /// \return a pointer to an instance of RbPrmShooter
-        static HPP_RBPRM_DLLAPI RbPrmShooterPtr_t create (const model::RbPrmDevicePtr_t& robot,
-                                         const core::ObjectVector_t &geometries,
-                                         const std::vector<std::string>& filter = std::vector<std::string>(),
-                                         const std::map<std::string, rbprm::NormalFilter>& normalFilters = std::map<std::string, rbprm::NormalFilter>(),
-                                         const std::size_t shootLimit = 10000,
-                                         const std::size_t displacementLimit = 100);
-    virtual core::ConfigurationPtr_t shoot () const;
+        static HPP_RBPRM_DLLAPI RbPrmShooterPtr_t
+	  create (const model::RbPrmDevicePtr_t& robot,
+		  const core::ObjectVector_t &geometries,
+		  const std::vector<std::string>& filter = std::vector<std::string>(),
+		  const std::map<std::string, rbprm::NormalFilter>& normalFilters = std::map<std::string, rbprm::NormalFilter>(),
+		  const std::size_t shootLimit = 10000,
+		  const std::size_t displacementLimit = 100,
+		  const std::size_t nbFilterMatch = 0);
+	virtual core::ConfigurationPtr_t shoot () const;
 
 
     public:
@@ -77,10 +79,15 @@ namespace hpp {
         /// [z_inf, z_sup, y_inf, y_sup, x_inf, x_sup]
         void BoundSO3(const std::vector<double>& limitszyx);
 
-    public:
-        typedef std::pair<fcl::Vec3f, TrianglePoints> T_TriangleNormal;
+	/// Set fullOrientationMode
+	/// true if robot fully oriented according to obstacle surface normal
+	/// false if robot randomly oriented
+	void fullOrientationMode (const bool fullOrientationMode) {
+	  fullOrientationMode_ = fullOrientationMode;
+	}
 
     public:
+	typedef std::pair<fcl::Vec3f, TrianglePoints> T_TriangleNormal;
         const std::size_t shootLimit_;
         const std::size_t displacementLimit_;
         const std::vector<std::string> filter_;
@@ -93,7 +100,8 @@ namespace hpp {
                   const std::vector<std::string>& filter,
                   const std::map<std::string, rbprm::NormalFilter>& normalFilters,
                   const std::size_t shootLimit = 10000,
-                  const std::size_t displacementLimit = 100);
+                  const std::size_t displacementLimit = 100,
+		  const std::size_t nbFilterMatch = 0);
 
     void init (const RbPrmShooterPtr_t& self);
 
@@ -109,6 +117,7 @@ namespace hpp {
         rbprm::RbPrmValidationPtr_t validator_;
         RbPrmShooterWkPtr_t weak_;
         model::DevicePtr_t eulerSo3_;
+	bool fullOrientationMode_;
     }; // class RbprmShooter
 /// \}
     } // namespace rbprm
