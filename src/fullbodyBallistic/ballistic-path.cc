@@ -108,7 +108,7 @@ namespace hpp {
       const core::JointPtr_t SO3joint = device_->getJointByName ("base_joint_SO3");
       const std::size_t rank = SO3joint->rankInConfiguration ();
       const core::size_type dimSO3 = SO3joint->configSize ();
-      core::Configuration_t q_limb;
+      core::Configuration_t q_limb(device_->configSize()+1);
       SO3joint->configuration ()->interpolate
           (initial_, end_, u, rank, result);
       
@@ -158,7 +158,7 @@ namespace hpp {
       bool success;
       core::Configuration_t q1 ((*this) (subInterval.first, success)); // straight
       core::Configuration_t q2 ((*this) (subInterval.second, success)); // straight
-      core::PathPtr_t result = rbprm::BallisticPath::create(device_,q1,q2,computeLength(q1,q2),coefficients_);
+      core::PathPtr_t result = rbprm::BallisticPath::create(device_,q1,q2,computeLength(q1,q2),coefficients_,lastRootIndex_);
       return result;
     }
 

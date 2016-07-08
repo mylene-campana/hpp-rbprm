@@ -57,6 +57,14 @@ namespace hpp {
 	
     {
       // TODO
+      lastRootIndex_ = robot_->device_->configSize();
+      for( rbprm::T_Limb::const_iterator lit = robot_->GetLimbs().begin();lit != robot_->GetLimbs().end(); ++lit){
+        hppDout(notice,"LIST OF LIMBS : "<< lit->first);
+        if(lit->second->limb_->rankInConfiguration() < lastRootIndex_){
+          lastRootIndex_ =lit->second->limb_->rankInConfiguration();
+        }
+      }
+      hppDout(notice,"Last root index = "<<lastRootIndex_);
     }
 
     BallisticInterpolation::~BallisticInterpolation()
@@ -590,7 +598,7 @@ namespace hpp {
 
       bp = Interpolate (qStart, qEnd, pathLength, pathCoefs);
       stateTop = computeTopExtendingPose (path, bp,lenghtTop);
-
+      bp->lastRootIndex(lastRootIndex_);
       hppDout(notice, "full lenght = "<<bp->length());
       hppDout(notice,"lenght top = "<<lenghtTop);
       //bp1max = Interpolate (qStart, q_max, lenghtTop, pathCoefs);
@@ -617,14 +625,17 @@ namespace hpp {
       */
       stateFrames.push_back(std::make_pair(0,start_));
       stateFrames.push_back(std::make_pair(lenghtTakeoff,contactState1));
-     /* stateFrames.push_back(std::make_pair(lenghtTop,stateTop));
+      stateFrames.push_back(std::make_pair(lenghtTop,stateTop));
       stateFrames.push_back(std::make_pair(bp->length() - lenghtLanding,contactState2));
-      stateFrames.push_back(std::make_pair(bp->length(),end_));*/
+      stateFrames.push_back(std::make_pair(bp->length(),end_));
       hppDout(notice, "position initial state frame  = "<<displayConfig(start_.configuration_));
-      hppDout(notice, "position initial state frame  = "<<displayConfig(contactState1.configuration_));
-      
+      hppDout(notice, "position initial Contact state frame  = "<<displayConfig(contactState1.configuration_));
+      hppDout(notice, "position top frame  = "<<displayConfig(stateTop.configuration_));
+      hppDout(notice, "position final contact frame  = "<<displayConfig(contactState2.configuration_));
+      hppDout(notice, "position final state frame  = "<<displayConfig(end_.configuration_));
+      hppDout(notice,"test last root index interpolate = "<<bp->lastRootIndex());
       pathLimb = rbprm::interpolation::interpolateStates(robot_,problem_,bp,stateFrames.begin(),stateFrames.end()-1);
-      bp->setLimbPath(pathLimb);
+    //  bp->setLimbPath(pathLimb);
       newPath->appendPath(bp);
             
       return newPath;

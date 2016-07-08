@@ -75,6 +75,7 @@ using namespace model;
         rootProblem_.collisionObstacles(referenceProblem->collisionObstacles());
         hppDout(notice,"REFERENCE PROBLEM OBSTACLE :"<<rootProblem_.collisionObstacles().size()<<" ; "<<referenceProblem->collisionObstacles().size());
         BallisticPathPtr_t bp = boost::dynamic_pointer_cast<BallisticPath>(rootPath);
+        hppDout(notice,"test last root index helper = "<<bp->lastRootIndex());
         if(bp)
           rootProblem_.steeringMethod(LimbRRTSteering::create(&rootProblem_,fullBodyDevice_->configSize()-1,bp));
         else
@@ -292,7 +293,7 @@ using namespace model;
             PathVectorPtr_t partialPath = interpolateStates(helper, a->second, b->second);
             if(partialPath)
             {
-                res[i] = optimize(helper,partialPath, numOptimizations);
+                //res[i] = optimize(helper,partialPath, numOptimizations);
                 valid[i]=true;
             }
             else

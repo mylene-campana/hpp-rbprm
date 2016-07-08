@@ -95,10 +95,8 @@ namespace hpp {
                       core::ConfigurationIn_t q2) const
       {
         
-       /* if(bp_)
-          return BallisticPath::create(problem_->robot(),q1,q2,bp_->computeLength(q1,q2),bp_->coefficients());
+  
         
-        */
         core::value_type length = (*problem_->distance()) (q1, q2);
         core::ConstraintSetPtr_t c;
         if (constraints() && constraints()->configProjector ()) {
@@ -107,8 +105,16 @@ namespace hpp {
         } else {
           c = constraints ();
         }
-        core::PathPtr_t path = LimbRRTPath::create
-          (problem_->robot(), q1, q2, length, c, pathDofRank_);
+        core::PathPtr_t path;
+        if(bp_){
+          BallisticPathPtr_t bpExtract =  BallisticPath::create(bp_->device(),q1,q2,bp_->computeLength(q1,q2),bp_->coefficients());
+          bpExtract->lastRootIndex(bp_->lastRootIndex());
+          path = LimbRRTPath::create
+            (problem_->robot(), q1, q2, length, c, pathDofRank_,bpExtract);
+        }
+        else
+          path = LimbRRTPath::create
+            (problem_->robot(), q1, q2, length, c, pathDofRank_);
             return path;
       }
     protected:

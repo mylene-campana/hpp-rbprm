@@ -150,14 +150,25 @@ namespace hpp {
         std::vector<std::string> freeLimbMotions(const std::vector<std::string>& allEffectors, const std::vector<std::string>& contactVariations) const
         {
             std::vector<std::string> res;
+            bool inContact;
             for(std::vector<std::string>::const_iterator cit = allEffectors.begin();
                 cit != allEffectors.end(); ++cit)
             {
-                if(std::find(contactVariations.begin(), contactVariations.end(), *cit) == contactVariations.end())
+                inContact=false;
+                if(contacts_.find(*cit) != contacts_.end())
+                  inContact = contacts_.at(*cit);
+                if(std::find(contactVariations.begin(), contactVariations.end(), *cit) == contactVariations.end()
+                  && !inContact)
                 {
                     res.push_back(*cit);
                 }
             }
+            std::cout<<"Free limbs motions = ";
+            for(size_t i = 0 ; i < res.size() ; i++){
+              std::cout<<res[i]<<"  ;  ";
+            }
+            std::cout<<""<<std::endl;
+            
             return res;
         }
 

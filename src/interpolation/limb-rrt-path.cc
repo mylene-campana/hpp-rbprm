@@ -34,13 +34,14 @@ namespace hpp {
         parent_t (interval_t (0, length), device->configSize (),
                   device->numberDof ()),
         device_ (device), initial_ (init), end_ (end),
-        pathDofRank_(pathDofRank)
+        pathDofRank_(pathDofRank),rootPath_()
       {
         assert (device);
         assert (length >= 0);
         assert (!constraints ());
       }
-
+    
+    
     LimbRRTPath::LimbRRTPath (const DevicePtr_t& device,
 				ConfigurationIn_t init,
                 ConfigurationIn_t end,
@@ -50,10 +51,26 @@ namespace hpp {
         parent_t (interval_t (0, length), device->configSize (),
                   device->numberDof (), constraints),
         device_ (device), initial_ (init), end_ (end),
-        pathDofRank_(pathDofRank)
+        pathDofRank_(pathDofRank),rootPath_()
     {
         assert (device);
         assert (length >= 0);
+    }
+    
+    LimbRRTPath::LimbRRTPath (const DevicePtr_t& device,
+				ConfigurationIn_t init,
+                ConfigurationIn_t end,
+                value_type length,
+                ConstraintSetPtr_t constraints,
+                const std::size_t pathDofRank, BallisticPathPtr_t bp) :
+        parent_t (interval_t (0, length), device->configSize (),
+                  device->numberDof (), constraints),
+        device_ (device), initial_ (init), end_ (end),
+        pathDofRank_(pathDofRank),rootPath_(bp)
+    {
+        assert (device);
+        assert (length >= 0);
+        lastRootIndex_ = bp->lastRootIndex();
     }
 
     LimbRRTPath::LimbRRTPath (const LimbRRTPath& path) :
@@ -97,7 +114,15 @@ namespace hpp {
         if (timeRange ().second == 0)
             u = 0;
         model::interpolate (device_, initial_, end_, u, result);
-        result[pathDofRank_] = ComputeExtraDofValue(pathDofRank_,initial_, end_, u);
+        value_type paramRoot = ComputeExtraDofValue(pathDofRank_,initial_, end_, u);
+        result[pathDofRank_] = paramRoot;
+        Configuration_t q_root(rootPath_->device()->configSize());
+        (*rootPath_)(q_root,paramRoot);
+        if(rootPath_){
+          for(size_t i = 0 ; i < lastRootIndex_ ; i++){
+            result[i] = q_root[i];
+          }
+        }
         return true;
     }
 
