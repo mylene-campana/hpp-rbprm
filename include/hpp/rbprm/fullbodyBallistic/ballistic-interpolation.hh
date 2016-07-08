@@ -50,7 +50,7 @@ namespace hpp {
       /// \param end the end full body configuration of the problem
       /// \return a pointer to the created BallisticInterpolation instance
       static BallisticInterpolationPtr_t create
-	(const core::Problem& problem, const RbPrmFullBodyPtr_t robot,
+	(const core::ProblemPtr_t& problem, const RbPrmFullBodyPtr_t robot,
 	 const State& start, const State& end,
 	 const core::PathVectorConstPtr_t path = core::PathVectorConstPtr_t());
 
@@ -125,7 +125,7 @@ namespace hpp {
       const State end_;
 
     protected:
-      BallisticInterpolation (const core::Problem& problem,
+      BallisticInterpolation (const core::ProblemPtr_t &problem,
 			      const RbPrmFullBodyPtr_t robot,
 			      const State& start, const State& end,
 			      const core::PathVectorConstPtr_t path);
@@ -195,8 +195,7 @@ namespace hpp {
       /// apply same contacts as in previousState. u_offset is decreased 
       /// (or increased) of alpha to get closer to previousState 
       /// until maxIter is reached.
-      core::Configuration_t computeOffsetContactConfig
-	(const BallisticPathPtr_t bp,
+      State computeOffsetContactConfig(const BallisticPathPtr_t bp,
 	 const State &previousState,
 	 const core::value_type u_offset, const bool increase_u_offset, core::value_type &lenght,
      const std::size_t maxIter = 100, const core::value_type alpha = 0.6);
@@ -204,8 +203,7 @@ namespace hpp {
       /// Return the configuration at the top of the parabola (path),
       /// using extendingPose_ for limbs part if defined,
       /// otherwise, just unsing interpolation (bp)
-      core::Configuration_t computeTopExtendingPose 
-	(const core::PathPtr_t path, const BallisticPathPtr_t bp, core::value_type &lenght);
+      State computeTopExtendingPose(const core::PathPtr_t path, const BallisticPathPtr_t bp, core::value_type &lenght);
 
       
       /**
@@ -226,7 +224,7 @@ namespace hpp {
 					const core::value_type r);
       
     private:
-      const core::Problem problem_;
+      core::ProblemPtr_t problem_;
       RbPrmFullBodyPtr_t robot_; // device of fullbody
       BallisticInterpolationWkPtr_t weakPtr_;
       core::Configuration_t extendingPose_;

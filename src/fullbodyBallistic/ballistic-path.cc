@@ -40,7 +40,7 @@ namespace hpp {
 				  vector_t coefs) :
       parent_t (interval_t (0, length), device->configSize (),
                 device->numberDof ()), device_ (device), initial_ (init),
-      end_ (end), coefficients_ (vector_t(coefs.size ())), length_ (length)
+      end_ (end), coefficients_ (vector_t(coefs.size ())), length_ (length),limbPath_()
     {
       assert (device);
       coefficients (coefs);
@@ -54,56 +54,64 @@ namespace hpp {
     }
 
     bool BallisticPath::impl_compute (core::ConfigurationOut_t result,
-				      value_type param) const
+                                      value_type param) const
     {
       if (param == 0 || initial_(0) == end_(0)) {
-        result = initial_;
+        hppDout(notice,"init = "<<displayConfig(initial_));
+        hppDout(notice,"init.size = "<<initial_.size());
+        hppDout(notice,"device size = "<<device_->configSize());
+        for(size_t i = 0 ; i < device_->configSize(); i++){
+          result[i] = initial_[i]; 
+        }
         return true;
       }
       if (param >= length_) {
-        result = end_;
+        for(size_t i = 0 ; i < device_->configSize(); i++){
+          result[i] = end_[i] ;
+        }
         return true;
       }
-
+      
       const size_type nbConfig = device_->configSize();
       const size_type ecsDim = device_->extraConfigSpace ().dimension ();
       const value_type u = param/length_;
       const value_type theta = coefficients_(3);
       const value_type x_theta_max = - 0.5 *
-	coefficients_ (1) / coefficients_ (0);
+          coefficients_ (1) / coefficients_ (0);
       const value_type x_theta_initial = cos(theta)*initial_ (0) +
-	sin(theta)*initial_ (1);
+          sin(theta)*initial_ (1);
       const value_type x_theta_end = cos(theta)*end_ (0) +
-	sin(theta)*end_ (1);
+          sin(theta)*end_ (1);
       const value_type u_max = (x_theta_max - x_theta_initial)
-	/ (x_theta_end - x_theta_initial);
+          / (x_theta_end - x_theta_initial);
       const bool tanThetaNotDefined = (theta < M_PI/2 + 1e-2 && theta > M_PI/2 - 1e-2) || (theta > -M_PI/2 - 1e-2 && theta < -M_PI/2 + 1e-2);
-
+      
       if (!tanThetaNotDefined) { //theta != +- pi/2
-	const value_type tanTheta = tan(theta);
-	result (0) = (1 - u)*initial_(0) + u*end_(0);
-	result (1) = tanTheta*result (0) -tanTheta*initial_(0) + initial_(1);
-	const value_type x_theta = cos(theta)*result (0) +
-	  sin(theta)*result (1);
-	result (2) = coefficients_(0)*x_theta*x_theta
-	  + coefficients_(1)*x_theta + coefficients_(2);
+        const value_type tanTheta = tan(theta);
+        result (0) = (1 - u)*initial_(0) + u*end_(0);
+        result (1) = tanTheta*result (0) -tanTheta*initial_(0) + initial_(1);
+        const value_type x_theta = cos(theta)*result (0) +
+            sin(theta)*result (1);
+        result (2) = coefficients_(0)*x_theta*x_theta
+            + coefficients_(1)*x_theta + coefficients_(2);
       }
       else { //theta = +- pi/2
-	result (0) = initial_ (0);
-	result (1) = (1 - u)*initial_(1) + u*end_(1);
-	const value_type x_theta = cos(theta)*result (0) +
-	  sin(theta)*result (1);
-	result (2) = coefficients_(0)*x_theta*x_theta
-	  + coefficients_(1)*x_theta + coefficients_(2);
+        result (0) = initial_ (0);
+        result (1) = (1 - u)*initial_(1) + u*end_(1);
+        const value_type x_theta = cos(theta)*result (0) +
+            sin(theta)*result (1);
+        result (2) = coefficients_(0)*x_theta*x_theta
+            + coefficients_(1)*x_theta + coefficients_(2);
       }
-
+      
       /* Quaternions interpolation */
       const core::JointPtr_t SO3joint = device_->getJointByName ("base_joint_SO3");
       const std::size_t rank = SO3joint->rankInConfiguration ();
       const core::size_type dimSO3 = SO3joint->configSize ();
+      core::Configuration_t q_limb;
       SO3joint->configuration ()->interpolate
-	(initial_, end_, u, rank, result);
-
+          (initial_, end_, u, rank, result);
+      
       /* if robot has internal DoF (except freeflyer ones) */
       // translation dimension of freeflyer hardcoded...
       // min value (to reach for u = u_max) hardcoded...
@@ -112,30 +120,37 @@ namespace hpp {
       const bool hasInternalDof = nbConfig > ecsDim + freeflyerDim;
       const value_type maxVal = 0; // because here initial_ = end_ ...
       if (hasInternalDof) {
-	for (core::size_type i = freeflyerDim; i<nbConfig-ecsDim; i++) {
-	  /* monopod leg interpolation
-	    if (u <= u_max) {
-	    const value_type u_prime = u / u_max;
-	    result (i) = (1 - u_prime) * initial_ (i) + u_prime * maxVal;
-	  }
-	  else {
-	    const value_type u_prime = (u - u_max) / (1 - u_max);
-	    result (i) = (1 - u_prime) * maxVal + u_prime * end_ (i);
-	    }*/
-	  /* classical interpolation for robot trunk and limbs */
-	  result (i) = (1 - u) * initial_ (i) + u * end_ (i);
-	}
-      }
-
-      /* Normal vector interpolation
-	 result (nbConfig-ecsDim) = (1 - u) *
-	 initial_(nbConfig-ecsDim) + u*end_(nbConfig-ecsDim);
-	 result (nbConfig-ecsDim+1) = (1 - u) *
-	 initial_(nbConfig-ecsDim+1) + u*end_(nbConfig-ecsDim+1);
-	 result (nbConfig-ecsDim+2) = (1 - u) *
-	 initial_(nbConfig-ecsDim+2) + u*end_(nbConfig-ecsDim+2);*/
-      return true;
+        
+        if(!limbPath_){
+          for (core::size_type i = freeflyerDim; i<nbConfig-ecsDim; i++) {
+            /* monopod leg interpolation
+      if (u <= u_max) {
+      const value_type u_prime = u / u_max;
+      result (i) = (1 - u_prime) * initial_ (i) + u_prime * maxVal;
     }
+    else {
+      const value_type u_prime = (u - u_max) / (1 - u_max);
+      result (i) = (1 - u_prime) * maxVal + u_prime * end_ (i);
+      }*/
+            /* classical interpolation for robot trunk and limbs */
+            result (i) = (1 - u) * initial_ (i) + u * end_ (i);
+          }
+        }else{
+          (*limbPath_)(q_limb,param);
+          for (core::size_type i = freeflyerDim; i<nbConfig-ecsDim; i++) {
+            result(i) = q_limb[i];
+          }
+        }
+      }
+        /* Normal vector interpolation
+   result (nbConfig-ecsDim) = (1 - u) *
+   initial_(nbConfig-ecsDim) + u*end_(nbConfig-ecsDim);
+   result (nbConfig-ecsDim+1) = (1 - u) *
+   initial_(nbConfig-ecsDim+1) + u*end_(nbConfig-ecsDim+1);
+   result (nbConfig-ecsDim+2) = (1 - u) *
+   initial_(nbConfig-ecsDim+2) + u*end_(nbConfig-ecsDim+2);*/
+        return true;
+      }
 
 
     core::PathPtr_t BallisticPath::extract (const interval_t& subInterval) const throw (hpp::core::projection_error)

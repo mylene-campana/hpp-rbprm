@@ -19,6 +19,7 @@
 #include <hpp/rbprm/interpolation/limb-rrt-path.hh>
 #include <hpp/model/device.hh>
 #include <hpp/model/configuration.hh>
+#include <hpp/rbprm/fullbodyBallistic/ballistic-path.hh>
 
 using namespace hpp::core;
 

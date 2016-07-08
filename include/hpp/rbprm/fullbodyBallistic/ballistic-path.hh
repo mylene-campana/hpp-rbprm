@@ -169,6 +169,12 @@ namespace hpp {
       core::vector_t coefficients () const {
 	return coefficients_;
       }
+      
+      void setLimbPath(core::PathPtr_t limbPath){
+        limbPath_ = limbPath;
+      }
+      
+      core::PathPtr_t limbPath(){ return limbPath_;}
 
       core::value_type computeLength (const core::ConfigurationIn_t q1,
 				      const core::ConfigurationIn_t q2) const;
@@ -226,6 +232,7 @@ namespace hpp {
       BallisticPathWkPtr_t weak_;
       mutable core::vector_t coefficients_; // 4 parabola coefficients
       mutable core::value_type length_;
+      core::PathPtr_t limbPath_;
     }; // class BallisticPath
   } //   namespace rbprm
 } // namespace hpp

@@ -124,4 +124,3 @@ namespace hpp {
 } // namespace hpp
 
 #endif // HPP_RBPRM_TOOLS_HH
-

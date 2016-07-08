@@ -23,6 +23,7 @@
 # include <hpp/core/steering-method-straight.hh>
 # include <hpp/core/straight-path.hh>
 # include <hpp/rbprm/interpolation/limb-rrt-path.hh>
+#include <hpp/rbprm/fullbodyBallistic/ballistic-path.hh>
 
 namespace hpp {
   namespace rbprm {
@@ -44,6 +45,15 @@ namespace hpp {
     public:
       /// Create instance and return shared pointer
       static LimbRRTSteeringPtr_t create (const core::ProblemPtr_t& problem,
+                                          const std::size_t pathDofRank,const BallisticPathPtr_t bp)
+      {
+    LimbRRTSteering* ptr = new LimbRRTSteering (problem, pathDofRank,bp);
+    LimbRRTSteeringPtr_t shPtr (ptr);
+    ptr->init (shPtr);
+    return shPtr;
+      }
+      
+      static LimbRRTSteeringPtr_t create (const core::ProblemPtr_t& problem,
                                           const std::size_t pathDofRank)
       {
     LimbRRTSteering* ptr = new LimbRRTSteering (problem, pathDofRank);
@@ -51,6 +61,8 @@ namespace hpp {
     ptr->init (shPtr);
     return shPtr;
       }
+      
+      
       /// Create instance and return shared pointer
       static LimbRRTSteeringPtr_t create
     (const core::DevicePtr_t& device, const core::WeighedDistancePtr_t& distance,
@@ -82,6 +94,11 @@ namespace hpp {
       virtual core::PathPtr_t impl_compute (core::ConfigurationIn_t q1,
                       core::ConfigurationIn_t q2) const
       {
+        
+       /* if(bp_)
+          return BallisticPath::create(problem_->robot(),q1,q2,bp_->computeLength(q1,q2),bp_->coefficients());
+        
+        */
         core::value_type length = (*problem_->distance()) (q1, q2);
         core::ConstraintSetPtr_t c;
         if (constraints() && constraints()->configProjector ()) {
@@ -98,10 +115,20 @@ namespace hpp {
       /// Constructor with robot
       /// Weighed distance is created from robot
       LimbRRTSteering (const core::ProblemPtr_t& problem,
-                       const std::size_t pathDofRank) :
-    SteeringMethod (problem), pathDofRank_(pathDofRank), weak_ ()
+                       const std::size_t pathDofRank,BallisticPathPtr_t bp) :
+    SteeringMethod (problem), pathDofRank_(pathDofRank), weak_ (),bp_(bp)
       {
       }
+      
+      /// Constructor with robot
+      /// Weighed distance is created from robot
+      LimbRRTSteering (const core::ProblemPtr_t& problem,
+                       const std::size_t pathDofRank) :
+    SteeringMethod (problem), pathDofRank_(pathDofRank), weak_ (),bp_()
+      {
+      }
+      
+      
       /// Constructor with weighed distance
       LimbRRTSteering (const core::DevicePtr_t& device,
                   const core::WeighedDistancePtr_t& distance,
@@ -126,6 +153,7 @@ namespace hpp {
     private:      
       const std::size_t pathDofRank_;
       LimbRRTSteeringWkPtr_t weak_;
+      const BallisticPathPtr_t bp_;
     }; // SteeringMethodStraight
     /// \}
   } // namespace interpolation

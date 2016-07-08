@@ -31,6 +31,7 @@
 #include <hpp/core/path-vector.hh>
 #include <hpp/core/subchain-path.hh>
 #include <hpp/model/joint.hh>
+#include <hpp/rbprm/fullbodyBallistic/ballistic-path.hh>
 #include <hpp/rbprm/tools.hh>
 
 namespace hpp {
@@ -64,10 +65,21 @@ using namespace model;
         , rootProblem_(fullBodyDevice_)
         , rootPath_(rootPath)
     {
+      
         // adding extra DOF for including time in sampling
+
         fullBodyDevice_->setDimensionExtraConfigSpace(fullBodyDevice_->extraConfigSpace().dimension()+1);
+        /*for(ObjectVector_t::const_iterator cit = referenceProblem->collisionObstacles().begin() ; cit != referenceProblem->collisionObstacles().end() ; ++cit){
+          rootProblem_.addObstacle(*cit);
+        }*/
         rootProblem_.collisionObstacles(referenceProblem->collisionObstacles());
-        rootProblem_.steeringMethod(LimbRRTSteering::create(&rootProblem_,fullBodyDevice_->configSize()-1));
+        hppDout(notice,"REFERENCE PROBLEM OBSTACLE :"<<rootProblem_.collisionObstacles().size()<<" ; "<<referenceProblem->collisionObstacles().size());
+        BallisticPathPtr_t bp = boost::dynamic_pointer_cast<BallisticPath>(rootPath);
+        if(bp)
+          rootProblem_.steeringMethod(LimbRRTSteering::create(&rootProblem_,fullBodyDevice_->configSize()-1,bp));
+        else
+          rootProblem_.steeringMethod(LimbRRTSteering::create(&rootProblem_,fullBodyDevice_->configSize()-1));
+          
     }
 
     namespace
@@ -82,9 +94,8 @@ using namespace model;
     void DisableUnNecessaryCollisions(core::Problem& problem, rbprm::RbPrmLimbPtr_t limb)
     {
         // TODO should we really disable collisions for other bodies ?
-        tools::RemoveNonLimbCollisionRec<core::Problem>(problem.robot()->rootJoint(),
-                                                        limb->limb_->name(),
-                                                        problem.collisionObstacles(),problem);
+         hppDout(notice,"REFERENCE PROBLEM OBSTACLE :"<<problem.collisionObstacles().size());
+        tools::RemoveNonLimbCollisionRec<core::Problem>(problem.robot()->rootJoint(),                                                        limb->limb_->name(), problem.collisionObstacles(),problem);
 
         if(limb->disableEndEffectorCollision_)
         {
@@ -190,12 +201,12 @@ using namespace model;
         core::PathPtr_t rootPath = helper.rootPath_;
         const rbprm::T_Limb& limbs = helper.fullbody_->GetLimbs();
         // get limbs that moved
-        std::vector<std::string> variations = to.allVariations(from, extractEffectorsName(limbs));
+        std::vector<std::string> variations = to.allVariations(from,extractEffectorsName(limbs));
         for(std::vector<std::string>::const_iterator cit = variations.begin();
             cit != variations.end(); ++cit)
         {
             SetPathValidation(helper);
-            DisableUnNecessaryCollisions(helper.rootProblem_, limbs.at(*cit));
+            //DisableUnNecessaryCollisions(helper.rootProblem_, limbs.at(*cit));
             SetConfigShooter(helper,limbs.at(*cit),rootPath);
 
             ConfigurationPtr_t start = limbRRTConfigFromDevice(helper, from, 0.);
@@ -267,10 +278,10 @@ using namespace model;
         PathVectorPtr_t res[100];
         bool valid[100];
         std::size_t distance = std::distance(startState,endState);
+        hppDout(notice,"InterpolateState distance = "<<distance);
         assert(distance < 100);
         // treat each interpolation between two states separatly
         // in a different thread
-        #pragma omp parallel for
         for(std::size_t i = 0; i < distance; ++i)
         {
             CIT_StateFrame a, b;
