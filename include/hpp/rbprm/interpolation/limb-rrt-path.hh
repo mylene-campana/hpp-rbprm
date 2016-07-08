@@ -22,7 +22,6 @@
 # include <hpp/core/fwd.hh>
 # include <hpp/core/config.hh>
 # include <hpp/core/path.hh>
-# include <hpp/rbprm/interpolation/limb-rrt-path.hh>
 
 namespace hpp {
 namespace rbprm {

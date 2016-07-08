@@ -69,6 +69,7 @@ SET(${PROJECT_NAME}_HEADERS
     include/hpp/rbprm/interpolation/limb-rrt-helper.hh
     include/hpp/rbprm/interpolation/limb-rrt-path-validation.hh
     include/hpp/rbprm/interpolation/limb-rrt-steering.hh
+    include/hpp/rbprm/interpolation/limb-rrt-path.hh
     include/hpp/rbprm/rbprm-shooter.hh
     include/hpp/rbprm/rbprm-state.hh
     include/hpp/rbprm/rbprm-validation.hh
@@ -115,7 +116,7 @@ ENDIF()
 
 ADD_SUBDIRECTORY(src)
 #ADD_SUBDIRECTORY(tools)
-ADD_SUBDIRECTORY(tests)
+#ADD_SUBDIRECTORY(tests)
 
 SETUP_PROJECT_FINALIZE()
 SETUP_PROJECT_CPACK()
