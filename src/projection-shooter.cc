@@ -19,7 +19,7 @@
 # include <hpp/rbprm/projection-shooter.hh>
 # include <sstream>
 # include <hpp/util/debug.hh>
-# include <fcl/distance.h>
+# include <hpp/fcl/distance.h>
 # include <hpp/model/collision-object.hh>
 # include <hpp/model/configuration.hh>
 # include <hpp/model/device.hh>

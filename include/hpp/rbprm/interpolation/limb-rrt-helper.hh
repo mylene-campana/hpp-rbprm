@@ -33,38 +33,116 @@
 namespace hpp {
     namespace rbprm {
     namespace interpolation {
-
-    //typedef std::map<std::string, core::DevicePtr_t> T_LimbDevice;
-
+    /// Helper struct for applying the LimbRRT algorithm. Maintains a pointer
+    /// to a RbPrmFullbody object, and creates a new instance
+    /// of a problem for a clone of the associated Device.
+    ///
     struct HPP_CORE_DLLAPI LimbRRTHelper
     {
+        /// \param fullbody robot considered for applying LimbRRT. The associated
+        /// Device will be cloned to avoid side effects during the planning,
+        /// An extra DOF is added to the cloned device, as required by the algorithm.
+        /// \param referenceProblem an internal problem will be created,
+        /// using this parameter as a reference, for retrieving collision obstacles
          LimbRRTHelper(RbPrmFullBodyPtr_t fullbody,
-                       core::ProblemPtr_t referenceProblem);
+                       core::ProblemPtr_t referenceProblem,
+                       core::PathPtr_t rootPath);
         ~LimbRRTHelper(){}
 
          RbPrmFullBodyPtr_t fullbody_;
          core::DevicePtr_t fullBodyDevice_;
-         //std::vector<core::DevicePtr_t> limbDevices_;
          core::Problem rootProblem_;
          core::PathPlannerPtr_t planner_;
-         //std::vector<core::Problem> problems_;
-    };
-
-    struct HPP_CORE_DLLAPI LimbRRTSolver
-    {
-         LimbRRTSolver(core::PathPtr_t rootPath, core::DevicePtr_t limbDevice,
-                       const core::Problem& problem);
-        ~LimbRRTSolver(){}
-
-         core::DevicePtr_t limbDevice_;
          core::PathPtr_t rootPath_;
-         core::Problem problem_;
     };
 
+    /// Runs the LimbRRT to create a kinematic, continuous,
+    /// collision free path between the two State (ie, only one effector
+    /// position differs between the states). Equilibirium is not
+    /// verified along the path.
+    /// To achieve this, an oriented RRT is run for the transitioning limb. The root path between
+    /// two State is given by the problem steering method defined in the helper parameter.
+    /// An extra DOF is used to sample a root position along the normalized path as well
+    /// as the limb configuration. To avoid going back and forth, two configurations can thus
+    /// only be connected if the first configuration has a DOF value lower than the second one.
+    /// The LimbRRT algorithm is a modification of the original algorithm introduced in Qiu et al.
+    /// "A Hierarchical Framework for Realizing Dynamically-stable
+    /// Motions of Humanoid Robot in Obstacle-cluttered Environments"
+    /// If OpenMP is activated, the interpolation between the states is run in parallel
+    /// WARNING: At the moment, no more than 100 states can be interpolated simultaneously
+    /// TODO: include parametrization of shortcut algorithm
+    ///
+    /// \param helper holds the problem parameters and the considered device
+    /// An extra DOF is added to the cloned device, as required by the algorithm.
+    /// The method assumes that the steering method associated with the helper's rootProblem_
+    /// produces a collision free path all parts of the Device different that the transitioning limb.
+    /// \param from initial state
+    /// \param to final state
+    /// \return the resulting path vector
     core::PathVectorPtr_t HPP_RBPRM_DLLAPI interpolateStates(LimbRRTHelper& helper, const State& from, const State& to);
-    core::PathVectorPtr_t HPP_RBPRM_DLLAPI interpolateStates(RbPrmFullBodyPtr_t fullbody, core::ProblemPtr_t referenceProblem,
+
+    /// Runs the LimbRRT to create a kinematic, continuous,
+    /// collision free path between an ordered State contrainer (Between each consecutive state, only one effector
+    /// position differs between the states). Equilibrium is not
+    /// verified along the path.
+    /// To achieve this, an oriented RRT is run for the transitioning limb. The root path between
+    /// two State is given by the problem steering method defined in the helper parameter.
+    /// An extra DOF is used to sample a root position along the normalized path as well
+    /// as the limb configuration. To avoid going back and forth, two configurations can thus
+    /// only be connected if the first configuration has a DOF value lower than the second one.
+    /// The LimbRRT algorithm is a modification of the original algorithm introduced in Qiu et al.
+    /// "A Hierarchical Framework for Realizing Dynamically-stable
+    /// Motions of Humanoid Robot in Obstacle-cluttered Environments"
+    /// If OpenMP is activated, the interpolation between the states is run in parallel
+    /// WARNING: At the moment, no more than 100 states can be interpolated simultaneously
+    /// TODO: include parametrization of shortcut algorithm
+    ///
+    /// \param helper holds the problem parameters and the considered device
+    /// An extra DOF is added to the cloned device, as required by the algorithm.
+    /// The method assumes that the steering method associated with the helper's rootProblem_
+    /// produces a collision free path all parts of the Device different that the transitioning limb.
+    /// Here the steering method of the reference problem will be used to
+    /// generate a root path between each consecutive state
+    /// with the assumption that the path is valid.
+    /// \param iterator to the initial State
+    /// \param to iterator to the final State
+    /// \param numOptimizations Number of iterations of the shortcut algorithm to apply between each states
+    /// \return the resulting path vector, concatenation of all the interpolation paths between the State
+    core::PathPtr_t HPP_RBPRM_DLLAPI interpolateStates(RbPrmFullBodyPtr_t fullbody, core::ProblemPtr_t referenceProblem,
                                                              const CIT_State& startState,
-                                                             const CIT_State& endState);
+                                                             const CIT_State& endState,
+                                                             const std::size_t numOptimizations = 10);
+    /// Runs the LimbRRT to create a kinematic, continuous,
+    /// collision free path between an ordered State contrainer (Between each consecutive state, only one effector
+    /// position differs between the states). Equilibrium is not
+    /// verified along the path.
+    /// To achieve this, an oriented RRT is run for the transitioning limb. The root path between
+    /// two State is given by the problem steering method defined in the helper parameter.
+    /// An extra DOF is used to sample a root position along the normalized path as well
+    /// as the limb configuration. To avoid going back and forth, two configurations can thus
+    /// only be connected if the first configuration has a DOF value lower than the second one.
+    /// The LimbRRT algorithm is a modification of the original algorithm introduced in Qiu et al.
+    /// "A Hierarchical Framework for Realizing Dynamically-stable
+    /// Motions of Humanoid Robot in Obstacle-cluttered Environments"
+    /// If OpenMP is activated, the interpolation between the states is run in parallel
+    /// WARNING: At the moment, no more than 100 states can be interpolated simultaneously
+    /// TODO: include parametrization of shortcut algorithm
+    ///
+    /// \param helper holds the problem parameters and the considered device
+    /// An extra DOF is added to the cloned device, as required by the algorithm.
+    /// The method assumes that the steering method associated with the helper's rootProblem_
+    /// produces a collision free path all parts of the Device different that the transitioning limb.
+    /// \param path reference path for the root
+    /// \param iterator to the initial State with its associated keyFrame in the path
+    /// \param to iterator to the final State with its associated keyFrame in the path
+    /// \param numOptimizations Number of iterations of the shortcut algorithm to apply between each states
+    /// \return the resulting path vector, concatenation of all the interpolation paths between the State
+    core::PathPtr_t HPP_RBPRM_DLLAPI interpolateStates(RbPrmFullBodyPtr_t fullbody,
+                                                             core::ProblemPtr_t referenceProblem,
+                                                             const core::PathPtr_t rootPath,
+                                                             const CIT_StateFrame& startState,
+                                                             const CIT_StateFrame& endState,
+                                                             const std::size_t numOptimizations = 10);
 
     } // namespace interpolation
     } // namespace rbprm

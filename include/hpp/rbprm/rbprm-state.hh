@@ -31,6 +31,9 @@ namespace hpp {
   struct State;
   typedef std::vector<State> T_State;
   typedef T_State::const_iterator CIT_State;
+  typedef std::pair<model::value_type, rbprm::State> StateFrame;
+  typedef std::vector<StateFrame> T_StateFrame;
+  typedef T_StateFrame::const_iterator CIT_StateFrame;
   struct HPP_RBPRM_DLLAPI State{
       State():nbContacts(0), stable(false){}
       State(const State& other)
@@ -144,11 +147,45 @@ namespace hpp {
             previous.contactCreations(*this, outList);
         }
 
+        std::vector<std::string> freeLimbMotions(const std::vector<std::string>& allEffectors, const std::vector<std::string>& contactVariations) const
+        {
+            std::vector<std::string> res;
+            for(std::vector<std::string>::const_iterator cit = allEffectors.begin();
+                cit != allEffectors.end(); ++cit)
+            {
+                if(std::find(contactVariations.begin(), contactVariations.end(), *cit) == contactVariations.end())
+                {
+                    res.push_back(*cit);
+                }
+            }
+            return res;
+        }
+
         std::vector<std::string> variations(const State& previous) const
         {
             std::vector<std::string> res;
             contactCreations(previous, res);
             contactBreaks(previous, res);
+            return res;
+        }
+
+        std::vector<std::string> allVariations(const State& previous, const std::vector<std::string>& allEffectors) const
+        {
+            std::vector<std::string> contactVariations = variations(previous);
+            return freeLimbMotions(allEffectors, contactVariations);
+        }
+
+        std::vector<std::string> fixedContacts(const State& previous) const
+        {
+            std::vector<std::string> res;
+            std::vector<std::string> variations = this->variations(previous);
+            for(std::map<std::string, fcl::Vec3f>::const_iterator cit = contactPositions_.begin();
+                cit != contactPositions_.end(); ++cit)
+            {
+                const std::string& name = cit->first;
+                if(std::find(variations.begin(), variations.end(), name) == variations.end())
+                    res.push_back(name);
+            }
             return res;
         }
 

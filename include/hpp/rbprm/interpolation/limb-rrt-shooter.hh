@@ -38,7 +38,9 @@ namespace hpp {
 
 /// \addtogroup configuration_sampling
 /// \{
-/// Samples configuration which respect the reachability condition
+/// Configuration shooter for the limb RRT.
+/// will generate a configuration for a given limb, and sample
+/// a root position extracted from a normalized path
     class HPP_RBPRM_DLLAPI LimbRRTShooter : public core::ConfigurationShooter{
     ///
     public:
@@ -58,6 +60,7 @@ namespace hpp {
         const hpp::rbprm::RbPrmLimbPtr_t limb_;
         const hpp::core::PathPtr_t path_;
         const std::size_t pathDofRank_;
+        const std::size_t configSize_;
 
     private:
         LimbRRTShooterWkPtr_t weak_;
