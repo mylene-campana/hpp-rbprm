@@ -198,14 +198,14 @@ namespace hpp {
       core::Configuration_t computeOffsetContactConfig
 	(const BallisticPathPtr_t bp,
 	 const State &previousState,
-	 const core::value_type u_offset, const bool increase_u_offset,
+	 const core::value_type u_offset, const bool increase_u_offset, core::value_type &lenght,
      const std::size_t maxIter = 100, const core::value_type alpha = 0.6);
 
       /// Return the configuration at the top of the parabola (path),
       /// using extendingPose_ for limbs part if defined,
       /// otherwise, just unsing interpolation (bp)
       core::Configuration_t computeTopExtendingPose 
-	(const core::PathPtr_t path, const BallisticPathPtr_t bp);
+	(const core::PathPtr_t path, const BallisticPathPtr_t bp, core::value_type &lenght);
 
       
       /**

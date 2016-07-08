@@ -183,7 +183,7 @@ namespace hpp {
     Configuration_t BallisticInterpolation::computeOffsetContactConfig
     (const BallisticPathPtr_t bp,
      const State& previousState, const value_type u_offset,
-     const bool increase_u_offset,
+     const bool increase_u_offset,value_type& lenght,
      const std::size_t maxIter, const value_type alpha) {
       Configuration_t q_trunk_offset, q_contact_offset(previousState.configuration_), q_interp, result;
       q_trunk_offset = previousState.configuration_; 
@@ -199,10 +199,10 @@ namespace hpp {
       value_type u;
       if(increase_u_offset){ // forward progression
         u = u_offset;
-        currentLenght = 0 + u;
+        currentLenght = 0;
       }else{ // backward progression
         u = - u_offset;
-        currentLenght = bp->length() + u;
+        currentLenght = bp->length();
       }
       std::map<std::string,core::CollisionValidationPtr_t> limbColVal = 
           robot_->getLimbcollisionValidations ();
@@ -215,8 +215,9 @@ namespace hpp {
         return q_interp;
       }
       
-      while (contact_OK && iteration < maxIter) { 
+      while (contact_OK && iteration < maxIter && ((((currentLenght<bp->length())/3.)&&increase_u_offset) || ((currentLenght > (bp->length()*2./3.))&&(!increase_u_offset)))){ 
         hppDout (info, "currentLenght= " << currentLenght);        
+        currentLenght += u;        
         iteration++;
         previousSuccessLimbs = successLimbs;
        // hppDout(notice, "previousSuccessLimbs size = "<<previousSuccessLimbs.size());
@@ -244,7 +245,6 @@ namespace hpp {
         hppDout (info, "q_contact_offset= " << displayConfig (q_contact_offset));
         hppDout (info, "## contactMaintained = " << contactMaintained);
         
-        currentLenght += u;
       }//while
       
       // replace limbs that are accurate:
@@ -272,12 +272,15 @@ namespace hpp {
       for (size_t i = 7 ; i < minIndex ; i++){
         q_contact_offset[i] = flexionPose_[i];
       }
-      
+      if(increase_u_offset)
+        lenght = currentLenght-u;
+      else
+        lenght = bp->length()-currentLenght+u;
       return q_contact_offset;
     }
 
     Configuration_t BallisticInterpolation::computeTopExtendingPose 
-    (const core::PathPtr_t path, const BallisticPathPtr_t bp) {
+    (const core::PathPtr_t path, const BallisticPathPtr_t bp, value_type& lenght) {
       bool success;
       ParabolaPathPtr_t pp = boost::dynamic_pointer_cast<ParabolaPath>(path);
       const vector_t coefs = pp->coefficients ();
@@ -298,7 +301,7 @@ namespace hpp {
       const bool parabTallEnough = (robotName.compare ("ant") == 0 &&  z_x_theta_max > 0.44) || (robotName.compare ("spiderman") == 0 &&  z_x_theta_max > 1.1) || (robotName.compare ("frog") == 0 &&  z_x_theta_max > 0.2);
       value_type r = 0.5; // blending coefficient of extending key-frame
       const Configuration_t q_interp_top = (*bp) (u_max*pathLength, success);
-
+      lenght = u_max*pathLength;
       if (parabTallEnough)
 	r = 0.8;
       else
@@ -417,6 +420,7 @@ namespace hpp {
       vector_t V0 (3), Vimp (3); fcl::Vec3f dir;
       core::PathPtr_t subpath = path_->pathAtRank (0);
       State state, state1, state2;
+      value_type lenghtTop,lenghtTakeoff,lenghtLanding;
 
       std::map<std::string,core::CollisionValidationPtr_t> limbColVal = robot_->getLimbcollisionValidations ();
 
@@ -470,31 +474,27 @@ namespace hpp {
 	hppDout (info, "q1contact= " << displayConfig(q1contact));
 
 	bp = Interpolate (q1contact, q2contact, pathLength, subpath->coefficients ());
-	q_max = computeTopExtendingPose (subpath, bp);
+	q_max = computeTopExtendingPose (subpath, bp,lenghtTop);
 
-	bp1max = Interpolate (q1contact, q_max, 
-			      pp->computeLength (q1contact, q_max),
-			      subpath->coefficients ());
-	bp2max = Interpolate (q_max, q2contact,
-			      pp->computeLength (q_max, q2contact),
-			      subpath->coefficients ());
+	//bp1max = Interpolate (q1contact, q_max,    lenghtTop, subpath->coefficients ());
+	//bp2max = Interpolate (q_max, q2contact,  bp->length()-lenghtTop,subpath->coefficients ());
 
-	q_contact_offset1 = computeOffsetContactConfig (bp1max, state1, u_offset, true);
-	q_contact_offset2 = computeOffsetContactConfig (bp2max, state2, u_offset, false);
+	q_contact_offset1 = computeOffsetContactConfig (bp, state1, u_offset, true,lenghtTakeoff);
+	q_contact_offset2 = computeOffsetContactConfig (bp, state2, u_offset, false,lenghtLanding);
 
   	hppDout (info, "offset contact 1= " << displayConfig(q_contact_offset1 - start_.configuration_));
   
 	bp1 = Interpolate (q1contact, q_contact_offset1,
-			   pp->computeLength (q1contact, q_contact_offset1),
+			   lenghtTakeoff,
 			   subpath->coefficients ());
 	bp1max = Interpolate (q_contact_offset1, q_max, 
-			      pp->computeLength (q_contact_offset1, q_max),
+			      lenghtTop-lenghtTakeoff,
 			      subpath->coefficients ());
 	bp2max = Interpolate (q_max, q_contact_offset2,
-			      pp->computeLength (q_max, q_contact_offset2),
+			      bp->length()-lenghtTop-lenghtLanding,
 			      subpath->coefficients ());
 	bp3 = Interpolate (q_contact_offset2, q2contact,
-			   pp->computeLength (q_contact_offset2, q2contact),
+			   lenghtLanding,
 			   subpath->coefficients ());
 
 	newPath->appendPath (bp1);
@@ -513,28 +513,24 @@ namespace hpp {
 	  // Compute top-keyframe and adapt ballistic-path with it
 	  bp = Interpolate (q1contact, q2contact, subpath->length (),
 			    subpath->coefficients ());
-	  q_max = computeTopExtendingPose (subpath, bp);
-	  bp1max = Interpolate (q1contact, q_max,
-				pp->computeLength (q1contact, q_max),
-				subpath->coefficients ());
-	  bp2max = Interpolate (q_max, q2contact,
-				pp->computeLength (q_max, q2contact),
-				subpath->coefficients ());
+	  q_max = computeTopExtendingPose (subpath, bp,lenghtTop);
+	  //bp1max = Interpolate (q1contact, q_max,	lenghtTop,	subpath->coefficients ());
+	  //bp2max = Interpolate (q_max, q2contact,	bp->length()-lenghtTop,	subpath->coefficients ());
 
-	  q_contact_offset1 = computeOffsetContactConfig (bp1max, state1, u_offset, true);
-	  q_contact_offset2 = computeOffsetContactConfig (bp2max, state2, u_offset, false);
+	  q_contact_offset1 = computeOffsetContactConfig (bp, state1, u_offset, true,lenghtTakeoff);
+	  q_contact_offset2 = computeOffsetContactConfig (bp, state2, u_offset, false,lenghtLanding);
 
 	  bp1 = Interpolate (q1contact, q_contact_offset1,
-			     pp->computeLength (q1contact, q_contact_offset1),
+			     lenghtTakeoff,
 			     subpath->coefficients ());
 	  bp1max = Interpolate (q_contact_offset1, q_max,
-				pp->computeLength (q_contact_offset1, q_max),
+				lenghtTop-lenghtTakeoff,
 				subpath->coefficients ());
 	  bp2max = Interpolate (q_max, q_contact_offset2,
-				pp->computeLength (q_max, q_contact_offset2),
+				bp->length()-lenghtTop-lenghtLanding,
 				subpath->coefficients ());
 	  bp3 = Interpolate (q_contact_offset2, q2contact,
-			     pp->computeLength (q_contact_offset2, q2contact),
+			     lenghtLanding,
 			     subpath->coefficients ());
 
 	  newPath->appendPath (bp1);
@@ -564,7 +560,7 @@ namespace hpp {
       robot_->noStability_ = true; // disable stability for waypoints
       vector_t V0 (3), Vimp (3); fcl::Vec3f dir;
       State state;
-
+      value_type lenghtTop,lenghtTakeoff,lenghtLanding;
       const core::PathPtr_t path = path_->pathAtRank (0);
       const ParabolaPathPtr_t pp = 
 	boost::dynamic_pointer_cast<ParabolaPath>(path);
@@ -572,22 +568,26 @@ namespace hpp {
       const vector_t pathCoefs = path->coefficients ();
 
       bp = Interpolate (qStart, qEnd, pathLength, pathCoefs);
-      q_max = computeTopExtendingPose (path, bp);
+      q_max = computeTopExtendingPose (path, bp,lenghtTop);
 
-      bp1max = Interpolate (qStart, q_max, pp->computeLength (qStart, q_max),
-			    pathCoefs);
-      bp2max = Interpolate (q_max, qEnd, pp->computeLength (q_max, qEnd),
-			    pathCoefs);
+      hppDout(notice, "full lenght = "<<bp->length());
+      hppDout(notice,"lenght top = "<<lenghtTop);
+      //bp1max = Interpolate (qStart, q_max, lenghtTop, pathCoefs);
+      //bp2max = Interpolate (q_max, qEnd, bp->length()-lenghtTop,  pathCoefs);
 
-      q_contact_offset1 = computeOffsetContactConfig (bp1max, start_, u_offset, true);
-      q_contact_offset2 = computeOffsetContactConfig (bp2max, end_, u_offset, false);      
+      q_contact_offset1 = computeOffsetContactConfig (bp, start_, u_offset, true,lenghtTakeoff);
+      q_contact_offset2 = computeOffsetContactConfig (bp, end_, u_offset, false,lenghtLanding);      
 
-      bp1 = Interpolate (qStart, q_contact_offset1,
-			 pp->computeLength (qStart, q_contact_offset1),
-			 pathCoefs);
-      bp1max = Interpolate (q_contact_offset1, q_max, pp->computeLength (q_contact_offset1, q_max),pathCoefs);
-      bp2max = Interpolate (q_max, q_contact_offset2, pp->computeLength (q_max, q_contact_offset2),	pathCoefs);
-      bp3 = Interpolate (q_contact_offset2, qEnd, pp->computeLength(q_contact_offset2, qEnd), pathCoefs);
+      bp1 = Interpolate (qStart, q_contact_offset1, lenghtTakeoff, pathCoefs);
+      hppDout(notice,"BP1 lenght = "<<bp1->length());
+      bp1max = Interpolate (q_contact_offset1, q_max, lenghtTop-lenghtTakeoff,pathCoefs);
+      bp2max = Interpolate (q_max, q_contact_offset2, bp->length()-lenghtTop-lenghtLanding,	pathCoefs);
+      bp3 = Interpolate (q_contact_offset2, qEnd, lenghtLanding, pathCoefs);
+      
+      hppDout(notice,"lenght bp1max = "<<bp1max->length());
+      hppDout(notice,"lenght bp2max = "<<bp2max->length());
+      
+      hppDout(notice,"BP3 lenght = "<<bp3->length());
 
       newPath->appendPath (bp1);
       newPath->appendPath (bp1max);
