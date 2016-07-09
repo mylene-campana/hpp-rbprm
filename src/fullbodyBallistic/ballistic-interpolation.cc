@@ -633,6 +633,11 @@ namespace hpp {
       hppDout(notice, "position top frame  = "<<displayConfig(stateTop.configuration_));
       hppDout(notice, "position final contact frame  = "<<displayConfig(contactState2.configuration_));
       hppDout(notice, "position final state frame  = "<<displayConfig(end_.configuration_));
+      hppDout(notice, "TIME initial state frame  = "<<0);
+      hppDout(notice, "TIME initial Contact state frame  = "<<lenghtTakeoff);
+      hppDout(notice, "TIME top frame  = "<<lenghtTop);
+      hppDout(notice, "TIME final contact frame  = "<<bp->length() - lenghtLanding);
+      hppDout(notice, "TIME final state frame  = "<<bp->length());
       hppDout(notice,"test last root index interpolate = "<<bp->lastRootIndex());
       pathLimb = rbprm::interpolation::interpolateStates(robot_,problem_,bp,stateFrames.begin(),stateFrames.end()-1);
     //  bp->setLimbPath(pathLimb);

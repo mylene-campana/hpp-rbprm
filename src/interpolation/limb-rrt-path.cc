@@ -55,6 +55,7 @@ namespace hpp {
     {
         assert (device);
         assert (length >= 0);
+        hppDout(warning,"SHOULD NOT USE THIS CCONSTRUCTOR !");
     }
     
     LimbRRTPath::LimbRRTPath (const DevicePtr_t& device,
@@ -75,14 +76,14 @@ namespace hpp {
 
     LimbRRTPath::LimbRRTPath (const LimbRRTPath& path) :
         parent_t (path), device_ (path.device_), initial_ (path.initial_),
-        end_ (path.end_), pathDofRank_(path.pathDofRank_)
+        end_ (path.end_), pathDofRank_(path.pathDofRank_),rootPath_(path.rootPath_),lastRootIndex_(lastRootIndex_)
     {
     }
 
     LimbRRTPath::LimbRRTPath (const LimbRRTPath& path,
                 const ConstraintSetPtr_t& constraints) :
         parent_t (path, constraints), device_ (path.device_),
-        initial_ (path.initial_), end_ (path.end_), pathDofRank_(path.pathDofRank_)
+        initial_ (path.initial_), end_ (path.end_), pathDofRank_(path.pathDofRank_),rootPath_(path.rootPath_),lastRootIndex_(lastRootIndex_)
     {
         // NOTHING
     }
@@ -130,19 +131,21 @@ namespace hpp {
       throw (projection_error)
     {
         // Length is assumed to be proportional to interval range
-        value_type l = fabs (subInterval.second - subInterval.first);
-
         bool success;
+
         Configuration_t q1 ((*this) (subInterval.first, success));
+        Configuration_t q2 ((*this) (subInterval.second, success));
+
+        value_type l = rootPath_->computeLength (q1 ,q2);
+
         if (!success) throw projection_error
                 ("Failed to apply constraints in StraightPath::extract");        
         q1[pathDofRank_] = ComputeExtraDofValue(pathDofRank_,initial_, end_, (subInterval.first - timeRange().first)  / (timeRange().second - timeRange().first));
-        Configuration_t q2 ((*this) (subInterval.second, success));
         if (!success) throw projection_error
                 ("Failed to apply constraints in StraightPath::extract");
         q2[pathDofRank_] = ComputeExtraDofValue(pathDofRank_,initial_, end_, (subInterval.second - timeRange().first)  / (timeRange().second - timeRange().first));
         PathPtr_t result = LimbRRTPath::create (device_, q1, q2, l,
-                           constraints (), pathDofRank_);
+                           constraints (), pathDofRank_,rootPath_);
         return result;
     }
 

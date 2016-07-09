@@ -76,10 +76,15 @@ using namespace model;
         hppDout(notice,"REFERENCE PROBLEM OBSTACLE :"<<rootProblem_.collisionObstacles().size()<<" ; "<<referenceProblem->collisionObstacles().size());
         BallisticPathPtr_t bp = boost::dynamic_pointer_cast<BallisticPath>(rootPath);
         hppDout(notice,"test last root index helper = "<<bp->lastRootIndex());
-        if(bp)
+        if(bp){
           rootProblem_.steeringMethod(LimbRRTSteering::create(&rootProblem_,fullBodyDevice_->configSize()-1,bp));
-        else
+          hppDout(notice,"create steering method with ballistic path.");
+        }
+        else{
           rootProblem_.steeringMethod(LimbRRTSteering::create(&rootProblem_,fullBodyDevice_->configSize()-1));
+          hppDout(notice,"create steering method without ballistic path.");
+
+        }
           
     }
 
@@ -288,12 +293,14 @@ using namespace model;
             CIT_StateFrame a, b;
             a = (startState+i);
             b = (startState+i+1);
+            PathPtr_t extractedPath = rootPath->extract(core::interval_t(a->first, b->first));
+            hppDout(notice," extracted path length = "<<extractedPath->length());
             LimbRRTHelper helper(fullbody, referenceProblem,
                                  rootPath->extract(core::interval_t(a->first, b->first)));
             PathVectorPtr_t partialPath = interpolateStates(helper, a->second, b->second);
             if(partialPath)
             {
-                //res[i] = optimize(helper,partialPath, numOptimizations);
+                res[i] = optimize(helper,partialPath, numOptimizations);
                 valid[i]=true;
             }
             else

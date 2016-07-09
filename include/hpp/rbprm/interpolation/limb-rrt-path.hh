@@ -23,6 +23,7 @@
 # include <hpp/core/config.hh>
 # include <hpp/core/path.hh>
 #include <hpp/rbprm/fullbodyBallistic/ballistic-path.hh>
+#include <hpp/util/debug.hh>
 namespace hpp {
 namespace rbprm {
 namespace interpolation {
@@ -55,6 +56,8 @@ namespace interpolation {
                                       core::value_type length,
                                       const std::size_t pathDofRank)
       {
+          hppDout(warning,"SHOULD NOT USE THIS FUNCTION !");
+
     LimbRRTPath* ptr = new LimbRRTPath (device, init, end, length, pathDofRank);
     LimbRRTPathPtr_t shPtr (ptr);
     ptr->init (shPtr);
@@ -74,6 +77,8 @@ namespace interpolation {
                                       core::ConstraintSetPtr_t constraints,
                                       const std::size_t pathDofRank)
       {
+          hppDout(warning,"SHOULD NOT USE THIS FUNCTION (constraints) !");
+
     LimbRRTPath* ptr = new LimbRRTPath (device, init, end,
                           length, constraints, pathDofRank);
     LimbRRTPathPtr_t shPtr (ptr);

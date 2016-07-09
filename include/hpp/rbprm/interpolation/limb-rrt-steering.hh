@@ -96,8 +96,12 @@ namespace hpp {
       {
         
   
-        
-        core::value_type length = (*problem_->distance()) (q1, q2);
+        core::value_type length;
+        if(bp_)
+            length = bp_->computeLength(q1,q2);
+        else
+            length = (*problem_->distance()) (q1, q2);
+
         core::ConstraintSetPtr_t c;
         if (constraints() && constraints()->configProjector ()) {
           c = HPP_STATIC_PTR_CAST (core::ConstraintSet, constraints()->copy ());
@@ -107,14 +111,17 @@ namespace hpp {
         }
         core::PathPtr_t path;
         if(bp_){
-          BallisticPathPtr_t bpExtract =  BallisticPath::create(bp_->device(),q1,q2,bp_->computeLength(q1,q2),bp_->coefficients());
+          hppDout(notice,"create path with ballistic root");
+          BallisticPathPtr_t bpExtract =  BallisticPath::create(bp_->device(),q1,q2,length,bp_->coefficients());
           bpExtract->lastRootIndex(bp_->lastRootIndex());
           path = LimbRRTPath::create
             (problem_->robot(), q1, q2, length, c, pathDofRank_,bpExtract);
         }
-        else
+        else{
+          hppDout(notice,"create path without root path");
           path = LimbRRTPath::create
             (problem_->robot(), q1, q2, length, c, pathDofRank_);
+        }
             return path;
       }
     protected:
