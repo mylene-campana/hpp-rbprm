@@ -273,8 +273,8 @@ using namespace model;
             core::SizeInterval_t interval(0, completePath->initial().rows()-1);
             core::SizeIntervals_t intervals;
             intervals.push_back(interval);
-            //PathPtr_t reducedPath = core::SubchainPath::create(completePath,intervals);
-            return completePath;
+            PathPtr_t reducedPath = core::SubchainPath::create(completePath,intervals);
+            return reducedPath;
         }
     }
 
@@ -300,8 +300,8 @@ using namespace model;
             PathVectorPtr_t partialPath = interpolateStates(helper, a->second, b->second);
             if(partialPath)
             {
-               // res[i] = optimize(helper,partialPath, numOptimizations);
-                res[i] = partialPath;
+                res[i] = optimize(helper,partialPath, numOptimizations);
+                //res[i] =partialPath;
                 valid[i]=true;
             }
             else

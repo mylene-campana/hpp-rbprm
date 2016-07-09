@@ -57,9 +57,6 @@ namespace hpp {
                                       value_type param) const
     {
       if (param == 0 || initial_(0) == end_(0)) {
-        hppDout(notice,"init = "<<displayConfig(initial_));
-        hppDout(notice,"init.size = "<<initial_.size());
-        hppDout(notice,"device size = "<<device_->configSize());
         for(size_t i = 0 ; i < device_->configSize(); i++){
           result[i] = initial_[i]; 
         }
@@ -161,6 +158,7 @@ namespace hpp {
       core::PathPtr_t result = rbprm::BallisticPath::create(device_,q1,q2,computeLength(q1,q2),coefficients_,lastRootIndex_);
       return result;
     }
+
 
     core::PathPtr_t BallisticPath::reverse () const{
       hppDout(notice, "reverse path parabola !!!!!!!!!!!!!!!!!!!!!!!!");

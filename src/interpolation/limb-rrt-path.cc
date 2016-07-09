@@ -105,12 +105,30 @@ namespace hpp {
     {
         if (param == timeRange ().first || timeRange ().second == 0)
         {
-            result = initial_;
+            for(size_t i = lastRootIndex_ ; i < result.size();i++){
+                result[i] = initial_[i];
+            }
+            if(rootPath_){
+              Configuration_t q_root(rootPath_->device()->configSize());
+              (*rootPath_)(q_root,param);
+              for(size_t i = 0 ; i < lastRootIndex_ ; i++){
+                result[i] = q_root[i];
+              }
+            }
             return true;
         }
         if (param == timeRange ().second)
         {
-            result = end_;
+            for(size_t i = lastRootIndex_ ; i < result.size();i++){
+                result[i] = end_[i];
+            }
+            if(rootPath_){
+              Configuration_t q_root(rootPath_->device()->configSize());
+              (*rootPath_)(q_root,param);
+              for(size_t i = 0 ; i < lastRootIndex_ ; i++){
+                result[i] = q_root[i];
+              }
+            }
             return true;
         }
         value_type u = param/timeRange ().second;
@@ -119,12 +137,10 @@ namespace hpp {
         model::interpolate (device_, initial_, end_, u, result);
         value_type paramRoot = ComputeExtraDofValue(pathDofRank_,initial_, end_, u);
         result[pathDofRank_] = paramRoot;
-        Configuration_t q_root(rootPath_->device()->configSize());
-        (*rootPath_)(q_root,param);
+
         if(rootPath_){
-          hppDout(notice,"last root index"<<lastRootIndex_);
-          hppDout(notice,"result size = "<<result.size());
-          hppDout(notice,"q_root size = "<<q_root.size());
+          Configuration_t q_root(rootPath_->device()->configSize());
+          (*rootPath_)(q_root,param);
           for(size_t i = 0 ; i < lastRootIndex_ ; i++){
             result[i] = q_root[i];
           }
@@ -149,8 +165,9 @@ namespace hpp {
         if (!success) throw projection_error
                 ("Failed to apply constraints in StraightPath::extract");
         q2[pathDofRank_] = ComputeExtraDofValue(pathDofRank_,initial_, end_, (subInterval.second - timeRange().first)  / (timeRange().second - timeRange().first));
+        core::PathPtr_t extractRoot = rootPath_->extract(subInterval);
         PathPtr_t result = LimbRRTPath::create (device_, q1, q2, l,
-                           constraints (), pathDofRank_,rootPath_);
+                           constraints (), pathDofRank_,boost::dynamic_pointer_cast<BallisticPath>(extractRoot));
         return result;
     }
 
