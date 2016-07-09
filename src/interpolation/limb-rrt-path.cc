@@ -39,6 +39,8 @@ namespace hpp {
         assert (device);
         assert (length >= 0);
         assert (!constraints ());
+        hppDout(warning,"SHOULD NOT USE THIS CCONSTRUCTOR !");
+
       }
     
     
@@ -76,14 +78,14 @@ namespace hpp {
 
     LimbRRTPath::LimbRRTPath (const LimbRRTPath& path) :
         parent_t (path), device_ (path.device_), initial_ (path.initial_),
-        end_ (path.end_), pathDofRank_(path.pathDofRank_),rootPath_(path.rootPath_),lastRootIndex_(lastRootIndex_)
+        end_ (path.end_), pathDofRank_(path.pathDofRank_),rootPath_(path.rootPath_),lastRootIndex_(path.lastRootIndex_)
     {
     }
 
     LimbRRTPath::LimbRRTPath (const LimbRRTPath& path,
                 const ConstraintSetPtr_t& constraints) :
         parent_t (path, constraints), device_ (path.device_),
-        initial_ (path.initial_), end_ (path.end_), pathDofRank_(path.pathDofRank_),rootPath_(path.rootPath_),lastRootIndex_(lastRootIndex_)
+        initial_ (path.initial_), end_ (path.end_), pathDofRank_(path.pathDofRank_),rootPath_(path.rootPath_),lastRootIndex_(path.lastRootIndex_)
     {
         // NOTHING
     }
@@ -118,8 +120,11 @@ namespace hpp {
         value_type paramRoot = ComputeExtraDofValue(pathDofRank_,initial_, end_, u);
         result[pathDofRank_] = paramRoot;
         Configuration_t q_root(rootPath_->device()->configSize());
-        (*rootPath_)(q_root,paramRoot);
+        (*rootPath_)(q_root,param);
         if(rootPath_){
+          hppDout(notice,"last root index"<<lastRootIndex_);
+          hppDout(notice,"result size = "<<result.size());
+          hppDout(notice,"q_root size = "<<q_root.size());
           for(size_t i = 0 ; i < lastRootIndex_ ; i++){
             result[i] = q_root[i];
           }

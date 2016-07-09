@@ -641,7 +641,7 @@ namespace hpp {
       hppDout(notice,"test last root index interpolate = "<<bp->lastRootIndex());
       pathLimb = rbprm::interpolation::interpolateStates(robot_,problem_,bp,stateFrames.begin(),stateFrames.end()-1);
     //  bp->setLimbPath(pathLimb);
-      newPath->appendPath(bp);
+      newPath->appendPath(pathLimb);
             
       return newPath;
     }
