@@ -196,8 +196,8 @@ namespace hpp {
       /// (or increased) of alpha to get closer to previousState 
       /// until maxIter is reached.
       State computeOffsetContactConfig(const BallisticPathPtr_t bp,
-	 const State &previousState,
-	 const core::value_type u_offset, const bool increase_u_offset, core::value_type &lenght,
+     const State &previousState, State& transitionDOFstate,
+     const core::value_type u_offset, const bool increase_u_offset, core::value_type &lenght, core::value_type &lenghtTransition,
      const std::size_t maxIter = 100, const core::value_type alpha = 0.6);
 
       /// Return the configuration at the top of the parabola (path),

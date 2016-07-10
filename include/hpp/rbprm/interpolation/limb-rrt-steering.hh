@@ -94,12 +94,10 @@ namespace hpp {
       virtual core::PathPtr_t impl_compute (core::ConfigurationIn_t q1,
                       core::ConfigurationIn_t q2) const
       {
-        std::cout<<"sterring method limb rrt"<<std::endl;
 
         core::value_type length;
         if(bp_){
             length = bp_->computeLength(q1,q2);
-            std::cout<<"bp initialized OK"<<std::endl;
         }
         else{
             length = (*problem_->distance()) (q1, q2);

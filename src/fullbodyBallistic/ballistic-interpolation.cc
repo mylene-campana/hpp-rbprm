@@ -191,8 +191,8 @@ namespace hpp {
 
     State BallisticInterpolation::computeOffsetContactConfig
     (const BallisticPathPtr_t bp,
-     const State& previousState, const value_type u_offset,
-     const bool increase_u_offset,value_type& lenght,
+     const State& previousState,State& transitionDOFstate, const value_type u_offset,
+     const bool increase_u_offset,value_type& lenght,value_type& lenghtTransition,
      const std::size_t maxIter, const value_type alpha) {
       Configuration_t q_trunk_offset, q_contact_offset(previousState.configuration_), q_interp, result;
       q_trunk_offset = previousState.configuration_; 
@@ -235,11 +235,16 @@ namespace hpp {
         //state = MaintainPreviousContacts (lastState, limbColVal, q_trunk_offset, contactMaintained, multipleBreaks, successLimbs);
         //state = robot_->MaintainPreviousContacts (lastState, robot_, limbColVal, q_trunk_offset, contactMaintained, multipleBreaks,0.);
         state = rbprm::ComputeContacts(lastState,robot_,q_trunk_offset,problem_->collisionObstacles(),dir,contactMaintained,multipleBreaks,true,0.,ignore6DOF,false);
-        if(!contactMaintained && !ignore6DOF){ // after the first fail with rotationnal constraint, we relax the problem for longer path
+        /*if(!contactMaintained && !ignore6DOF){ // after the first fail with rotationnal constraint, we relax the problem for longer path
           ignore6DOF = true;
+          transitionDOFstate = state;
+          if(increase_u_offset)
+            lenghtTransition = currentLenght-u;
+          else
+            lenghtTransition = bp->length()-currentLenght+u;
           state = rbprm::ComputeContacts(lastState,robot_,q_trunk_offset,problem_->collisionObstacles(),dir,contactMaintained,multipleBreaks,true,0.,ignore6DOF,false);
           hppDout(notice,"Relax 6DOF constraints after "<<iteration<<" iterations");
-        }
+        }*/
         if(contactMaintained){
           contact_OK = true;
           lastState = state;
@@ -280,6 +285,9 @@ namespace hpp {
         lenght = currentLenght-u;
       else
         lenght = bp->length()-currentLenght+u;
+
+
+      lastState.ignore6DOF = ignore6DOF;
       return lastState;
     }
 
@@ -431,8 +439,8 @@ namespace hpp {
       vector_t V0 (3), Vimp (3); fcl::Vec3f dir;
       core::PathPtr_t subpath = path_->pathAtRank (0);
       State state1, state2;
-      State contactState1,contactState2,stateTop;
-      core::value_type lenghtTop,lenghtTakeoff,lenghtLanding;
+      State contactState1,contactState2,stateTop,contactTransition1,contactTransition2;
+      core::value_type lenghtTop,lenghtTakeoff,lenghtLanding,lenghtLanding6DOF,lenghtTakeoff6DOF;
 
 
       for (std::size_t i = 0; i < subPathNumber - 1; i++) {
@@ -492,8 +500,8 @@ namespace hpp {
 	//bp1max = Interpolate (q1contact, q_max,    lenghtTop, subpath->coefficients ());
 	//bp2max = Interpolate (q_max, q2contact,  bp->length()-lenghtTop,subpath->coefficients ());
 
-	contactState1 = computeOffsetContactConfig (bp, state1, u_offset, true,lenghtTakeoff);
-	contactState2 = computeOffsetContactConfig (bp, state2, u_offset, false,lenghtLanding);
+    contactState1 = computeOffsetContactConfig (bp, state1,contactTransition1, u_offset, true,lenghtTakeoff,lenghtTakeoff6DOF);
+    contactState2 = computeOffsetContactConfig (bp, state2,contactTransition2, u_offset, false,lenghtLanding,lenghtLanding6DOF);
 
   /*
 	bp1 = Interpolate (q1contact, q_contact_offset1,
@@ -514,13 +522,17 @@ namespace hpp {
 	newPath->appendPath (bp2max);
 	newPath->appendPath (bp3);
   */
-  stateFrames.push_back(std::make_pair(0,state1));
-  stateFrames.push_back(std::make_pair(lenghtTakeoff,contactState1));
-  stateFrames.push_back(std::make_pair(lenghtTop,stateTop));
-  stateFrames.push_back(std::make_pair(bp->length() - lenghtLanding,contactState2));
-  stateFrames.push_back(std::make_pair(bp->length(),state2));
+    stateFrames.push_back(std::make_pair(0,start_));
+   /* if(contactState1.ignore6DOF && (lenghtTakeoff != lenghtTakeoff6DOF))
+        stateFrames.push_back(std::make_pair(lenghtTakeoff6DOF,contactTransition1));*/
+    stateFrames.push_back(std::make_pair(lenghtTakeoff,contactState1));
+    stateFrames.push_back(std::make_pair(lenghtTop,stateTop));
+    stateFrames.push_back(std::make_pair(bp->length() - lenghtLanding,contactState2));
+   /* if(contactState2.ignore6DOF && (lenghtLanding != lenghtLanding6DOF))
+        stateFrames.push_back(std::make_pair(bp->length() -lenghtLanding6DOF,contactTransition2));*/
+    stateFrames.push_back(std::make_pair(bp->length(),end_));
   
-  pathLimb = rbprm::interpolation::interpolateStates(robot_,problem_,bp,stateFrames.begin(),stateFrames.end());
+  pathLimb = rbprm::interpolation::interpolateStates(robot_,problem_,bp,stateFrames.begin(),stateFrames.end()-1,2);
   bp->setLimbPath(pathLimb);
   newPath->appendPath(bp);
   
@@ -541,8 +553,8 @@ namespace hpp {
 	  //bp1max = Interpolate (q1contact, q_max,	lenghtTop,	subpath->coefficients ());
 	  //bp2max = Interpolate (q_max, q2contact,	bp->length()-lenghtTop,	subpath->coefficients ());
 
-	  contactState1 = computeOffsetContactConfig (bp, state1, u_offset, true,lenghtTakeoff);
-	  contactState2 = computeOffsetContactConfig (bp, state2, u_offset, false,lenghtLanding);
+      contactState1 = computeOffsetContactConfig (bp, state1,contactTransition1, u_offset, true,lenghtTakeoff,lenghtTakeoff6DOF);
+      contactState2 = computeOffsetContactConfig (bp, state2,contactTransition2 ,u_offset, false,lenghtLanding,lenghtLanding6DOF);
 /*
 	  bp1 = Interpolate (q1contact, q_contact_offset1,
 			     lenghtTakeoff,
@@ -561,13 +573,17 @@ namespace hpp {
 	  newPath->appendPath (bp1max);
 	  newPath->appendPath (bp2max);
 	  newPath->appendPath (bp3);*/
-    stateFrames.push_back(std::make_pair(0,state1));
-    stateFrames.push_back(std::make_pair(lenghtTakeoff,contactState1));
-    stateFrames.push_back(std::make_pair(lenghtTop,stateTop));
-    stateFrames.push_back(std::make_pair(bp->length() - lenghtLanding,contactState2));
-    stateFrames.push_back(std::make_pair(bp->length(),state2));
+      stateFrames.push_back(std::make_pair(0,start_));
+     /* if(contactState1.ignore6DOF && (lenghtTakeoff != lenghtTakeoff6DOF))
+          stateFrames.push_back(std::make_pair(lenghtTakeoff6DOF,contactTransition1));*/
+      stateFrames.push_back(std::make_pair(lenghtTakeoff,contactState1));
+      stateFrames.push_back(std::make_pair(lenghtTop,stateTop));
+      stateFrames.push_back(std::make_pair(bp->length() - lenghtLanding,contactState2));
+     /* if(contactState2.ignore6DOF && (lenghtLanding != lenghtLanding6DOF))
+          stateFrames.push_back(std::make_pair(bp->length() -lenghtLanding6DOF,contactTransition2));*/
+      stateFrames.push_back(std::make_pair(bp->length(),end_));
     
-    pathLimb = rbprm::interpolation::interpolateStates(robot_,problem_,bp,stateFrames.begin(),stateFrames.end());
+    pathLimb = rbprm::interpolation::interpolateStates(robot_,problem_,bp,stateFrames.begin(),stateFrames.end()-1,2);
     bp->setLimbPath(pathLimb);
     newPath->appendPath(bp);
     
@@ -589,9 +605,9 @@ namespace hpp {
 	(robot->configSize (), robot->numberDof ());
       robot_->noStability_ = true; // disable stability for waypoints
       vector_t V0 (3), Vimp (3); fcl::Vec3f dir;
-      State contactState1,contactState2,stateTop;
+      State contactState1,contactState2,contactTransition1,contactTransition2,stateTop;
       T_StateFrame stateFrames;
-      value_type lenghtTop,lenghtTakeoff,lenghtLanding;
+      value_type lenghtTop,lenghtTakeoff,lenghtLanding,lenghtLanding6DOF,lenghtTakeoff6DOF;
       const core::PathPtr_t path = path_->pathAtRank (0);
       const value_type pathLength = path->length ();
       const vector_t pathCoefs = path->coefficients ();
@@ -604,8 +620,8 @@ namespace hpp {
       //bp1max = Interpolate (qStart, q_max, lenghtTop, pathCoefs);
       //bp2max = Interpolate (q_max, qEnd, bp->length()-lenghtTop,  pathCoefs);
 
-      contactState1 = computeOffsetContactConfig (bp, start_, u_offset, true,lenghtTakeoff);
-      contactState2 = computeOffsetContactConfig (bp, end_, u_offset, false,lenghtLanding);      
+      contactState1 = computeOffsetContactConfig (bp, start_, contactTransition1,u_offset, true,lenghtTakeoff,lenghtTakeoff6DOF);
+      contactState2 = computeOffsetContactConfig (bp, end_, contactTransition2,u_offset, false,lenghtLanding,lenghtLanding6DOF);
 
       /*
       bp1 = Interpolate (qStart, q_contact_offset1, lenghtTakeoff, pathCoefs);
@@ -624,22 +640,33 @@ namespace hpp {
       newPath->appendPath (bp3);
       */
       stateFrames.push_back(std::make_pair(0,start_));
+      /*if(contactState1.ignore6DOF && (lenghtTakeoff != lenghtTakeoff6DOF))
+          stateFrames.push_back(std::make_pair(lenghtTakeoff6DOF,contactTransition1));*/
       stateFrames.push_back(std::make_pair(lenghtTakeoff,contactState1));
       stateFrames.push_back(std::make_pair(lenghtTop,stateTop));
       stateFrames.push_back(std::make_pair(bp->length() - lenghtLanding,contactState2));
+      /*if(contactState2.ignore6DOF && (lenghtLanding != lenghtLanding6DOF)){
+          contactState2.ignore6DOF = false;
+          contactTransition2.ignore6DOF = true;
+          stateFrames.push_back(std::make_pair(bp->length() -lenghtLanding6DOF,contactTransition2));
+      }*/
       stateFrames.push_back(std::make_pair(bp->length(),end_));
       hppDout(notice, "position initial state frame  = "<<displayConfig(start_.configuration_));
+      hppDout(notice, "position initial Contact transition state frame  = "<<displayConfig(contactTransition1.configuration_));
       hppDout(notice, "position initial Contact state frame  = "<<displayConfig(contactState1.configuration_));
       hppDout(notice, "position top frame  = "<<displayConfig(stateTop.configuration_));
       hppDout(notice, "position final contact frame  = "<<displayConfig(contactState2.configuration_));
+      hppDout(notice, "position final Contact transition state frame  = "<<displayConfig(contactTransition2.configuration_));
       hppDout(notice, "position final state frame  = "<<displayConfig(end_.configuration_));
       hppDout(notice, "TIME initial state frame  = "<<0);
+      hppDout(notice, "TIME initial Contact transition state frame  = "<<lenghtTakeoff6DOF);
       hppDout(notice, "TIME initial Contact state frame  = "<<lenghtTakeoff);
       hppDout(notice, "TIME top frame  = "<<lenghtTop);
       hppDout(notice, "TIME final contact frame  = "<<bp->length() - lenghtLanding);
+      hppDout(notice, "TIME final contact transition frame  = "<<bp->length() - lenghtLanding6DOF);
       hppDout(notice, "TIME final state frame  = "<<bp->length());
       hppDout(notice,"test last root index interpolate = "<<bp->lastRootIndex());
-      pathLimb = rbprm::interpolation::interpolateStates(robot_,problem_,bp,stateFrames.begin(),stateFrames.end()-1);
+      pathLimb = rbprm::interpolation::interpolateStates(robot_,problem_,bp,stateFrames.begin(),stateFrames.end()-1,2);
     //  bp->setLimbPath(pathLimb);
       newPath->appendPath(pathLimb);
             

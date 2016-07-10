@@ -169,7 +169,7 @@ using namespace model;
             proj->add(core::NumericalConstraint::create (
                                     constraints::deprecated::Position::create("",device,
                                                                   effectorJoint,fcl::Vec3f(0,0,0), ppos)));
-            if(limb->contactType_ == hpp::rbprm::_6_DOF)
+            if(limb->contactType_ == hpp::rbprm::_6_DOF && !to.ignore6DOF)
             {
                 proj->add(core::NumericalConstraint::create (constraints::deprecated::Orientation::create("", device,
                                                                                   effectorJoint,

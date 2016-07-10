@@ -35,14 +35,14 @@ namespace hpp {
   typedef std::vector<StateFrame> T_StateFrame;
   typedef T_StateFrame::const_iterator CIT_StateFrame;
   struct HPP_RBPRM_DLLAPI State{
-      State():nbContacts(0), stable(false){}
+      State():nbContacts(0), stable(false),ignore6DOF(false){}
       State(const State& other)
           : configuration_(other.configuration_)
           , com_(other.com_)
           , contactOrder_(other.contactOrder_)
           , nbContacts(other.nbContacts)
           , stable(other.stable)
-          , robustness(other.robustness)
+          , robustness(other.robustness),ignore6DOF(other.ignore6DOF)
       {
           contacts_= (other.contacts_);
           contactNormals_ = (other.contactNormals_);
@@ -63,6 +63,7 @@ namespace hpp {
         std::size_t nbContacts;
         bool stable;
         double robustness;
+        bool ignore6DOF;
 
         State& operator= (const State& other)
         {
