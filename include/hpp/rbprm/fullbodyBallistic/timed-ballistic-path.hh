@@ -148,6 +148,7 @@ namespace hpp {
 
       value_type velocityAtParam(double t) const;
 
+      core::vector_t evaluateVelocity (const value_type t) const;
 
 
       /// Extraction/Reversion of a sub-path

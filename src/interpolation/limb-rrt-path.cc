@@ -95,14 +95,14 @@ namespace hpp {
 
     LimbRRTPath::LimbRRTPath (const LimbRRTPath& path) :
         parent_t (path), device_ (path.device_), initial_ (path.initial_),
-        end_ (path.end_), pathDofRank_(path.pathDofRank_),rootPath_(path.rootPath_),lastRootIndex_(path.lastRootIndex_)
+        end_ (path.end_), pathDofRank_(path.pathDofRank_),rootPath_(path.rootPath_),lastRootIndex_(path.lastRootIndex_),bp_(path.bp_),tbp_(path.tbp_)
     {
     }
 
     LimbRRTPath::LimbRRTPath (const LimbRRTPath& path,
                 const ConstraintSetPtr_t& constraints) :
         parent_t (path, constraints), device_ (path.device_),
-        initial_ (path.initial_), end_ (path.end_), pathDofRank_(path.pathDofRank_),rootPath_(path.rootPath_),lastRootIndex_(path.lastRootIndex_)
+        initial_ (path.initial_), end_ (path.end_), pathDofRank_(path.pathDofRank_),rootPath_(path.rootPath_),lastRootIndex_(path.lastRootIndex_),bp_(path.bp_),tbp_(path.tbp_)
     {
         // NOTHING
     }
@@ -129,6 +129,7 @@ namespace hpp {
               Configuration_t q_root(result.size());
               (*rootPath_)(q_root,param);
               for(size_t i = 0 ; i < lastRootIndex_ ; i++){
+                hppDout(info,"i = "<<i);
                 result[i] = q_root[i];
               }
             }

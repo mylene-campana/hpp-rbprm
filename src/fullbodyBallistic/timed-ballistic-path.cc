@@ -141,8 +141,11 @@ namespace hpp {
       const core::size_type dimSO3 = SO3joint->configSize ();
       SO3joint->configuration ()->interpolate
 	(initial_, end_, u, rank, result);
+
+      const size_type nbConfig = device_->configSize();
+      const size_type ecsDim = device_->extraConfigSpace ().dimension ();
       
-      for(size_t i = 7 ; i < lastRootIndex_ ; i++){
+      for(size_t i = 7 ; i < nbConfig-ecsDim ; i++){
           result (i) = (1 - u) * initial_ (i) + u * end_ (i);
       }
       return true;
@@ -156,7 +159,7 @@ namespace hpp {
       core::Configuration_t q1 ((*this) (subInterval.first, success)); // straight
       core::Configuration_t q2 ((*this) (subInterval.second, success)); // straight
       core::PathPtr_t result = rbprm::TimedBallisticPath::create(device_,q1,q2,computeLength(q1,q2),alpha_,theta_,velocityAtParam(subInterval.first),
-                                                                 boost::dynamic_pointer_cast<BallisticPath>(extractBp));
+                                                                 boost::dynamic_pointer_cast<BallisticPath>(extractBp),lastRootIndex_);
       return result;
     }
     
@@ -184,13 +187,34 @@ namespace hpp {
     value_type TimedBallisticPath::computeLength
     (const core::ConfigurationIn_t q1, const core::ConfigurationIn_t q2) const {
       value_type z = q1[2] - q2[2]; // difference of height
+      value_type xTheta1 = q1[0]*cos(theta_) + q1[1]*sin(theta_);
+      value_type xTheta2 = q2[0]*cos(theta_) + q2[1]*sin(theta_);
+      value_type t1 = xTheta1 / (v0_*cos(alpha_));
+      value_type t2 = xTheta2 / (v0_*cos(alpha_));
+
+      value_type lenght = std::fabs(t2 - t1);
       hppDout(info,"difference of height = "<<z);
-      value_type lenght = (v0_*sin(alpha_) + sqrt((v0_*sin(alpha_))*(v0_*sin(alpha_)) + 2*g_*z))/g_;
       hppDout(notice, "total flying time = "<<lenght);
-      hppDout(notice,"xTheta0 = "<<xTheta0_<< "   , xTheta final = "<<v0_*cos(alpha_)*lenght + xTheta0_);
+      hppDout(notice,"xTheta1 = "<<xTheta1<< "   , xTheta2 = "<<xTheta2);
       return lenght;
     }
     
+
+    vector_t TimedBallisticPath::evaluateVelocity (const value_type t) const {
+      vector_t vel (3);
+      bool success;
+      const value_type theta = bp_->coefficients()[3];
+      const value_type alpha = bp_->coefficients()[4];;
+      const value_type x_theta_0_dot = bp_->coefficients()[5];;
+      const value_type inv_x_theta_0_dot_sq = 1/(x_theta_0_dot*x_theta_0_dot);
+      const value_type x_theta_0 = bp_->coefficients()[6];
+      const core::Configuration_t q = (*this) (t, success);
+      const value_type x_theta = q [0]*cos(theta) + q [1]*sin(theta);
+      vel [0] = x_theta_0_dot * cos(theta);
+      vel [1] = x_theta_0_dot * sin(theta);
+      vel [2] = x_theta_0_dot * (-9.81 * (x_theta - x_theta_0)*inv_x_theta_0_dot_sq + tan(alpha));
+      return vel;
+    }
     
     
   } //   namespace rbprm

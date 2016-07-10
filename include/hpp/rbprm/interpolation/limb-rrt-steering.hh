@@ -133,7 +133,7 @@ namespace hpp {
           BallisticPathPtr_t bpExtract =  BallisticPath::create(tbp_->device(),q1,q2,length,tbp_->coefficients(),tbp_->lastRootIndex());
           TimedBallisticPathPtr_t tbpExtract =  TimedBallisticPath::create(bpExtract);
  		  length = tbpExtract->length();
-         size_t rankParamRoot = q1.size() - 1;
+          size_t rankParamRoot = q1.size() - 1;
           core::Configuration_t q11(q1);
           q11[rankParamRoot] = 0.;
           core::Configuration_t q22(q2);
