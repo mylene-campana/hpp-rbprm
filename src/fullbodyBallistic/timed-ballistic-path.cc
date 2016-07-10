@@ -37,17 +37,17 @@ namespace hpp {
                                             core::ConfigurationIn_t init,
                                             core::ConfigurationIn_t end,
                                             value_type length,
-                                            value_type alpha, value_type theta, value_type v0) :
+                                            value_type alpha, value_type theta, value_type v0,BallisticPathPtr_t bp) :
       parent_t (interval_t (0, length), device->configSize (),
                 device->numberDof ()), device_ (device), initial_ (init),
-      end_ (end), length_ (length),alpha_(alpha),theta_(theta),v0_(v0),g_(9.81)
+      end_ (end), length_ (length),alpha_(alpha),theta_(theta),v0_(v0),g_(9.81),bp_(bp)
     {
       assert (device);
       xTheta0_ = initial_[0]*cos(theta_) + initial_[1]*sin(theta_);
     }
     
     TimedBallisticPath::TimedBallisticPath (const rbprm::BallisticPathPtr_t ballisticPath) :
-      parent_t (interval_t(0,ballisticPath->length()),ballisticPath->device()->configSize(),ballisticPath->device()->numberDof ()),device_(ballisticPath->device()),initial_(ballisticPath->initial()),end_(ballisticPath->end()),length_(ballisticPath->length()),g_(9.81)
+      parent_t (interval_t(0,ballisticPath->length()),ballisticPath->device()->configSize(),ballisticPath->device()->numberDof ()),device_(ballisticPath->device()),initial_(ballisticPath->initial()),end_(ballisticPath->end()),length_(ballisticPath->length()),g_(9.81),lastRootIndex_(ballisticPath->lastRootIndex()),bp_(ballisticPath)
     {
       // TODO : get coeffs
       alpha_ = ballisticPath->coefficients()[4];
@@ -85,7 +85,7 @@ namespace hpp {
     
     TimedBallisticPath::TimedBallisticPath (const TimedBallisticPath& path) :
       parent_t (path), device_ (path.device_), initial_ (path.initial_),
-      end_ (path.end_),length_ (path.length_),alpha_(path.alpha_),theta_(path.theta_),v0_(path.v0_)
+      end_ (path.end_),length_ (path.length_),alpha_(path.alpha_),theta_(path.theta_),v0_(path.v0_),lastRootIndex_(path.lastRootIndex_)
     {
       xTheta0_ = initial_[0]*cos(theta_) + initial_[1]*sin(theta_);
     }
@@ -93,19 +93,23 @@ namespace hpp {
     bool TimedBallisticPath::impl_compute (core::ConfigurationOut_t result,
                                            value_type t) const
     {
-      if (t == 0 || initial_(0) == end_(0)) {
-        result = initial_;
-        return true;
-      }
-      if (t >= length_) {
-        result = end_;
-        return true;
-      } 
+        if (t == 0 || initial_(0) == end_(0)) {
+          for(size_t i = 0 ; i < device_->configSize(); i++){
+            result[i] = initial_[i];
+          }
+          return true;
+        }
+        if (t >= length_) {
+          for(size_t i = 0 ; i < device_->configSize(); i++){
+            result[i] = end_[i] ;
+          }
+          return true;
+        }
       value_type xTheta = v0_*cos(alpha_)*t ;
       //hppDout(info,"xTheta = "<<xTheta);
       value_type u; // param in BallisticPath representation (need convertion from param t)
       // interpolation for the articulation are done by ballisticPath (one of the 4 subpath)
-      if(t < t1_){
+    /*  if(t < t1_){
         u = (t/t1_) * bp1_->length();
         (*bp1_)(result,u);
         //hppDout(notice,"1 : u ="<<u<<"  lenght = "<<bp1_->length());
@@ -121,7 +125,7 @@ namespace hpp {
         u = ((t-t2Max_)/(t2_-t2Max_)) * bp2_->length();
         (*bp2_)(result,u);
         //hppDout(notice,"2 : u ="<<u<<"  lenght = "<<bp2_->length());        
-      }
+      }*/
       
       
         
@@ -138,17 +142,17 @@ namespace hpp {
       SO3joint->configuration ()->interpolate
 	(initial_, end_, u, rank, result);
       
-      
+      for(size_t i = 7 ; i < lastRootIndex_ ; i++){
+          result (i) = (1 - u) * initial_ (i) + u * end_ (i);
+      }
       return true;
     }
     
     
     core::PathPtr_t TimedBallisticPath::extract (const interval_t& subInterval) const throw (hpp::core::projection_error)
     {
-      bool success;
-      core::Configuration_t q1 ((*this) (subInterval.first, success)); // straight
-      core::Configuration_t q2 ((*this) (subInterval.second, success)); // straight
-      core::PathPtr_t result = rbprm::TimedBallisticPath::create(device_,q1,q2,computeLength(q1,q2),alpha_,theta_,v0_);
+      core::PathPtr_t extractBp = bp_->extract(subInterval);
+      core::PathPtr_t result = rbprm::TimedBallisticPath::create(boost::dynamic_pointer_cast<BallisticPath>(extractBp));
       return result;
     }
     
@@ -158,7 +162,7 @@ namespace hpp {
       core::Configuration_t q1 ((*this) (length_, success));
       core::Configuration_t q2 ((*this) (0, success));
       core::PathPtr_t result = TimedBallisticPath::create (device_, q1, q2, length_,
-                                                           alpha_,theta_,v0_);
+                                                           alpha_,theta_,v0_,bp_);
       return result;
     }
     

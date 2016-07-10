@@ -69,11 +69,28 @@ namespace hpp {
         parent_t (interval_t (0, length), device->configSize (),
                   device->numberDof (), constraints),
         device_ (device), initial_ (init), end_ (end),
-        pathDofRank_(pathDofRank),rootPath_(bp)
+        pathDofRank_(pathDofRank),rootPath_(bp),bp_(bp),tbp_()
     {
         assert (device);
         assert (length >= 0);
         lastRootIndex_ = bp->lastRootIndex();
+    }
+
+    LimbRRTPath::LimbRRTPath (const DevicePtr_t& device,
+                ConfigurationIn_t init,
+                ConfigurationIn_t end,
+                value_type length,
+                ConstraintSetPtr_t constraints,
+                const std::size_t pathDofRank, TimedBallisticPathPtr_t tbp) :
+        parent_t (interval_t (0, length), device->configSize (),
+                  device->numberDof (), constraints),
+        device_ (device), initial_ (init), end_ (end),
+        pathDofRank_(pathDofRank),rootPath_(tbp),bp_(),tbp_(tbp)
+    {
+        assert (device);
+        assert (length >= 0);
+
+        lastRootIndex_ = tbp->lastRootIndex();
     }
 
     LimbRRTPath::LimbRRTPath (const LimbRRTPath& path) :
@@ -109,7 +126,7 @@ namespace hpp {
                 result[i] = initial_[i];
             }
             if(rootPath_){
-              Configuration_t q_root(rootPath_->device()->configSize());
+              Configuration_t q_root(result.size());
               (*rootPath_)(q_root,param);
               for(size_t i = 0 ; i < lastRootIndex_ ; i++){
                 result[i] = q_root[i];
@@ -123,7 +140,7 @@ namespace hpp {
                 result[i] = end_[i];
             }
             if(rootPath_){
-              Configuration_t q_root(rootPath_->device()->configSize());
+              Configuration_t q_root(result.size());
               (*rootPath_)(q_root,param);
               for(size_t i = 0 ; i < lastRootIndex_ ; i++){
                 result[i] = q_root[i];
@@ -137,9 +154,9 @@ namespace hpp {
         model::interpolate (device_, initial_, end_, u, result);
         value_type paramRoot = ComputeExtraDofValue(pathDofRank_,initial_, end_, u);
         result[pathDofRank_] = paramRoot;
-        hppDout(notice,"paramRoot = "<<paramRoot<<"  ; max = "<<end_[pathDofRank_]<<" ; length ="<<length());
+
         if(rootPath_){
-          Configuration_t q_root(rootPath_->device()->configSize());
+          Configuration_t q_root(result.size());
           (*rootPath_)(q_root,paramRoot);
           for(size_t i = 0 ; i < lastRootIndex_ ; i++){
             result[i] = q_root[i];
@@ -157,18 +174,25 @@ namespace hpp {
         Configuration_t q1 ((*this) (subInterval.first, success));
         Configuration_t q2 ((*this) (subInterval.second, success));
 
-        value_type l = rootPath_->computeLength (q1 ,q2);
+        value_type l;
+        if(bp_)
+            l = bp_->computeLength (q1 ,q2);
+        if(tbp_)
+            l = tbp_->computeLength (q1 ,q2);
 
         if (!success) throw projection_error
                 ("Failed to apply constraints in StraightPath::extract");        
-      //  q1[pathDofRank_] = ComputeExtraDofValue(pathDofRank_,initial_, end_, (subInterval.first - timeRange().first)  / (timeRange().second - timeRange().first));
+
         q1[pathDofRank_] = 0.;
         q2[pathDofRank_] = l;
-        
-        //q2[pathDofRank_] = ComputeExtraDofValue(pathDofRank_,initial_, end_, (subInterval.second - timeRange().first)  / (timeRange().second - timeRange().first));
         core::PathPtr_t extractRoot = rootPath_->extract(subInterval);
-        PathPtr_t result = LimbRRTPath::create (device_, q1, q2, l,
+        PathPtr_t result;
+        if(bp_)
+            result = LimbRRTPath::create (device_, q1, q2, l,
                            constraints (), pathDofRank_,boost::dynamic_pointer_cast<BallisticPath>(extractRoot));
+        if(tbp_)
+            result = LimbRRTPath::create (device_, q1, q2, l,
+                           constraints (), pathDofRank_,boost::dynamic_pointer_cast<TimedBallisticPath>(extractRoot));
         return result;
     }
 

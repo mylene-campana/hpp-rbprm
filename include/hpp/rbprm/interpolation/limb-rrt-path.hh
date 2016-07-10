@@ -23,6 +23,7 @@
 # include <hpp/core/config.hh>
 # include <hpp/core/path.hh>
 #include <hpp/rbprm/fullbodyBallistic/ballistic-path.hh>
+#include <hpp/rbprm/fullbodyBallistic/timed-ballistic-path.hh>
 #include <hpp/util/debug.hh>
 namespace hpp {
 namespace rbprm {
@@ -98,6 +99,26 @@ namespace interpolation {
                                       core::value_type length,
                                       core::ConstraintSetPtr_t constraints,
                                       const std::size_t pathDofRank,BallisticPathPtr_t bp)
+      {
+    LimbRRTPath* ptr = new LimbRRTPath (device, init, end,
+                          length, constraints, pathDofRank,bp);
+    LimbRRTPathPtr_t shPtr (ptr);
+    ptr->init (shPtr);
+        ptr->checkPath ();
+    return shPtr;
+      }
+
+      /// Create instance and return shared pointer
+      /// \param device Robot corresponding to configurations
+      /// \param init, end Start and end configurations of the path
+      /// \param length Distance between the configurations.
+      /// \param constraints the path is subject to
+      static LimbRRTPathPtr_t create (const core::DevicePtr_t& device,
+                                      core::ConfigurationIn_t init,
+                                      core::ConfigurationIn_t end,
+                                      core::value_type length,
+                                      core::ConstraintSetPtr_t constraints,
+                                      const std::size_t pathDofRank,TimedBallisticPathPtr_t bp)
       {
     LimbRRTPath* ptr = new LimbRRTPath (device, init, end,
                           length, constraints, pathDofRank,bp);
@@ -228,6 +249,10 @@ namespace interpolation {
             core::ConfigurationIn_t end, core::value_type length,
             core::ConstraintSetPtr_t constraints, const std::size_t pathDofRank, BallisticPathPtr_t bp);
       
+      /// Constructor with constraints
+      LimbRRTPath (const core::DevicePtr_t& robot, core::ConfigurationIn_t init,
+            core::ConfigurationIn_t end, core::value_type length,
+            core::ConstraintSetPtr_t constraints, const std::size_t pathDofRank, TimedBallisticPathPtr_t tbp);
 
       /// Copy constructor
       LimbRRTPath (const LimbRRTPath& path);
@@ -262,7 +287,10 @@ namespace interpolation {
 
     private:
       LimbRRTPathWkPtr_t weak_;
-      BallisticPathPtr_t rootPath_;
+      TimedBallisticPathPtr_t tbp_;
+      BallisticPathPtr_t bp_;
+      core::PathPtr_t rootPath_;
+
       size_t lastRootIndex_;
     }; // class LimbRRTPath
 } // namespace interpolation
