@@ -145,6 +145,11 @@ namespace hpp {
         return createCopy (weak_.lock (), constraints);
       }
       
+
+      value_type velocityAtParam(double t) const;
+
+
+
       /// Extraction/Reversion of a sub-path
       /// \param subInterval interval of definition of the extract path
       /// If upper bound of subInterval is smaller than lower bound,

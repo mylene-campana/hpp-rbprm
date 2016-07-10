@@ -152,7 +152,11 @@ namespace hpp {
     core::PathPtr_t TimedBallisticPath::extract (const interval_t& subInterval) const throw (hpp::core::projection_error)
     {
       core::PathPtr_t extractBp = bp_->extract(subInterval);
-      core::PathPtr_t result = rbprm::TimedBallisticPath::create(boost::dynamic_pointer_cast<BallisticPath>(extractBp));
+      bool success;
+      core::Configuration_t q1 ((*this) (subInterval.first, success)); // straight
+      core::Configuration_t q2 ((*this) (subInterval.second, success)); // straight
+      core::PathPtr_t result = rbprm::TimedBallisticPath::create(device_,q1,q2,computeLength(q1,q2),alpha_,theta_,velocityAtParam(subInterval.first),
+                                                                 boost::dynamic_pointer_cast<BallisticPath>(extractBp));
       return result;
     }
     
@@ -169,6 +173,12 @@ namespace hpp {
     core::DevicePtr_t TimedBallisticPath::device () const
     {
       return device_;
+    }
+
+    value_type TimedBallisticPath::velocityAtParam(double t) const{
+      value_type xTheta = v0_*cos(alpha_)*t;
+      value_type v = sqrt(v0_*v0_-2.*g_*xTheta*tan(alpha_) + (g_*xTheta)/(v0_*cos(alpha_))*(g_*xTheta)/(v0_*cos(alpha_)));
+      return v;
     }
     
     value_type TimedBallisticPath::computeLength
