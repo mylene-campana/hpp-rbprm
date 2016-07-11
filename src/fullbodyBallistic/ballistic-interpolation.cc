@@ -120,7 +120,8 @@ namespace hpp {
     {
       Configuration_t result (refConfig.rows ());
       const std::size_t configSize = refConfig.rows ();
-      const std::size_t trunkSize = trunkConfig.size ();
+      //const std::size_t trunkSize = trunkConfig.size ();
+      const std::size_t trunkSize = 7;
       const std::size_t ecsSize = 
 	robot_->device_->extraConfigSpace ().dimension ();
       hppDout (info, "original config= " << displayConfig (trunkConfig));
@@ -333,9 +334,9 @@ namespace hpp {
       
       state.configuration_ = q_top;
       // test : 
-      for( rbprm::T_Limb::const_iterator lit = robot_->GetLimbs().begin();lit != robot_->GetLimbs().end(); ++lit){
+     /* for( rbprm::T_Limb::const_iterator lit = robot_->GetLimbs().begin();lit != robot_->GetLimbs().end(); ++lit){
         hppDout(notice,"LIST OF LIMBS : "<< lit->first << "contact = "<<state.contacts_[lit->first]);
-      }
+      }*/
       
       return state;
     }
@@ -495,6 +496,7 @@ namespace hpp {
 	hppDout (info, "q1contact= " << displayConfig(q1contact));
 
 	bp = Interpolate (q1contact, q2contact, pathLength, subpath->coefficients ());
+  bp->lastRootIndex(lastRootIndex_);
 	stateTop = computeTopExtendingPose (subpath, bp,lenghtTop);
 
 	//bp1max = Interpolate (q1contact, q_max,    lenghtTop, subpath->coefficients ());
@@ -522,7 +524,8 @@ namespace hpp {
 	newPath->appendPath (bp2max);
 	newPath->appendPath (bp3);
   */
-    stateFrames.push_back(std::make_pair(0,start_));
+    stateFrames.clear();
+    stateFrames.push_back(std::make_pair(0,state1));
    /* if(contactState1.ignore6DOF && (lenghtTakeoff != lenghtTakeoff6DOF))
         stateFrames.push_back(std::make_pair(lenghtTakeoff6DOF,contactTransition1));*/
     stateFrames.push_back(std::make_pair(lenghtTakeoff,contactState1));
@@ -530,17 +533,15 @@ namespace hpp {
     stateFrames.push_back(std::make_pair(bp->length() - lenghtLanding,contactState2));
    /* if(contactState2.ignore6DOF && (lenghtLanding != lenghtLanding6DOF))
         stateFrames.push_back(std::make_pair(bp->length() -lenghtLanding6DOF,contactTransition2));*/
-    stateFrames.push_back(std::make_pair(bp->length(),end_));
+    stateFrames.push_back(std::make_pair(bp->length(),state2));
   
   pathLimb = rbprm::interpolation::interpolateStates(robot_,problem_,bp,stateFrames.begin(),stateFrames.end()-1,2);
-  bp->setLimbPath(pathLimb);
-  newPath->appendPath(bp);
+  newPath->appendPath(pathLimb);
   
 	subpath = subpath_next;
 	pp = boost::dynamic_pointer_cast<ParabolaPath>(subpath);
 	
 	if (i == subPathNumber - 2) { // subpath_next = final subpath
-    stateFrames.clear();
 	  q1contact = q2contact;
 	  state1 = state2;
 	  q2contact = qEnd;
@@ -549,6 +550,7 @@ namespace hpp {
 	  // Compute top-keyframe and adapt ballistic-path with it
 	  bp = Interpolate (q1contact, q2contact, subpath->length (),
 			    subpath->coefficients ());
+    bp->lastRootIndex(lastRootIndex_);
 	  stateTop = computeTopExtendingPose (subpath, bp,lenghtTop);
 	  //bp1max = Interpolate (q1contact, q_max,	lenghtTop,	subpath->coefficients ());
 	  //bp2max = Interpolate (q_max, q2contact,	bp->length()-lenghtTop,	subpath->coefficients ());
@@ -573,7 +575,8 @@ namespace hpp {
 	  newPath->appendPath (bp1max);
 	  newPath->appendPath (bp2max);
 	  newPath->appendPath (bp3);*/
-      stateFrames.push_back(std::make_pair(0,start_));
+      stateFrames.clear();
+      stateFrames.push_back(std::make_pair(0,state1));
      /* if(contactState1.ignore6DOF && (lenghtTakeoff != lenghtTakeoff6DOF))
           stateFrames.push_back(std::make_pair(lenghtTakeoff6DOF,contactTransition1));*/
       stateFrames.push_back(std::make_pair(lenghtTakeoff,contactState1));
@@ -581,11 +584,10 @@ namespace hpp {
       stateFrames.push_back(std::make_pair(bp->length() - lenghtLanding,contactState2));
      /* if(contactState2.ignore6DOF && (lenghtLanding != lenghtLanding6DOF))
           stateFrames.push_back(std::make_pair(bp->length() -lenghtLanding6DOF,contactTransition2));*/
-      stateFrames.push_back(std::make_pair(bp->length(),end_));
+      stateFrames.push_back(std::make_pair(bp->length(),state2));
     
     pathLimb = rbprm::interpolation::interpolateStates(robot_,problem_,bp,stateFrames.begin(),stateFrames.end()-1,2);
-    bp->setLimbPath(pathLimb);
-    newPath->appendPath(bp);
+    newPath->appendPath(pathLimb);
     
 	}//if final subpath
       }// for subpaths
