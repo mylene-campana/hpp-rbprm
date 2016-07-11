@@ -155,6 +155,7 @@ using namespace model;
         std::vector<std::string> res;
         for(rbprm::T_Limb::const_iterator cit = limbs.begin(); cit != limbs.end(); ++cit)
         {
+            hppDout(info,"all effector names + "<<cit->first);
             res.push_back(cit->first);
         }
         return res;
@@ -176,22 +177,27 @@ using namespace model;
             std::cout << "constraint " << *cit << std::endl;
             RbPrmLimbPtr_t limb = helper.fullbody_->GetLimbs().at(*cit);
             const fcl::Vec3f& ppos  = from.contactPositions_.at(*cit);
-            const fcl::Matrix3f& rotation = from.contactRotation_.at(*cit);
+
             JointPtr_t effectorJoint = device->getJointByName(limb->effector_->name());
             proj->add(core::NumericalConstraint::create (
                                     constraints::deprecated::Position::create("",device,
                                                                   effectorJoint,fcl::Vec3f(0,0,0), ppos)));
             if(limb->contactType_ == hpp::rbprm::_6_DOF && !to.ignore6DOF)
             {
+                const fcl::Matrix3f& rotation = from.contactRotation_.at(*cit);
+
                 proj->add(core::NumericalConstraint::create (constraints::deprecated::Orientation::create("", device,
                                                                                   effectorJoint,
                                                                                   rotation,
                                                                                   cosntraintsR)));
+
             }
         }
         //LockRootAndNonContributingJoints(device, proj, fixed, from, to );
+
         cSet->addConstraint(proj);
         problem.constraints(cSet);
+
     }
 
     void SetPathValidation(LimbRRTHelper& helper)
@@ -210,7 +216,8 @@ using namespace model;
         core::PathPtr_t rootPath = helper.rootPath_;
         const rbprm::T_Limb& limbs = helper.fullbody_->GetLimbs();
         // get limbs that moved
-        std::vector<std::string> variations = to.allVariations(from,extractEffectorsName(limbs));
+        //std::vector<std::string> variations = to.allVariations(from,extractEffectorsName(limbs));
+        std::vector<std::string> variations = extractEffectorsName(limbs);
         for(std::vector<std::string>::const_iterator cit = variations.begin();
             cit != variations.end(); ++cit)
         {

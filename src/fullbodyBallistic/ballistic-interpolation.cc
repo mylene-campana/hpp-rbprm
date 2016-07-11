@@ -473,17 +473,17 @@ namespace hpp {
 	state2 = ComputeContacts(robot_, q2, collisionObjects, dir);
 	q2contact = computeContactPose(state2);
 	// compute average-normal corresponding to new contacts
-	std::queue<std::string> contactStack = state2.contactOrder_;
+    //std::queue<std::string> contactStack = state2.contactOrder_;
 	fcl::Vec3f normalAv = (0,0,0);
-	const std::size_t contactNumber = contactStack.size ();
-	while(!contactStack.empty())
+    /*const std::size_t contactNumber = contactStack.size ();
+    while(!contactStack.empty())
         {
 	  const std::string name = contactStack.front();
 	  contactStack.pop();
 	  const fcl::Vec3f& normal = state2.contactNormals_.at(name);
 	  for (std::size_t j = 0; j < 3; j++)
 	    normalAv [j] += normal [j]/contactNumber;
-	}
+    }*/
 	normalAv.normalize ();
 	hppDout (info, "normed normalAv= " << normalAv);
 	// If robot has ECS, fill new average-normal in it
@@ -702,6 +702,15 @@ namespace hpp {
       hppDout(notice, "TIME final contact transition frame  = "<<bp->length() - lenghtLanding6DOF);
       hppDout(notice, "TIME final state frame  = "<<bp->length());
       hppDout(notice,"test last root index interpolate = "<<bp->lastRootIndex());
+
+
+      for( rbprm::T_Limb::const_iterator lit = robot_->GetLimbs().begin();lit != robot_->GetLimbs().end(); ++lit){
+        hppDout(notice,"LIST OF LIMBS END : "<< lit->first << "contact = "<<((end_.contacts_.find(lit->first) != end_.contacts_.end()) && end_.contacts_.at(lit->first)));
+      }
+
+      for( rbprm::T_Limb::const_iterator lit = robot_->GetLimbs().begin();lit != robot_->GetLimbs().end(); ++lit){
+        hppDout(notice,"LIST OF LIMBS END_extend : "<< lit->first << "contact = "<<contactTransition2.contacts_[lit->first]);
+      }
       pathLimb = rbprm::interpolation::interpolateStates(robot_,problem_,bp,stateFrames.begin(),stateFrames.end()-1,2);
     //  bp->setLimbPath(pathLimb);
       newPath->appendPath(pathLimb);

@@ -158,8 +158,7 @@ namespace hpp {
                 inContact=false;
                 if(contacts_.find(*cit) != contacts_.end())
                   inContact = contacts_.at(*cit);
-                if(std::find(contactVariations.begin(), contactVariations.end(), *cit) == contactVariations.end()
-                  && !inContact)
+                if(!inContact || (inContact && (std::find(contactVariations.begin(),contactVariations.end(),*cit) == contactVariations.end()) ))
                 {
                     res.push_back(*cit);
                 }
@@ -183,12 +182,22 @@ namespace hpp {
 
         std::vector<std::string> allVariations(const State& previous, const std::vector<std::string>& allEffectors) const
         {
-            std::vector<std::string> contactVariations = variations(previous);
+            std::vector<std::string> contactVariations;
+            bool inContact;
+            for(std::vector<std::string>::const_iterator cit = allEffectors.begin();
+                cit != allEffectors.end(); ++cit){
+                inContact = false;
+                if(previous.contacts_.find(*cit) != previous.contacts_.end())
+                    inContact = previous.contacts_.at(*cit);
+                if(inContact)
+                    contactVariations.push_back(*cit);
+            }
             return freeLimbMotions(allEffectors, contactVariations);
         }
 
         std::vector<std::string> fixedContacts(const State& previous) const
         {
+            hppDout(notice,"contact fixed : ");
             std::vector<std::string> res;
             std::vector<std::string> variations = this->variations(previous);
             for(std::map<std::string, fcl::Vec3f>::const_iterator cit = contactPositions_.begin();
@@ -205,17 +214,39 @@ namespace hpp {
         
         std::vector<std::string> allFixedContacts(const State& previous,const std::vector<std::string>& allEffectors) const
         {
+          /*  hppDout(notice,"contact all fixed : ");
+
             std::vector<std::string> res;
             std::vector<std::string> variations = this->allVariations(previous,allEffectors);
-            for(std::map<std::string, fcl::Vec3f>::const_iterator cit = contactPositions_.begin();
-                cit != contactPositions_.end(); ++cit)
+            for(std::vector<std::string>::const_iterator cit = allEffectors.begin() ; cit != allEffectors.end() ; ++cit)
             {
-                const std::string& name = cit->first;
-                if(std::find(variations.begin(), variations.end(), name) == variations.end()){
-                    hppDout(notice,"Contact Allfixed : "<<name);
-                    res.push_back(name);
+                hppDout(notice,"cit = "<<*cit);
+                if(std::find(variations.begin(), variations.end(), *cit) == variations.end()){
+                    hppDout(notice,"Contact Allfixed : "<<*cit);
+                    res.push_back(*cit);
                 }
             }
+            return res;*/
+
+            hppDout(notice,"contact all fixed : ");
+            std::vector<std::string> res;
+            bool inContact;
+            for(std::vector<std::string>::const_iterator cit = allEffectors.begin() ; cit != allEffectors.end() ; ++cit){
+               inContact = false;
+               if(contacts_.find(*cit) != contacts_.end())
+                   inContact = contacts_.at(*cit);
+
+               if(inContact && (previous.contacts_.find(*cit) != previous.contacts_.end()))
+                   inContact = previous.contacts_.at(*cit);
+               else
+                   inContact = false;
+
+               if(inContact){
+                   res.push_back(*cit);
+                   hppDout(notice,"Contact Allfixed : "<<*cit);
+                }
+            }
+
             return res;
         }
 
