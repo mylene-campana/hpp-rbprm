@@ -73,6 +73,7 @@ namespace hpp {
     {
         assert (device);
         assert (length >= 0);
+
         lastRootIndex_ = bp->lastRootIndex();
     }
 
@@ -126,7 +127,7 @@ namespace hpp {
                 result[i] = initial_[i];
             }
             if(rootPath_){
-              Configuration_t q_root(result.size());
+              Configuration_t q_root(result.size() -1);
               (*rootPath_)(q_root,param);
               for(size_t i = 0 ; i < lastRootIndex_ ; i++){
                 hppDout(info,"i = "<<i);
@@ -141,7 +142,7 @@ namespace hpp {
                 result[i] = end_[i];
             }
             if(rootPath_){
-              Configuration_t q_root(result.size());
+              Configuration_t q_root(result.size() - 1 );
               (*rootPath_)(q_root,param);
               for(size_t i = 0 ; i < lastRootIndex_ ; i++){
                 result[i] = q_root[i];
@@ -157,7 +158,7 @@ namespace hpp {
         result[pathDofRank_] = paramRoot;
 
         if(rootPath_){
-          Configuration_t q_root(result.size());
+          Configuration_t q_root(result.size() - 1);
           (*rootPath_)(q_root,paramRoot);
           for(size_t i = 0 ; i < lastRootIndex_ ; i++){
             result[i] = q_root[i];
@@ -171,9 +172,17 @@ namespace hpp {
     {
         // Length is assumed to be proportional to interval range
         bool success;
+        
+        value_type intFirst = subInterval.first;
+        value_type intSecond = subInterval.second;
+        
+        if(subInterval.first > subInterval.second){
+          intFirst = subInterval.second;
+          intSecond = subInterval.first;
+        }
 
-        Configuration_t q1 ((*this) (subInterval.first, success));
-        Configuration_t q2 ((*this) (subInterval.second, success));
+        Configuration_t q1 ((*this) (intFirst, success));
+        Configuration_t q2 ((*this) (intSecond, success));
 
         value_type l;
         if(bp_)
@@ -181,6 +190,8 @@ namespace hpp {
         if(tbp_)
             l = tbp_->computeLength (q1 ,q2);
 
+        interval_t subInterval2(intFirst,intSecond);
+        hppDout(notice,"EXTRACT LIMB PATH : lenght = "<<l<<"  subinterval = "<<intSecond-intFirst);
         if (!success) throw projection_error
                 ("Failed to apply constraints in StraightPath::extract");        
 

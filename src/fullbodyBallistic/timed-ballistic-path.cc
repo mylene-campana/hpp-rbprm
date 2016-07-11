@@ -24,6 +24,7 @@
 #include <hpp/core/config-projector.hh>
 #include <hpp/rbprm/fullbodyBallistic/timed-ballistic-path.hh>
 #include <hpp/core/straight-path.hh>
+#include <Eigen/Geometry>
 
 namespace hpp {
   namespace rbprm {
@@ -130,9 +131,15 @@ namespace hpp {
       
         
       // replace with the correct position / orientation for the center
+
       result[0] = xTheta*cos(theta_) + initial_[0];
       result[1] = xTheta*sin(theta_) + initial_[1];     
       result[2] = -0.5*g_*t*t + v0_*sin(alpha_)*t + initial_[2];
+      
+      
+      std::cout<<"t = "<<t;
+      std::cout<<"   ; z0 = "<<initial_[2]<< "   ; z = "<<result[2]<<"  ; alpha0 = "<<alpha_<<std::endl;
+      
       
       /* Quaternions interpolation */
       u = t/length_;
@@ -154,11 +161,13 @@ namespace hpp {
     
     core::PathPtr_t TimedBallisticPath::extract (const interval_t& subInterval) const throw (hpp::core::projection_error)
     {
-      core::PathPtr_t extractBp = bp_->extract(subInterval);
       bool success;
+      hppDout(notice,"extract timed path : "<<subInterval.second - subInterval.first);
       core::Configuration_t q1 ((*this) (subInterval.first, success)); // straight
       core::Configuration_t q2 ((*this) (subInterval.second, success)); // straight
-      core::PathPtr_t result = rbprm::TimedBallisticPath::create(device_,q1,q2,computeLength(q1,q2),alpha_,theta_,velocityAtParam(subInterval.first),
+      interval_t bpInterval(bp_->computeLength(bp_->initial(),q1),bp_->computeLength(bp_->initial(),q2));
+      core::PathPtr_t extractBp = bp_->extract(bpInterval);
+      core::PathPtr_t result = rbprm::TimedBallisticPath::create(device_,q1,q2,computeLength(q1,q2),alphaAtParam(subInterval.first),theta_,velocityAtParam(subInterval.first),
                                                                  boost::dynamic_pointer_cast<BallisticPath>(extractBp),lastRootIndex_);
       return result;
     }
@@ -184,6 +193,20 @@ namespace hpp {
       return v;
     }
     
+    value_type TimedBallisticPath::alphaAtParam(value_type t) const{
+      Eigen::Vector3d dir = evaluateVelocity(t);
+      Eigen::Vector3d xTheta(cos(theta_),sin(theta_),0);
+      dir.normalize();
+      xTheta.normalize();
+      hppDout(notice,"direction for alpha = "<<dir);
+      hppDout(notice,"xTheta for alpha = "<<xTheta);
+      value_type alphaT = acos(xTheta.dot(dir));
+      if(dir[2] < 0 )
+        alphaT = -alphaT;
+      hppDout(notice,"Current alpha = "<<alphaT<< " with alpha0 = "<<alpha_<<"  ; at t ="<<t);
+      return alphaT;
+    }
+    
     value_type TimedBallisticPath::computeLength
     (const core::ConfigurationIn_t q1, const core::ConfigurationIn_t q2) const {
       value_type z = q1[2] - q2[2]; // difference of height
@@ -198,6 +221,7 @@ namespace hpp {
       hppDout(notice,"xTheta1 = "<<xTheta1<< "   , xTheta2 = "<<xTheta2);
       return lenght;
     }
+    
     
 
     vector_t TimedBallisticPath::evaluateVelocity (const value_type t) const {
@@ -215,6 +239,8 @@ namespace hpp {
       vel [2] = x_theta_0_dot * (-9.81 * (x_theta - x_theta_0)*inv_x_theta_0_dot_sq + tan(alpha));
       return vel;
     }
+    
+
     
     
   } //   namespace rbprm

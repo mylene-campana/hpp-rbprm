@@ -147,6 +147,8 @@ namespace hpp {
       
 
       value_type velocityAtParam(double t) const;
+      
+      value_type alphaAtParam(value_type t) const;
 
       core::vector_t evaluateVelocity (const value_type t) const;
 
@@ -218,6 +220,14 @@ namespace hpp {
       value_type theta(){return theta_;}
       value_type v0(){return v0_;}
       
+      
+      value_type sgn(value_type val) const {
+          return (value_type(0) < val) - (val < value_type(0));
+      }
+      
+      
+      BallisticPathPtr_t bp(){return bp_;}
+      
       /// Evaluate velocity vector at path abcissa t
       
     protected:
@@ -260,6 +270,7 @@ namespace hpp {
         parent_t::initCopy (self);
         weak_ = self;
       }
+     
       
       /// Same as parabola-path for trunk (freeflyer + internal trunk DOF)
       /// Param is the curvilinear abcissa \in [0 : pathLength]
