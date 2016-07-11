@@ -789,14 +789,17 @@ namespace hpp {
       problem_->configValidations()->validate(config, report);
       core::RbprmValidationReportPtr_t rbReport =
 	boost::dynamic_pointer_cast<core::RbprmValidationReport> (report);
-      if(!rbReport)
-	hppDout(error,"Validation Report cannot be cast");
+      if(rbReport){
       hppDout (info, "nbROM= " << rbReport->ROMReports.size());
       for (std::map<std::string,core::CollisionValidationReportPtr_t>::const_iterator it = rbReport->ROMReports.begin(); it != rbReport->ROMReports.end(); it++) {
 	std::string ROMname = it->first;
 	hppDout (info, "ROMname= " << ROMname);
 	(*ROMnames).push_back (ROMname);
+      }
 
+      }else{
+        hppDout(error,"Validation Report cannot be cast");
+        
       }
     }
 
