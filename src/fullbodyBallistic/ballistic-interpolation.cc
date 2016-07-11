@@ -535,6 +535,24 @@ namespace hpp {
         stateFrames.push_back(std::make_pair(bp->length() -lenghtLanding6DOF,contactTransition2));*/
     stateFrames.push_back(std::make_pair(bp->length(),state2));
   
+    
+    hppDout(notice, "position initial state frame  = "<<displayConfig(state1.configuration_));
+    hppDout(notice, "position initial Contact transition state frame  = "<<displayConfig(contactTransition1.configuration_));
+    hppDout(notice, "position initial Contact state frame  = "<<displayConfig(contactState1.configuration_));
+    hppDout(notice, "position top frame  = "<<displayConfig(stateTop.configuration_));
+    hppDout(notice, "position final contact frame  = "<<displayConfig(contactState2.configuration_));
+    hppDout(notice, "position final Contact transition state frame  = "<<displayConfig(contactTransition2.configuration_));
+    hppDout(notice, "position final state frame  = "<<displayConfig(state2.configuration_));
+    hppDout(notice, "TIME initial state frame  = "<<0);
+    hppDout(notice, "TIME initial Contact transition state frame  = "<<lenghtTakeoff6DOF);
+    hppDout(notice, "TIME initial Contact state frame  = "<<lenghtTakeoff);
+    hppDout(notice, "TIME top frame  = "<<lenghtTop);
+    hppDout(notice, "TIME final contact frame  = "<<bp->length() - lenghtLanding);
+    hppDout(notice, "TIME final contact transition frame  = "<<bp->length() - lenghtLanding6DOF);
+    hppDout(notice, "TIME final state frame  = "<<bp->length());
+    hppDout(notice,"test last root index interpolate = "<<bp->lastRootIndex());
+    
+    
   pathLimb = rbprm::interpolation::interpolateStates(robot_,problem_,bp,stateFrames.begin(),stateFrames.end()-1,2);
   newPath->appendPath(pathLimb);
   
@@ -585,6 +603,22 @@ namespace hpp {
      /* if(contactState2.ignore6DOF && (lenghtLanding != lenghtLanding6DOF))
           stateFrames.push_back(std::make_pair(bp->length() -lenghtLanding6DOF,contactTransition2));*/
       stateFrames.push_back(std::make_pair(bp->length(),state2));
+      
+      hppDout(notice, "position initial state frame  = "<<displayConfig(state1.configuration_));
+      hppDout(notice, "position initial Contact transition state frame  = "<<displayConfig(contactTransition1.configuration_));
+      hppDout(notice, "position initial Contact state frame  = "<<displayConfig(contactState1.configuration_));
+      hppDout(notice, "position top frame  = "<<displayConfig(stateTop.configuration_));
+      hppDout(notice, "position final contact frame  = "<<displayConfig(contactState2.configuration_));
+      hppDout(notice, "position final Contact transition state frame  = "<<displayConfig(contactTransition2.configuration_));
+      hppDout(notice, "position final state frame  = "<<displayConfig(state2.configuration_));
+      hppDout(notice, "TIME initial state frame  = "<<0);
+      hppDout(notice, "TIME initial Contact transition state frame  = "<<lenghtTakeoff6DOF);
+      hppDout(notice, "TIME initial Contact state frame  = "<<lenghtTakeoff);
+      hppDout(notice, "TIME top frame  = "<<lenghtTop);
+      hppDout(notice, "TIME final contact frame  = "<<bp->length() - lenghtLanding);
+      hppDout(notice, "TIME final contact transition frame  = "<<bp->length() - lenghtLanding6DOF);
+      hppDout(notice, "TIME final state frame  = "<<bp->length());
+      hppDout(notice,"test last root index interpolate = "<<bp->lastRootIndex());
     
     pathLimb = rbprm::interpolation::interpolateStates(robot_,problem_,bp,stateFrames.begin(),stateFrames.end()-1,2);
     newPath->appendPath(pathLimb);

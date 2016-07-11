@@ -195,8 +195,26 @@ namespace hpp {
                 cit != contactPositions_.end(); ++cit)
             {
                 const std::string& name = cit->first;
-                if(std::find(variations.begin(), variations.end(), name) == variations.end())
+                if(std::find(variations.begin(), variations.end(), name) == variations.end()){
+                    hppDout(notice,"Contact fixed : "<<name);
                     res.push_back(name);
+                }
+            }
+            return res;
+        }
+        
+        std::vector<std::string> allFixedContacts(const State& previous,const std::vector<std::string>& allEffectors) const
+        {
+            std::vector<std::string> res;
+            std::vector<std::string> variations = this->allVariations(previous,allEffectors);
+            for(std::map<std::string, fcl::Vec3f>::const_iterator cit = contactPositions_.begin();
+                cit != contactPositions_.end(); ++cit)
+            {
+                const std::string& name = cit->first;
+                if(std::find(variations.begin(), variations.end(), name) == variations.end()){
+                    hppDout(notice,"Contact Allfixed : "<<name);
+                    res.push_back(name);
+                }
             }
             return res;
         }

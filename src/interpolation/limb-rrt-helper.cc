@@ -150,10 +150,22 @@ using namespace model;
         tools::LockJointRec(spared, device->rootJoint(), projector);
     }
 
+    std::vector<std::string> extractEffectorsName(const rbprm::T_Limb& limbs)
+    {
+        std::vector<std::string> res;
+        for(rbprm::T_Limb::const_iterator cit = limbs.begin(); cit != limbs.end(); ++cit)
+        {
+            res.push_back(cit->first);
+        }
+        return res;
+    }
+
+    
     void AddContactConstraints(LimbRRTHelper& helper, const State& from, const State& to)
     {
         std::vector<bool> cosntraintsR = setMaintainRotationConstraints();
-        std::vector<std::string> fixed = to.fixedContacts(from);
+        const rbprm::T_Limb& limbs = helper.fullbody_->GetLimbs();        
+        std::vector<std::string> fixed = to.allFixedContacts(from,extractEffectorsName(limbs));
         core::Problem& problem = helper.rootProblem_;
         model::DevicePtr_t device = problem.robot();
         core::ConstraintSetPtr_t cSet = core::ConstraintSet::create(device,"");
@@ -189,15 +201,6 @@ using namespace model;
         helper.rootProblem_.pathValidation(pathVal);
     }
 
-    std::vector<std::string> extractEffectorsName(const rbprm::T_Limb& limbs)
-    {
-        std::vector<std::string> res;
-        for(rbprm::T_Limb::const_iterator cit = limbs.begin(); cit != limbs.end(); ++cit)
-        {
-            res.push_back(cit->first);
-        }
-        return res;
-    }
 
     }
 
