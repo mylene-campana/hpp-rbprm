@@ -130,7 +130,6 @@ namespace hpp {
               Configuration_t q_root(result.size() -1);
               (*rootPath_)(q_root,param);
               for(size_t i = 0 ; i < lastRootIndex_ ; i++){
-                hppDout(info,"i = "<<i);
                 result[i] = q_root[i];
               }
             }
@@ -156,7 +155,7 @@ namespace hpp {
         model::interpolate (device_, initial_, end_, u, result);
         value_type paramRoot = ComputeExtraDofValue(pathDofRank_,initial_, end_, u);
         result[pathDofRank_] = paramRoot;
-
+        hppDout(notice,"paramRoot = "<<paramRoot<<"  ; max = "<<end_[pathDofRank_]<<" ; length ="<<length());
         if(rootPath_){
           Configuration_t q_root(result.size() - 1);
           (*rootPath_)(q_root,paramRoot);

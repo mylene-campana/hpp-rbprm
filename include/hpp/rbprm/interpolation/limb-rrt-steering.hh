@@ -125,21 +125,21 @@ namespace hpp {
           hppDout(notice,"create path with ballistic root");
           BallisticPathPtr_t bpExtract =  BallisticPath::create(bp_->device(),q1,q2,length,bp_->coefficients(),bp_->lastRootIndex());
           path = LimbRRTPath::create
-            (problem_->robot(), q1, q2, length, c, pathDofRank_,bpExtract);
+            (problem_->robot(), q11, q22, length, c, pathDofRank_,bpExtract);
         }
         else if(tbp_){
           hppDout(notice,"create path with ballistic root");
-	      length = tbp_->ballisticPath()->computeLength(q1,q2);
+          length = tbp_->ballisticPath()->computeLength(q1,q2);
           BallisticPathPtr_t bpExtract =  BallisticPath::create(tbp_->device(),q1,q2,length,tbp_->coefficients(),tbp_->lastRootIndex());
           TimedBallisticPathPtr_t tbpExtract =  TimedBallisticPath::create(bpExtract);
- 		  length = tbpExtract->length();
+          length = tbpExtract->length();
           size_t rankParamRoot = q1.size() - 1;
           core::Configuration_t q11(q1);
           q11[rankParamRoot] = 0.;
           core::Configuration_t q22(q2);
           q22[rankParamRoot] = length;          
 	      path = LimbRRTPath::create
-            (problem_->robot(), q1, q2, length, c, pathDofRank_,tbpExtract);
+            (problem_->robot(), q11, q22, length, c, pathDofRank_,tbpExtract);
         }
         else{
           hppDout(notice,"create path without root path");

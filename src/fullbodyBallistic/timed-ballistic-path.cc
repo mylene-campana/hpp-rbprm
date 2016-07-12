@@ -137,8 +137,8 @@ namespace hpp {
       result[2] = -0.5*g_*t*t + v0_*sin(alpha_)*t + initial_[2];
       
       
-      std::cout<<"t = "<<t;
-      std::cout<<"   ; z0 = "<<initial_[2]<< "   ; z = "<<result[2]<<"  ; alpha0 = "<<alpha_<<std::endl;
+    // std::cout<<"t = "<<t;
+     // std::cout<<"   ; z0 = "<<initial_[2]<< "   ; z = "<<result[2]<<"  ; alpha0 = "<<alpha_<<std::endl;
       
       
       /* Quaternions interpolation */
