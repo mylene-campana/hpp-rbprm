@@ -312,7 +312,8 @@ namespace hpp {
       core::Configuration_t q_top;
       const std::string robotName = robot_->device_->name ();
       hppDout (info, "robotName= " << robotName);
-      const bool parabTallEnough = (robotName.compare ("ant") == 0 &&  z_x_theta_max > 0.44) || (robotName.compare ("spiderman") == 0 &&  z_x_theta_max > 1.1) || (robotName.compare ("frog") == 0 &&  z_x_theta_max > 0.2);
+      hppDout (info, "z_x_theta_max= " << z_x_theta_max);
+      const bool parabTallEnough = (robotName.compare ("ant") == 0 &&  z_x_theta_max > 0.44) || (robotName.compare ("spiderman") == 0 &&  z_x_theta_max > 1.1) || (robotName.compare ("frog") == 0 &&  z_x_theta_max > 0.2) || (robotName.compare ("armlessSkeleton") == 0 &&  z_x_theta_max > 0.6);
       value_type r = 0.5; // blending coefficient of extending key-frame
       const Configuration_t q_interp_top = (*bp) (u_max*pathLength, success);
       lenght = u_max*pathLength;
@@ -470,6 +471,8 @@ namespace hpp {
 	Vimp = pp->Vimp_; // Vimp_i
 	dir = computeDir (V0, Vimp);
 	hppDout (info, "dir (Vimp-V0)= " << dir);
+	robot_->V0dir_ = V0;
+	robot_->Vfdir_ = Vimp;
 	state2 = ComputeContacts(robot_, q2, collisionObjects, dir);
 	q2contact = computeContactPose(state2);
 	// compute average-normal corresponding to new contacts

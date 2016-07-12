@@ -107,6 +107,9 @@ namespace hpp {
 	std::map<std::string, core::CollisionValidationPtr_t> getLimbcollisionValidations () { return limbcollisionValidations_; }
         const model::DevicePtr_t device_;
 	bool noStability_;
+	core::vector_t V0dir_;
+	core::vector_t Vfdir_;
+	core::value_type mu_; // friction coef
 
     private:
         core::CollisionValidationPtr_t collisionValidation_;
