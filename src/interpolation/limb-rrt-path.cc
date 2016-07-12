@@ -137,10 +137,10 @@ namespace hpp {
         model::interpolate (device_, initial_, end_, u, result);
         value_type paramRoot = ComputeExtraDofValue(pathDofRank_,initial_, end_, u);
         result[pathDofRank_] = paramRoot;
-
+        hppDout(notice,"paramRoot = "<<paramRoot<<"  ; max = "<<end_[pathDofRank_]<<" ; length ="<<length());
         if(rootPath_){
           Configuration_t q_root(rootPath_->device()->configSize());
-          (*rootPath_)(q_root,param);
+          (*rootPath_)(q_root,paramRoot);
           for(size_t i = 0 ; i < lastRootIndex_ ; i++){
             result[i] = q_root[i];
           }
@@ -161,10 +161,11 @@ namespace hpp {
 
         if (!success) throw projection_error
                 ("Failed to apply constraints in StraightPath::extract");        
-        q1[pathDofRank_] = ComputeExtraDofValue(pathDofRank_,initial_, end_, (subInterval.first - timeRange().first)  / (timeRange().second - timeRange().first));
-        if (!success) throw projection_error
-                ("Failed to apply constraints in StraightPath::extract");
-        q2[pathDofRank_] = ComputeExtraDofValue(pathDofRank_,initial_, end_, (subInterval.second - timeRange().first)  / (timeRange().second - timeRange().first));
+      //  q1[pathDofRank_] = ComputeExtraDofValue(pathDofRank_,initial_, end_, (subInterval.first - timeRange().first)  / (timeRange().second - timeRange().first));
+        q1[pathDofRank_] = 0.;
+        q2[pathDofRank_] = l;
+        
+        //q2[pathDofRank_] = ComputeExtraDofValue(pathDofRank_,initial_, end_, (subInterval.second - timeRange().first)  / (timeRange().second - timeRange().first));
         core::PathPtr_t extractRoot = rootPath_->extract(subInterval);
         PathPtr_t result = LimbRRTPath::create (device_, q1, q2, l,
                            constraints (), pathDofRank_,boost::dynamic_pointer_cast<BallisticPath>(extractRoot));

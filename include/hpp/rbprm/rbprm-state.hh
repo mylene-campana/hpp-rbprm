@@ -151,19 +151,21 @@ namespace hpp {
         std::vector<std::string> freeLimbMotions(const std::vector<std::string>& allEffectors, const std::vector<std::string>& contactVariations) const
         {
             std::vector<std::string> res;
-            bool inContact;
+            bool contactTo;
             for(std::vector<std::string>::const_iterator cit = allEffectors.begin();
                 cit != allEffectors.end(); ++cit)
             {
-                inContact=false;
+                contactTo=false;
                 if(contacts_.find(*cit) != contacts_.end())
-                  inContact = contacts_.at(*cit);
-                if(!inContact || (inContact && (std::find(contactVariations.begin(),contactVariations.end(),*cit) == contactVariations.end()) ))
+                  contactTo = contacts_.at(*cit);
+                
+                // contact in previous OR current state
+                if(contactTo || (std::find(contactVariations.begin(),contactVariations.end(),*cit) != contactVariations.end()))
                 {
                     res.push_back(*cit);
                 }
             }
-            std::cout<<"Free limbs motions = ";
+            std::cout<<"limbs motions = ";
             for(size_t i = 0 ; i < res.size() ; i++){
               std::cout<<res[i]<<"  ;  ";
             }

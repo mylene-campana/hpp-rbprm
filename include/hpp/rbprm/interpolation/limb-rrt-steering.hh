@@ -112,11 +112,16 @@ namespace hpp {
         }
         core::PathPtr_t path;
         if(bp_){
+          size_t rankParamRoot = q1.size() - 1;
+          core::Configuration_t q11(q1);
+          q11[rankParamRoot] = 0.;
+          core::Configuration_t q22(q2);
+          q22[rankParamRoot] = length;
           hppDout(notice,"create path with ballistic root");
-          BallisticPathPtr_t bpExtract =  BallisticPath::create(bp_->device(),q1,q2,length,bp_->coefficients());
+          BallisticPathPtr_t bpExtract =  BallisticPath::create(bp_->device(),q11,q22,length,bp_->coefficients());
           bpExtract->lastRootIndex(bp_->lastRootIndex());
           path = LimbRRTPath::create
-            (problem_->robot(), q1, q2, length, c, pathDofRank_,bpExtract);
+            (problem_->robot(), q11, q22, length, c, pathDofRank_,bpExtract);
         }
         else{
           hppDout(notice,"create path without root path");

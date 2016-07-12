@@ -216,8 +216,8 @@ using namespace model;
         core::PathPtr_t rootPath = helper.rootPath_;
         const rbprm::T_Limb& limbs = helper.fullbody_->GetLimbs();
         // get limbs that moved
-        //std::vector<std::string> variations = to.allVariations(from,extractEffectorsName(limbs));
-        std::vector<std::string> variations = extractEffectorsName(limbs);
+        std::vector<std::string> variations = to.allVariations(from,extractEffectorsName(limbs));
+        //std::vector<std::string> variations = extractEffectorsName(limbs);
         for(std::vector<std::string>::const_iterator cit = variations.begin();
             cit != variations.end(); ++cit)
         {
@@ -226,7 +226,7 @@ using namespace model;
             SetConfigShooter(helper,limbs.at(*cit),rootPath);
 
             ConfigurationPtr_t start = limbRRTConfigFromDevice(helper, from, 0.);
-            ConfigurationPtr_t end   = limbRRTConfigFromDevice(helper, to  , 1.);
+            ConfigurationPtr_t end   = limbRRTConfigFromDevice(helper, to  ,rootPath->length());
             helper.rootProblem_.initConfig(start);
             BiRRTPlannerPtr_t planner = BiRRTPlanner::create(helper.rootProblem_);
             ProblemTargetPtr_t target = problemTarget::GoalConfigurations::create (planner);
