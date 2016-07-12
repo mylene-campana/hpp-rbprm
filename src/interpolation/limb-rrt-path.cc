@@ -137,7 +137,6 @@ namespace hpp {
         model::interpolate (device_, initial_, end_, u, result);
         value_type paramRoot = ComputeExtraDofValue(pathDofRank_,initial_, end_, u);
         result[pathDofRank_] = paramRoot;
-        hppDout(notice,"paramRoot = "<<paramRoot<<"  ; max = "<<end_[pathDofRank_]<<" ; length ="<<length());
         if(rootPath_){
           Configuration_t q_root(rootPath_->device()->configSize());
           (*rootPath_)(q_root,paramRoot);

@@ -298,6 +298,7 @@ using namespace model;
         assert(distance < 100);
         // treat each interpolation between two states separatly
         // in a different thread
+        #pragma omp parallel for
         for(std::size_t i = 0; i < distance; ++i)
         {
             CIT_StateFrame a, b;
