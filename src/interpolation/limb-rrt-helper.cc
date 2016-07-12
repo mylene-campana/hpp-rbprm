@@ -193,7 +193,6 @@ using namespace model;
 
             }
         }
-        //LockRootAndNonContributingJoints(device, proj, fixed, from, to );
 
         cSet->addConstraint(proj);
         problem.constraints(cSet);
@@ -217,6 +216,7 @@ using namespace model;
         const rbprm::T_Limb& limbs = helper.fullbody_->GetLimbs();
         // get limbs that moved
         std::vector<std::string> variations = to.allVariations(from,extractEffectorsName(limbs));
+        
         //std::vector<std::string> variations = extractEffectorsName(limbs);
         for(std::vector<std::string>::const_iterator cit = variations.begin();
             cit != variations.end(); ++cit)
