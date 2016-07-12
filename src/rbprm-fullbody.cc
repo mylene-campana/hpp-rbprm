@@ -43,17 +43,10 @@ namespace hpp {
 				const core::vector_t& V0Dir,
 				const core::vector_t& VfDir,
 				const core::value_type& mu) {
-      hppDout (info, "V0Dir= " << V0Dir);
-      hppDout (info, "VfDir= " << VfDir);
-      hppDout (info, "n= " << n);
       const core::vector_t V0dir = V0Dir/V0Dir.norm ();
-      const core::vector_t Vfdir = VfDir/VfDir.norm ();
-      hppDout (info, "V0dir= " << V0dir);
-      hppDout (info, "Vfdir= " << Vfdir);
-      hppDout (info, "V0dir.dot(n)= " << V0dir.dot(n));
-      hppDout (info, "Vfdir.dot(n)= " << Vfdir.dot(n));
+      const core::vector_t Vfdir = -VfDir/VfDir.norm ();
       const core::value_type a1 = fabs(acos(V0dir.dot(n)));
-      const core::value_type a2 = fabs(acos(-Vfdir.dot(n)));
+      const core::value_type a2 = fabs(acos(Vfdir.dot(n)));
       const core::value_type phi = atan(mu);
       hppDout (info, "a1= " << a1);
       hppDout (info, "a2= " << a2);
@@ -65,12 +58,11 @@ namespace hpp {
     }
 
     fcl::Vec3f updateConeDirection (const State state) {
-      const std::size_t contactNumber = state.contactOrder_.size ();
+      const std::size_t contactNumber = state.contacts_.size ();
       fcl::Vec3f normalAv = (0,0,0);
       for(std::map<std::string, bool>::const_iterator cit = state.contacts_.begin() ; cit != state.contacts_.end() ; ++cit){
 	if(cit->second){ // in contact
 	  const fcl::Vec3f& normal = state.contactNormals_.at(cit->first);
-	  hppDout (info, "normal= " << normal);
 	  for (std::size_t j = 0; j < 3; j++)
 	    normalAv [j] += normal [j]/contactNumber;
 	}
@@ -500,8 +492,8 @@ namespace hpp {
 		      fcl::Vec3f n_fcl = updateConeDirection (tmp);
 		      hppDout (info, "n_fcl= " << n_fcl);
 		      core::vector_t n = n_fcl;
-		      //if (n.norm () < 1.1)
-		      //inCone = isCentroidalConeValid (n, V0Dir, VfDir, mu);
+		      if (n.norm () < 1.1)
+			inCone = isCentroidalConeValid (n, V0Dir, VfDir, mu);
 		      hppDout (info, "inCone?= " << inCone);
 		    } else
 		      hppDout (info, "problem initializing isCentroidalConeValid");

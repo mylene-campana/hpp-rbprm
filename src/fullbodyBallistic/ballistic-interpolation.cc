@@ -476,7 +476,7 @@ namespace hpp {
 	state2 = ComputeContacts(robot_, q2, collisionObjects, dir);
 	q2contact = computeContactPose(state2);
 	// compute average-normal corresponding to new contacts
-  const std::size_t contactNumber = state2.contactOrder_.size ();
+  const std::size_t contactNumber = state2.contacts_.size ();
   fcl::Vec3f normalAv = (0,0,0);
   for(std::map<std::string, bool>::const_iterator cit = state2.contacts_.begin() ; cit != state2.contacts_.end() ; ++cit){
    if(cit->second){ // in contact
