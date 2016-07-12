@@ -60,14 +60,32 @@ namespace hpp {
                                              core::value_type length,
                                              value_type alpha,
                                              value_type theta,
-                                             value_type v0)
+                                             value_type v0,BallisticPathPtr_t bp)
       {
         TimedBallisticPath* ptr = new TimedBallisticPath (device, init, end, length,
-                                                           alpha, theta, v0);
+                                                           alpha, theta, v0,bp);
         TimedBallisticPathPtr_t shPtr (ptr);
         ptr->init (shPtr);
         return shPtr;
       }
+
+      static TimedBallisticPathPtr_t create (const core::DevicePtr_t& device,
+                                             core::ConfigurationIn_t init,
+                                             core::ConfigurationIn_t end,
+                                             core::value_type length,
+                                             value_type alpha,
+                                             value_type theta,
+                                             value_type v0,BallisticPathPtr_t bp,size_t lastRootIndex)
+      {
+        TimedBallisticPath* ptr = new TimedBallisticPath (device, init, end, length,
+                                                           alpha, theta, v0,bp);
+        TimedBallisticPathPtr_t shPtr (ptr);
+        ptr->init (shPtr);
+        shPtr->lastRootIndex(lastRootIndex);
+        return shPtr;
+      }
+
+
       
       static TimedBallisticPathPtr_t create (const rbprm::BallisticPathPtr_t ballisticPath)
       {
@@ -127,6 +145,14 @@ namespace hpp {
         return createCopy (weak_.lock (), constraints);
       }
       
+
+      value_type velocityAtParam(double t) const;
+      
+      value_type alphaAtParam(value_type t) const;
+
+      core::vector_t evaluateVelocity (const value_type t) const;
+
+
       /// Extraction/Reversion of a sub-path
       /// \param subInterval interval of definition of the extract path
       /// If upper bound of subInterval is smaller than lower bound,
@@ -178,12 +204,29 @@ namespace hpp {
         return length_;
       }
       
+      BallisticPathPtr_t ballisticPath(){return bp_;}
 
-      
+      size_t lastRootIndex(){return lastRootIndex_;}
+
+      void lastRootIndex(size_t index){ lastRootIndex_ = index;}
+
+      core::vector_t coefficients () const {return bp_->coefficients();}
 
       
       core::value_type computeLength (const core::ConfigurationIn_t q1,
                                       const core::ConfigurationIn_t q2) const;
+
+      value_type alpha(){return alpha_;}
+      value_type theta(){return theta_;}
+      value_type v0(){return v0_;}
+      
+      
+      value_type sgn(value_type val) const {
+          return (value_type(0) < val) - (val < value_type(0));
+      }
+      
+      
+      BallisticPathPtr_t bp(){return bp_;}
       
       /// Evaluate velocity vector at path abcissa t
       
@@ -204,7 +247,7 @@ namespace hpp {
                           core::ConfigurationIn_t end, core::value_type length,
                           value_type alpha,
                           value_type theta,
-                          value_type v0);
+                          value_type v0, BallisticPathPtr_t bp);
       
       
       TimedBallisticPath (const BallisticPathPtr_t ballisticPath);
@@ -227,6 +270,7 @@ namespace hpp {
         parent_t::initCopy (self);
         weak_ = self;
       }
+     
       
       /// Same as parabola-path for trunk (freeflyer + internal trunk DOF)
       /// Param is the curvilinear abcissa \in [0 : pathLength]
@@ -247,8 +291,10 @@ namespace hpp {
       value_type theta_;
       value_type v0_;
       value_type g_;
+      size_t lastRootIndex_;
       value_type xTheta0_;
       // we use the 4 subpath for joint interpolation
+      BallisticPathPtr_t bp_;
       BallisticPathPtr_t bp1_;
       BallisticPathPtr_t bp1Max_;
       BallisticPathPtr_t bp2Max_;

@@ -65,7 +65,7 @@ using namespace model;
         , rootProblem_(fullBodyDevice_)
         , rootPath_(rootPath)
     {
-      
+
         // adding extra DOF for including time in sampling
 
         fullBodyDevice_->setDimensionExtraConfigSpace(fullBodyDevice_->extraConfigSpace().dimension()+1);
@@ -74,18 +74,13 @@ using namespace model;
         }*/
         rootProblem_.collisionObstacles(referenceProblem->collisionObstacles());
         hppDout(notice,"REFERENCE PROBLEM OBSTACLE :"<<rootProblem_.collisionObstacles().size()<<" ; "<<referenceProblem->collisionObstacles().size());
-        BallisticPathPtr_t bp = boost::dynamic_pointer_cast<BallisticPath>(rootPath);
-        hppDout(notice,"test last root index helper = "<<bp->lastRootIndex());
-        if(bp){
-          rootProblem_.steeringMethod(LimbRRTSteering::create(&rootProblem_,fullBodyDevice_->configSize()-1,bp));
-          hppDout(notice,"create steering method with ballistic path.");
-        }
-        else{
-          rootProblem_.steeringMethod(LimbRRTSteering::create(&rootProblem_,fullBodyDevice_->configSize()-1));
-          hppDout(notice,"create steering method without ballistic path.");
+        //BallisticPathPtr_t bp = boost::dynamic_pointer_cast<BallisticPath>(rootPath);
+       // hppDout(notice,"test last root index helper = "<<bp->lastRootIndex());
 
-        }
-          
+       rootProblem_.steeringMethod(LimbRRTSteering::create(&rootProblem_,fullBodyDevice_->configSize()-1,rootPath));
+
+
+
     }
 
     namespace

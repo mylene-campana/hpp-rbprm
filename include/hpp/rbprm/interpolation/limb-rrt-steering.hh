@@ -24,6 +24,8 @@
 # include <hpp/core/straight-path.hh>
 # include <hpp/rbprm/interpolation/limb-rrt-path.hh>
 #include <hpp/rbprm/fullbodyBallistic/ballistic-path.hh>
+#include <hpp/rbprm/fullbodyBallistic/timed-ballistic-path.hh>
+
 
 namespace hpp {
   namespace rbprm {
@@ -45,9 +47,9 @@ namespace hpp {
     public:
       /// Create instance and return shared pointer
       static LimbRRTSteeringPtr_t create (const core::ProblemPtr_t& problem,
-                                          const std::size_t pathDofRank,const BallisticPathPtr_t bp)
+                                          const std::size_t pathDofRank,const core::PathPtr_t rootPath)
       {
-    LimbRRTSteering* ptr = new LimbRRTSteering (problem, pathDofRank,bp);
+    LimbRRTSteering* ptr = new LimbRRTSteering (problem, pathDofRank,rootPath);
     LimbRRTSteeringPtr_t shPtr (ptr);
     ptr->init (shPtr);
     return shPtr;
@@ -99,6 +101,9 @@ namespace hpp {
         if(bp_){
             length = bp_->computeLength(q1,q2);
         }
+        else if(tbp_){
+            length = tbp_->computeLength(q1,q2);
+        }
         else{
             length = (*problem_->distance()) (q1, q2);
         }
@@ -118,10 +123,23 @@ namespace hpp {
           core::Configuration_t q22(q2);
           q22[rankParamRoot] = length;
           hppDout(notice,"create path with ballistic root");
-          BallisticPathPtr_t bpExtract =  BallisticPath::create(bp_->device(),q11,q22,length,bp_->coefficients());
-          bpExtract->lastRootIndex(bp_->lastRootIndex());
+          BallisticPathPtr_t bpExtract =  BallisticPath::create(bp_->device(),q1,q2,length,bp_->coefficients(),bp_->lastRootIndex());
           path = LimbRRTPath::create
             (problem_->robot(), q11, q22, length, c, pathDofRank_,bpExtract);
+        }
+        else if(tbp_){
+          hppDout(notice,"create path with ballistic root");
+          length = tbp_->ballisticPath()->computeLength(q1,q2);
+          BallisticPathPtr_t bpExtract =  BallisticPath::create(tbp_->device(),q1,q2,length,tbp_->coefficients(),tbp_->lastRootIndex());
+          TimedBallisticPathPtr_t tbpExtract =  TimedBallisticPath::create(bpExtract);
+          length = tbpExtract->length();
+          size_t rankParamRoot = q1.size() - 1;
+          core::Configuration_t q11(q1);
+          q11[rankParamRoot] = 0.;
+          core::Configuration_t q22(q2);
+          q22[rankParamRoot] = length;          
+	      path = LimbRRTPath::create
+            (problem_->robot(), q11, q22, length, c, pathDofRank_,tbpExtract);
         }
         else{
           hppDout(notice,"create path without root path");
@@ -134,9 +152,17 @@ namespace hpp {
       /// Constructor with robot
       /// Weighed distance is created from robot
       LimbRRTSteering (const core::ProblemPtr_t& problem,
-                       const std::size_t pathDofRank,BallisticPathPtr_t bp) :
-    SteeringMethod (problem), pathDofRank_(pathDofRank), weak_ (),bp_(bp)
+                       const std::size_t pathDofRank,core::PathPtr_t root) :
+    SteeringMethod (problem), pathDofRank_(pathDofRank), weak_ (),bp_(),tbp_()
       {
+          BallisticPathPtr_t bp = boost::dynamic_pointer_cast<BallisticPath>(root);
+          if(bp)
+              bp_=bp;
+
+          TimedBallisticPathPtr_t tbp = boost::dynamic_pointer_cast<TimedBallisticPath>(root);
+          if(tbp)
+              tbp_=tbp;
+
       }
       
       /// Constructor with robot
@@ -172,7 +198,8 @@ namespace hpp {
     private:      
       const std::size_t pathDofRank_;
       LimbRRTSteeringWkPtr_t weak_;
-      const BallisticPathPtr_t bp_;
+      BallisticPathPtr_t bp_;
+      TimedBallisticPathPtr_t tbp_;
     }; // SteeringMethodStraight
     /// \}
   } // namespace interpolation

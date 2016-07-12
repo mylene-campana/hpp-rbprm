@@ -195,7 +195,7 @@ namespace hpp {
       /// apply same contacts as in previousState. u_offset is decreased 
       /// (or increased) of alpha to get closer to previousState 
       /// until maxIter is reached.
-      State computeOffsetContactConfig(const BallisticPathPtr_t bp,
+      State computeOffsetContactConfig(const core::PathPtr_t bp,
      const State &previousState, State& transitionDOFstate,
      const core::value_type u_offset, const bool increase_u_offset, core::value_type &lenght, core::value_type &lenghtTransition,
      const std::size_t maxIter = 100, const core::value_type alpha = 0.6);
@@ -203,7 +203,7 @@ namespace hpp {
       /// Return the configuration at the top of the parabola (path),
       /// using extendingPose_ for limbs part if defined,
       /// otherwise, just unsing interpolation (bp)
-      State computeTopExtendingPose(const core::PathPtr_t path, const BallisticPathPtr_t bp, core::value_type &lenght);
+      State computeTopExtendingPose(const core::PathPtr_t path, const core::PathPtr_t bp, core::value_type &lenght);
 
       
       /**
