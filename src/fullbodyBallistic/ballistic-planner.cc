@@ -140,14 +140,20 @@ namespace hpp {
 
 	    if (fwdPath) {
 	      hppDout (info, "forward path is valid");
-	      fwdDelayedEdge = DelayedEdge_t (*n_it, impactNode, fwdPath);
-	      delayedEdges.push_back (fwdDelayedEdge);
+        if(fwdPath->length() > 3){
+          hppDout (info, "forward path long enough");          
+          fwdDelayedEdge = DelayedEdge_t (*n_it, impactNode, fwdPath);
+          delayedEdges.push_back (fwdDelayedEdge);
+        }
 	    }
 
 	    if (bwdPath) {
 	      hppDout (info, "backward path is valid");
-	      bwdDelayedEdge = DelayedEdge_t (impactNode, *n_it, bwdPath);
-	      delayedEdges.push_back (bwdDelayedEdge);
+        if(bwdPath->length() > 3){
+          hppDout (info, "backward path long enough");          
+          bwdDelayedEdge = DelayedEdge_t (impactNode, *n_it, bwdPath);
+          delayedEdges.push_back (bwdDelayedEdge);
+        }
 	    }
 	  }//for nodes in cc
 	}//avoid impactNode cc

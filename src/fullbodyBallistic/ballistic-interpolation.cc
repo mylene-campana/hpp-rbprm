@@ -540,9 +540,11 @@ namespace hpp {
     stateFrames.push_back(std::make_pair(0,state1));
    /* if(contactState1.ignore6DOF && (lenghtTakeoff != lenghtTakeoff6DOF))
         stateFrames.push_back(std::make_pair(lenghtTakeoff6DOF,contactTransition1));*/
-    stateFrames.push_back(std::make_pair(lenghtTakeoff,contactState1));
+    if(lenghtTakeoff > 0 )
+      stateFrames.push_back(std::make_pair(lenghtTakeoff,contactState1));
     stateFrames.push_back(std::make_pair(lenghtTop,stateTop));
-    stateFrames.push_back(std::make_pair(bp->length() - lenghtLanding,contactState2));
+    if(lenghtLanding < bp->length())
+      stateFrames.push_back(std::make_pair(bp->length() - lenghtLanding,contactState2));
    /* if(contactState2.ignore6DOF && (lenghtLanding != lenghtLanding6DOF))
         stateFrames.push_back(std::make_pair(bp->length() -lenghtLanding6DOF,contactTransition2));*/
     stateFrames.push_back(std::make_pair(bp->length(),state2));
@@ -609,9 +611,11 @@ namespace hpp {
       stateFrames.push_back(std::make_pair(0,state1));
      /* if(contactState1.ignore6DOF && (lenghtTakeoff != lenghtTakeoff6DOF))
           stateFrames.push_back(std::make_pair(lenghtTakeoff6DOF,contactTransition1));*/
-      stateFrames.push_back(std::make_pair(lenghtTakeoff,contactState1));
+      if(lenghtTakeoff > 0 )
+        stateFrames.push_back(std::make_pair(lenghtTakeoff,contactState1));
       stateFrames.push_back(std::make_pair(lenghtTop,stateTop));
-      stateFrames.push_back(std::make_pair(bp->length() - lenghtLanding,contactState2));
+      if(lenghtLanding < bp->length())
+        stateFrames.push_back(std::make_pair(bp->length() - lenghtLanding,contactState2));
      /* if(contactState2.ignore6DOF && (lenghtLanding != lenghtLanding6DOF))
           stateFrames.push_back(std::make_pair(bp->length() -lenghtLanding6DOF,contactTransition2));*/
       stateFrames.push_back(std::make_pair(bp->length(),state2));
@@ -690,9 +694,11 @@ namespace hpp {
       stateFrames.push_back(std::make_pair(0,start_));
       /*if(contactState1.ignore6DOF && (lenghtTakeoff != lenghtTakeoff6DOF))
           stateFrames.push_back(std::make_pair(lenghtTakeoff6DOF,contactTransition1));*/
-      stateFrames.push_back(std::make_pair(lenghtTakeoff,contactState1));
+      if(lenghtTakeoff > 0 )
+        stateFrames.push_back(std::make_pair(lenghtTakeoff,contactState1));
       stateFrames.push_back(std::make_pair(lenghtTop,stateTop));
-      stateFrames.push_back(std::make_pair(bp->length() - lenghtLanding,contactState2));
+      if(lenghtLanding < bp->length())
+        stateFrames.push_back(std::make_pair(bp->length() - lenghtLanding,contactState2));
       /*if(contactState2.ignore6DOF && (lenghtLanding != lenghtLanding6DOF)){
           contactState2.ignore6DOF = false;
           contactTransition2.ignore6DOF = true;
