@@ -15,6 +15,7 @@
 // hpp-rbprm. If not, see <http://www.gnu.org/licenses/>.
 
 #include <hpp/util/debug.hh>
+#include <hpp/util/timer.hh>
 #include <hpp/model/configuration.hh>
 #include <hpp/model/joint.hh>
 #include <hpp/constraints/generic-transformation.hh>
@@ -28,6 +29,9 @@
 #include <hpp/rbprm/stability/stability.hh>
 #include <hpp/rbprm/ik-solver.hh>
 #include <hpp/rbprm/interpolation/limb-rrt-helper.hh>
+HPP_DEFINE_TIMECOUNTER (Interpolate);
+HPP_DEFINE_TIMECOUNTER (ComputeContact);
+
 
 namespace hpp {
   namespace rbprm {
@@ -312,7 +316,7 @@ namespace hpp {
       core::Configuration_t q_top;
       const std::string robotName = robot_->device_->name ();
       hppDout (info, "robotName= " << robotName);
-      const bool parabTallEnough = (robotName.compare ("ant") == 0 &&  z_x_theta_max > 0.44) || (robotName.compare ("spiderman") == 0 &&  z_x_theta_max > 1.1) || (robotName.compare ("frog") == 0 &&  z_x_theta_max > 0.2);
+      const bool parabTallEnough = (robotName.compare ("ant") == 0 &&  z_x_theta_max > 0.44) || (robotName.compare ("spiderman") == 0 &&  z_x_theta_max > 1.1) || (robotName.compare ("frog") == 0 &&  z_x_theta_max > 0.2) || (robotName.compare ("armlessSkeleton") == 0 &&  z_x_theta_max > 0.6);
       value_type r = 0.5; // blending coefficient of extending key-frame
       const Configuration_t q_interp_top = (*bp) (u_max*pathLength, success);
       lenght = u_max*pathLength;
@@ -421,6 +425,7 @@ namespace hpp {
 
     core::PathVectorPtr_t BallisticInterpolation::InterpolateFullPath
     (const core::value_type u_offset) {
+      HPP_START_TIMECOUNTER(Interpolate);
       if(!path_) throw std::runtime_error ("Cannot interpolate; not path given to interpolator ");
       Configuration_t qStart = computeContactPose(start_);
       Configuration_t qEnd = computeContactPose(end_);
@@ -470,7 +475,12 @@ namespace hpp {
 	Vimp = pp->Vimp_; // Vimp_i
 	dir = computeDir (V0, Vimp);
 	hppDout (info, "dir (Vimp-V0)= " << dir);
-	state2 = ComputeContacts(robot_, q2, collisionObjects, dir);
+
+  HPP_START_TIMECOUNTER(ComputeContact);  
+	state2 = ComputeContacts(robot_, q2, collisionObjects, fcl::Vec3f(0,0,-1));
+  HPP_STOP_TIMECOUNTER(ComputeContact);
+  HPP_DISPLAY_TIMECOUNTER(ComputeContact);
+  
 	q2contact = computeContactPose(state2);
 	// compute average-normal corresponding to new contacts
   const std::size_t contactNumber = state2.contactOrder_.size ();
@@ -634,6 +644,8 @@ namespace hpp {
     
 	}//if final subpath
       }// for subpaths
+      HPP_STOP_TIMECOUNTER(Interpolate);
+      HPP_DISPLAY_TIMECOUNTER(Interpolate);
       return newPath;
     }
 

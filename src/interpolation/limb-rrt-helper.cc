@@ -145,7 +145,7 @@ using namespace model;
         to.contactBreaks(from, spared);
         for(std::vector<std::string>::const_iterator cit = spared.begin(); cit != spared.end(); ++cit)
         {
-            std::cout << "spared " << *cit << std::endl;
+            //std::cout << "spared " << *cit << std::endl;
         }
         tools::LockJointRec(spared, device->rootJoint(), projector);
     }
@@ -174,7 +174,7 @@ using namespace model;
         for(std::vector<std::string>::const_iterator cit = fixed.begin();
             cit != fixed.end(); ++cit)
         {
-            std::cout << "constraint " << *cit << std::endl;
+            //std::cout << "constraint " << *cit << std::endl;
             RbPrmLimbPtr_t limb = helper.fullbody_->GetLimbs().at(*cit);
             const fcl::Vec3f& ppos  = from.contactPositions_.at(*cit);
 
