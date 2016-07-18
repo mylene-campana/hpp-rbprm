@@ -196,7 +196,7 @@ namespace hpp {
       /// (or increased) of alpha to get closer to previousState 
       /// until maxIter is reached.
       State computeOffsetContactConfig(const BallisticPathPtr_t bp,
-     const State &previousState, State& transitionDOFstate,
+     const State &previousState, T_StateFrame& stateFrames,
      const core::value_type u_offset, const bool increase_u_offset, core::value_type &lenght, core::value_type &lenghtTransition,
      const std::size_t maxIter = 100, const core::value_type alpha = 0.6);
 

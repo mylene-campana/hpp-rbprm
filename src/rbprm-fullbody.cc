@@ -661,7 +661,7 @@ else
         // if no stable replacement contact found
         // modify contact order to try to replace another contact at the next step
         if(ComputeStableContact(body,result,body->limbcollisionValidations_.at(replaceContact),replaceContact,body->limbs_.at(replaceContact),
-                             configuration, config,collisionObjects,direction,position, normal, robustnessTreshold, true, false, body->factory_.heuristics_["random"])
+                             configuration, config,collisionObjects,direction,position, normal, robustnessTreshold, true, false, body->factory_.heuristics_["static"])
                 != STABLE_CONTACT)
         {
             result = previous;
