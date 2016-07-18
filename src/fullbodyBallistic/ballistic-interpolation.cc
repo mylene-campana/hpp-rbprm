@@ -212,7 +212,7 @@ namespace hpp {
       lastState = previousState;
       value_type currentLenght;
       value_type u;
-      
+      T_StateFrame reverseFrame;
       for( rbprm::T_Limb::const_iterator lit = robot_->GetLimbs().begin();lit != robot_->GetLimbs().end(); ++lit){
         if( lastState.contacts_[lit->first]){ // limb is in contact
          contactingLimbs.push_back(lit->first);
@@ -272,8 +272,11 @@ namespace hpp {
             } 
           }
           if(contact_OK){ // there is another limb in contact
-            hppDout(notice,"another limb in contact, add intermediate state : "<<displayConfig(lastState.configuration_));            
-            stateFrames.push_back(std::make_pair(currentLenght-u,lastState)); // add intermediate state             
+            hppDout(notice,"another limb in contact, add intermediate state : "<<displayConfig(lastState.configuration_)); 
+            if(increase_u_offset)
+              stateFrames.push_back(std::make_pair(currentLenght-u,lastState)); // add intermediate state     
+            else
+              reverseFrame.push_back(std::make_pair(currentLenght-u,lastState)); // add intermediate state                   
             lastState = state;
           }
         }
@@ -327,7 +330,13 @@ namespace hpp {
 
       lastState.ignore6DOF = ignore6DOF;
       
-      stateFrames.push_back(std::make_pair(lenght,lastState)); // add intermediate state             
+      stateFrames.push_back(std::make_pair(lenght,lastState)); // add intermediate state     
+      
+      if(!increase_u_offset){ // add reverse intermediate states
+        for(T_StateFrame::reverse_iterator cit = reverseFrame.rbegin() ; cit != reverseFrame.rend(); cit++){
+          stateFrames.push_back(*cit);
+        }
+      }
       
       return lastState;
     }
