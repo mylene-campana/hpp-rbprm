@@ -274,9 +274,13 @@ namespace hpp {
           if(contact_OK){ // there is another limb in contact
             hppDout(notice,"another limb in contact, add intermediate state : "<<displayConfig(lastState.configuration_)); 
             if(increase_u_offset)
-              stateFrames.push_back(std::make_pair(currentLenght-u,lastState)); // add intermediate state     
+              lenght = currentLenght-u;
             else
-              reverseFrame.push_back(std::make_pair(currentLenght-u,lastState)); // add intermediate state                   
+              lenght = bp->length()-currentLenght+u;
+            if(increase_u_offset)
+              stateFrames.push_back(std::make_pair(lenght,lastState)); // add intermediate state     
+            else
+              reverseFrame.push_back(std::make_pair(lenght,lastState)); // add intermediate state                   
             lastState = state;
           }
         }
