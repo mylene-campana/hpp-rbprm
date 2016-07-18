@@ -193,6 +193,17 @@ namespace hpp {
       hppDout (info, "nb active limbs= " << activeLimbs.size ());
       return activeLimbs;
     }
+    
+    Configuration_t replaceFixedLimb(Configuration_t trunk, Configuration_t fixedLimb){
+      Configuration_t result(trunk);
+      for(size_t i = 0 ; i < trunk.size() ; i++){
+        if(fixedLimb[i] != 0){
+          result[i] = fixedLimb[i];
+          hppDout(notice,"replace limb "<<i<<"result = "<<result[i]);
+        }
+      }
+      return result;
+    }
 
     State BallisticInterpolation::computeOffsetContactConfig
     (const BallisticPathPtr_t bp,
@@ -205,6 +216,10 @@ namespace hpp {
       core::DevicePtr_t robot = robot_->device_;
       bool success, contact_OK = true, multipleBreaks, contactMaintained;
       std::vector<std::string> contactingLimbs;
+      Configuration_t lastfixedLimb(robot->configSize());
+      for(size_t i = 0 ; i < lastfixedLimb.size() ; i ++){lastfixedLimb[i] = 0;}
+      Configuration_t fixedLimb(lastfixedLimb);
+      
       bool ignore6DOF = false;
       std::size_t iteration = 0;
       fcl::Vec3f dir;
@@ -269,14 +284,25 @@ namespace hpp {
           for( rbprm::T_Limb::const_iterator lit = robot_->GetLimbs().begin();lit != robot_->GetLimbs().end(); ++lit){
             if( state.contacts_[lit->first]){ // limb is in contact
              contact_OK = true;
-            } 
+            }else{ // limb not in contact
+              if(lastState.contacts_[lit->first]){ // limb just loose the contact
+                for(size_t i=robot_->GetLimbs().at(lit->first)->limb_->rankInConfiguration() ; i < robot_->GetLimbs().at(lit->first)->effector_->rankInConfiguration() ; i++){
+                  fixedLimb[i] = lastState.configuration_[i];
+                  hppDout(notice,"fixed limb "<<i<<" = "<<fixedLimb[i]);
+                }
+              }
+            }
           }
           if(contact_OK){ // there is another limb in contact
             hppDout(notice,"another limb in contact, add intermediate state : "<<displayConfig(lastState.configuration_)); 
             if(increase_u_offset)
               lenght = currentLenght-u;
             else
-              lenght = bp->length()-currentLenght+u;
+              lenght = bp->length()-currentLenght-u;
+            
+            lastState.configuration_ = replaceFixedLimb(lastState.configuration_,lastfixedLimb);
+            lastfixedLimb = fixedLimb;
+            
             if(increase_u_offset)
               stateFrames.push_back(std::make_pair(lenght,lastState)); // add intermediate state     
             else
@@ -302,7 +328,7 @@ namespace hpp {
         if(lit->second->limb_->rankInConfiguration() < minIndex){
           minIndex =lit->second->limb_->rankInConfiguration();
         }
-        if( ! lastState.contacts_[lit->first]){ // limb is not in contact
+        if( !lastState.contacts_[lit->first]){ // limb was not in contact in first state
           if(std::find(contactingLimbs.begin(),contactingLimbs.end(),lit->first) == contactingLimbs.end()){
             hppDout(notice," Not in contact, index config : "<<lit->second->limb_->rankInConfiguration()<<" -> "<<lit->second->effector_->rankInConfiguration());
             for(size_t i = lit->second->limb_->rankInConfiguration() ; i < lit->second->effector_->rankInConfiguration() ; i++){
@@ -329,15 +355,17 @@ namespace hpp {
       if(increase_u_offset)
         lenght = currentLenght-u;
       else
-        lenght = bp->length()-currentLenght+u;
+        lenght = bp->length()-currentLenght-u;
 
 
       lastState.ignore6DOF = ignore6DOF;
       
+      lastState.configuration_ = replaceFixedLimb(lastState.configuration_,lastfixedLimb);
+      
       stateFrames.push_back(std::make_pair(lenght,lastState)); // add intermediate state     
       
       if(!increase_u_offset){ // add reverse intermediate states
-        for(T_StateFrame::reverse_iterator cit = reverseFrame.rbegin() ; cit != reverseFrame.rend(); cit++){
+        for(T_StateFrame::const_reverse_iterator cit = reverseFrame.rbegin() ; cit != reverseFrame.rend(); ++cit){
           stateFrames.push_back(*cit);
         }
       }
@@ -746,18 +774,15 @@ namespace hpp {
       newPath->appendPath (bp2max);
       newPath->appendPath (bp3);
       */
-      stateFrames.push_back(std::make_pair(0,start_));
+    
       /*if(contactState1.ignore6DOF && (lenghtTakeoff != lenghtTakeoff6DOF))
           stateFrames.push_back(std::make_pair(lenghtTakeoff6DOF,contactTransition1));*/
-      stateFrames.push_back(std::make_pair(lenghtTakeoff,contactState1));
-      stateFrames.push_back(std::make_pair(lenghtTop,stateTop));
-      stateFrames.push_back(std::make_pair(bp->length() - lenghtLanding,contactState2));
+
       /*if(contactState2.ignore6DOF && (lenghtLanding != lenghtLanding6DOF)){
           contactState2.ignore6DOF = false;
           contactTransition2.ignore6DOF = true;
           stateFrames.push_back(std::make_pair(bp->length() -lenghtLanding6DOF,contactTransition2));
       }*/
-      stateFrames.push_back(std::make_pair(bp->length(),end_));
       hppDout(notice, "position initial state frame  = "<<displayConfig(start_.configuration_));
       hppDout(notice, "position initial Contact transition state frame  = "<<displayConfig(contactTransition1.configuration_));
       hppDout(notice, "position initial Contact state frame  = "<<displayConfig(contactState1.configuration_));
