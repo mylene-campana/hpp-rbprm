@@ -194,10 +194,10 @@ namespace
                                             const std::size_t shootLimit, const std::size_t displacementLimit,
 					    const std::size_t nbFilterMatch)
     {
-       /* unsigned int seed = (unsigned int)(time(NULL));
+        unsigned int seed = (unsigned int)(time(NULL));
         srand (seed);
         hppDout(notice,"&&&&&& SEED = "<<seed);
-*/
+        std::cout<<"seed = "<<seed<<std::endl;
      // srand (0);
 
         RbPrmShooter* ptr = new RbPrmShooter (robot, geometries, filter, normalFilters, shootLimit, displacementLimit, nbFilterMatch);

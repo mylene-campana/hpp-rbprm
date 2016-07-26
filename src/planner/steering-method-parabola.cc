@@ -156,8 +156,8 @@ namespace hpp {
       hppDout (info, "n2_angle: " << n2_angle);
       
       // Only for demo without friction :
-      //delta1 = 100.;
-      //delta2 = 100.;
+     // delta1 = 100.;
+     // delta2 = 100.;
 
       const value_type alpha_0_min = n1_angle - delta1;
       const value_type alpha_0_max = n1_angle + delta1;
@@ -267,11 +267,11 @@ namespace hpp {
       /* Select alpha_0 as middle of ]alpha_inf_bound,alpha_sup_bound[ */
       value_type alpha = 0.5*(alpha_inf_bound + alpha_sup_bound);
       // for demo only :
-    /*  alpha = alpha_inf_bound;
+     /* alpha = alpha_inf_bound + 0.1*(alpha_sup_bound - alpha_inf_bound);
       if(alpha < 0)
           alpha = 0;
-      hppDout (info, "alpha: " << alpha);
-      */
+      hppDout (info, "alpha: " << alpha);*/
+      
       /* Compute Parabola coefficients */
       vector_t coefs = computeCoefficients (alpha, theta, X_theta, Z, 
 					    x_theta_0, z_0);
@@ -317,13 +317,13 @@ namespace hpp {
       if (hasCollisions || !maxHeightRespected) {
 	problem_->parabolaResults_ [0] ++; // not increased during dichotomy
 	hppDout (info, "parabola has collisions, start dichotomy");
-    while ((hasCollisions || !maxHeightRespected) && n < nLimit_/* alpha <= alpha_sup_bound*/) { // for demo
+    while ((hasCollisions || !maxHeightRespected) && n < nLimit_ /*alpha <= alpha_sup_bound*/) { // for demo
       alpha = dichotomy (alpha_inf_bound, alpha_sup_bound, n);
 
       /*if(alpha <= 0)
           alpha += 0.1;
-       alpha *= 1.1; */     // for demo : use the min of alpha :
-
+       alpha *= 1.1;      // for demo : use the min of alpha :
+*/
 	  hppDout (info, "alpha= " << alpha);
 	  coefs = computeCoefficients (alpha, theta, X_theta, Z, x_theta_0,z_0);
 	  maxHeightRespected = parabMaxHeightRespected (coefs, x_theta_0,

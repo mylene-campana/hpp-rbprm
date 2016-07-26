@@ -59,8 +59,13 @@ using namespace core;
         value_type pathDofVal = (b-a)* u + a;
         ConfigurationPtr_t config (new Configuration_t(configSize_));
         config->head(configSize_-1) =  (*path_)(pathDofVal);
-        (*config) [pathDofRank_] = u;
+        (*config) [pathDofRank_] = pathDofVal;
         // choose random limb configuration
+        (*config)[pathDofRank_-1] = 0.;
+        (*config)[pathDofRank_-2] = 1.;
+        (*config)[pathDofRank_-3] = 0.;
+        (*config)[pathDofRank_-4] = 0.;
+        
         const sampling::Sample& sample = *(limb_->sampleContainer_.samples_.begin() + (rand() % (int) (limb_->sampleContainer_.samples_.size() -1)));
         sampling::Load(sample,*config);
         return config;

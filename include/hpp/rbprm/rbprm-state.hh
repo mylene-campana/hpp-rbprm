@@ -165,12 +165,12 @@ namespace hpp {
                     res.push_back(*cit);
                 }
             }
-            std::cout<<"limbs motions = ";
-            for(size_t i = 0 ; i < res.size() ; i++){
+            //std::cout<<"limbs motions = ";
+            /*for(size_t i = 0 ; i < res.size() ; i++){
               std::cout<<res[i]<<"  ;  ";
             }
             std::cout<<""<<std::endl;
-            
+            */
             return res;
         }
 

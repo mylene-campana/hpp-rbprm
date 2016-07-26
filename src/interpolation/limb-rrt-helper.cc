@@ -145,7 +145,7 @@ using namespace model;
         to.contactBreaks(from, spared);
         for(std::vector<std::string>::const_iterator cit = spared.begin(); cit != spared.end(); ++cit)
         {
-            std::cout << "spared " << *cit << std::endl;
+            //std::cout << "spared " << *cit << std::endl;
         }
         tools::LockJointRec(spared, device->rootJoint(), projector);
     }
@@ -174,7 +174,7 @@ using namespace model;
         for(std::vector<std::string>::const_iterator cit = fixed.begin();
             cit != fixed.end(); ++cit)
         {
-            std::cout << "constraint " << *cit << std::endl;
+            //std::cout << "constraint " << *cit << std::endl;
             RbPrmLimbPtr_t limb = helper.fullbody_->GetLimbs().at(*cit);
             const fcl::Vec3f& ppos  = from.contactPositions_.at(*cit);
 
@@ -193,7 +193,6 @@ using namespace model;
 
             }
         }
-        //LockRootAndNonContributingJoints(device, proj, fixed, from, to );
 
         cSet->addConstraint(proj);
         problem.constraints(cSet);
@@ -217,6 +216,7 @@ using namespace model;
         const rbprm::T_Limb& limbs = helper.fullbody_->GetLimbs();
         // get limbs that moved
         std::vector<std::string> variations = to.allVariations(from,extractEffectorsName(limbs));
+        
         //std::vector<std::string> variations = extractEffectorsName(limbs);
         for(std::vector<std::string>::const_iterator cit = variations.begin();
             cit != variations.end(); ++cit)
@@ -298,7 +298,7 @@ using namespace model;
         assert(distance < 100);
         // treat each interpolation between two states separatly
         // in a different thread
-        #pragma omp parallel for
+        //#pragma omp parallel for
         for(std::size_t i = 0; i < distance; ++i)
         {
             CIT_StateFrame a, b;

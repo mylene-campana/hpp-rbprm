@@ -110,6 +110,8 @@ namespace hpp {
 	core::vector_t V0dir_;
 	core::vector_t Vfdir_;
 	core::value_type mu_; // friction coef
+  
+        const core::CollisionValidationPtr_t getCollisionValidation(){return collisionValidation_;}
 
     private:
         core::CollisionValidationPtr_t collisionValidation_;
