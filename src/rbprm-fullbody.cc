@@ -492,8 +492,8 @@ namespace hpp {
 		      fcl::Vec3f n_fcl = updateConeDirection (tmp);
 		      hppDout (info, "n_fcl= " << n_fcl);
 		      core::vector_t n = n_fcl;
-		      if (n.norm () < 1.1)
-			inCone = isCentroidalConeValid (n, V0Dir, VfDir, mu);
+		      /*if (n.norm () < 1.1)
+			inCone = isCentroidalConeValid (n, V0Dir, VfDir, mu);*/
 		      hppDout (info, "inCone?= " << inCone);
 		    } else
 		      hppDout (info, "problem initializing isCentroidalConeValid");
