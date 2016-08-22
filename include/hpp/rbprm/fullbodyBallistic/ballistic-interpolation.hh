@@ -192,18 +192,21 @@ namespace hpp {
      bool& multipleBreaks, std::vector <RbPrmLimbPtr_t>& successLimbs, const double robustnessTreshold = 0);*/
 
       /// Return the configuration based at u_offset on subpath, trying to 
-      /// apply same contacts as in previousState. u_offset is decreased 
-      /// (or increased) of alpha to get closer to previousState 
-      /// until maxIter is reached.
-      State computeOffsetContactConfig(const BallisticPathPtr_t bp,
-     const State &previousState, T_StateFrame& stateFrames,
-     const core::value_type u_offset, const bool increase_u_offset, core::value_type &lenght, core::value_type &lenghtTransition,
-     const std::size_t maxIter = 100, const core::value_type alpha = 0.6);
+      /// apply same contacts as in previousState. u is decreased 
+      /// (or increased) of u_offset to get closer to previousState 
+      /// until maxIter is reached or when contact cannot be maintained anymore.
+      State computeOffsetContactConfig
+	(const BallisticPathPtr_t bp, const State &previousState,
+	 T_StateFrame& stateFrames, const core::value_type u_offset,
+	 const bool increase_u_offset, core::value_type &lenght,
+	 core::value_type &lenghtTransition, const std::size_t maxIter = 100);
 
       /// Return the configuration at the top of the parabola (path),
       /// using extendingPose_ for limbs part if defined,
       /// otherwise, just unsing interpolation (bp)
-      State computeTopExtendingPose(const core::PathPtr_t path, const BallisticPathPtr_t bp, core::value_type &lenght);
+      State computeTopExtendingPose(const core::PathPtr_t path,
+				    const BallisticPathPtr_t bp,
+				    core::value_type &lenght);
 
       
       /**
