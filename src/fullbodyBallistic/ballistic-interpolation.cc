@@ -18,7 +18,9 @@
 #include <hpp/model/configuration.hh>
 #include <hpp/model/joint.hh>
 #include <hpp/constraints/generic-transformation.hh>
+#include <hpp/core/basic-configuration-shooter.hh>
 #include <hpp/core/config-projector.hh>
+#include <hpp/core/config-validations.hh>
 #include <hpp/core/locked-joint.hh>
 #include <hpp/core/path.hh>
 #include <hpp/core/path-vector.hh>
@@ -222,9 +224,10 @@ namespace hpp {
       fcl::Vec3f dir;
       State state,lastState;
       lastState = previousState;
-      value_type currentLenght;
+      value_type currentLenght, previousLength;
       value_type u;
       T_StateFrame reverseFrame;
+      core::ValidationReportPtr_t validationReport;
       for( rbprm::T_Limb::const_iterator lit = robot_->GetLimbs().begin();lit != robot_->GetLimbs().end(); ++lit){
         if(lastState.contacts_[lit->first]){ // limb is in contact
          contactingLimbs.push_back(lit->first);
@@ -239,6 +242,7 @@ namespace hpp {
         u = - u_offset;
         currentLenght = bp->length();
       }
+      previousLength = currentLenght;
      
       q_interp = (*bp) (currentLenght, success);
       
@@ -247,6 +251,8 @@ namespace hpp {
         state.configuration_ = q_interp;
         return state;
       }
+      hppDout (info, "bp->length()/3.= " << bp->length()/3.);
+      hppDout (info, "bp->length()2./3.= " << bp->length()*2./3.);
       
       while (contact_OK && iteration < maxIter && ((((currentLenght<bp->length())/3.)&&increase_u_offset) || ((currentLenght > (bp->length()*2./3.))&&(!increase_u_offset)))){ 
         hppDout (info, "currentLenght= " << currentLenght);        
@@ -296,23 +302,29 @@ namespace hpp {
             
             lastState.configuration_ = replaceFixedLimb(lastState.configuration_,lastfixedLimb);
             lastfixedLimb = fixedLimb;
+
+	    bool isValid = problem_->configValidations ()->validate (lastState.configuration_, validationReport);
+	    hppDout (info, "isValid lastState= " << isValid);
+	    bool lastStateHasImproved = fabs(lenght - previousLength) > u_offset; // to prevent adding the (same) state two consecutive times, NOT USED YET
+	    hppDout (info, "lastStateHasImproved= " << lastStateHasImproved);
             
             if(increase_u_offset) {
 	      hppDout (info, "lenght= " << lenght);
-	      if (lenght > u_offset) {
+	      if (lenght > u_offset && isValid) {
 		hppDout (info, "takeoff contact state is pushed in stack");
 		stateFrames.push_back(std::make_pair(lenght,lastState)); // add intermediate state
 	      } else
 		hppDout (info, "takeoff contact state NOT pushed in stack");
 	    } else {
 	      hppDout (info, "lenght= " << lenght);
-	      if (lenght < bp->length() - u_offset) {
+	      if (lenght < bp->length() - u_offset && isValid) {
 		hppDout (info, "landing contact state is pushed in stack");
 		reverseFrame.push_back(std::make_pair(lenght,lastState)); // add intermediate state
 	      } else
 		hppDout (info, "landing contact state NOT pushed in stack");
 	    }
             lastState = state;
+	    previousLength = lenght;
           }
         }
         hppDout (info, "q_contact_offset= " << displayConfig (q_contact_offset));
@@ -368,10 +380,15 @@ namespace hpp {
       lastState.ignore6DOF = ignore6DOF;
       
       lastState.configuration_ = replaceFixedLimb(lastState.configuration_,lastfixedLimb);
+
+      bool isValid = problem_->configValidations ()->validate (lastState.configuration_, validationReport);
+      hppDout (info, "isValid lastState= " << isValid);
+      bool lastStateHasImproved = fabs(lenght - previousLength) > u_offset; // to prevent adding the (same) state two consecutive times, NOT USED YET
+      hppDout (info, "lastStateHasImproved= " << lastStateHasImproved);
      
       if(increase_u_offset){ // ADDED My
        hppDout (info, "lenght= " << lenght);
-       if (lenght > u_offset) {
+       if (lenght > u_offset && isValid) {
 	 hppDout (info, "takeoff contact state is pushed in stack");
 	 stateFrames.push_back(std::make_pair(lenght,lastState)); // add intermediate state
        } else
@@ -379,14 +396,8 @@ namespace hpp {
       }
       
       if(!increase_u_offset){ // add reverse intermediate states
-	hppDout (info, "lenght= " << lenght);
-	if (lenght < bp->length() - u_offset) {
-	  hppDout (info, "landing contact state is pushed in stack");
-	  for(T_StateFrame::const_reverse_iterator cit = reverseFrame.rbegin() ; cit != reverseFrame.rend(); ++cit){
-	    stateFrames.push_back(*cit);
-	  }
-	} else
-	  hppDout (info, "landing contact state NOT pushed in stack");
+	for(T_StateFrame::const_reverse_iterator cit = reverseFrame.rbegin() ; cit != reverseFrame.rend(); ++cit)
+	  stateFrames.push_back(*cit);
       }
       
       return lastState;
@@ -416,6 +427,7 @@ namespace hpp {
       const bool parabTallEnough = (robotName.compare ("ant") == 0 &&  z_x_theta_max > 0.44) || (robotName.compare ("spiderman") == 0 &&  z_x_theta_max > 1.1) || (robotName.compare ("frog") == 0 &&  z_x_theta_max > 0.2) || (robotName.compare ("armlessSkeleton") == 0 &&  z_x_theta_max > 0.6) || (robotName.compare ("lamp") == 0 &&  z_x_theta_max > 0.75);
       value_type r = 0.5; // blending coefficient of extending key-frame
       const Configuration_t q_interp_top = (*bp) (u_max*pathLength, success);
+      core::Configuration_t q;
       lenght = u_max*pathLength;
       if (parabTallEnough)
 	r = 0.8;
@@ -425,14 +437,52 @@ namespace hpp {
       
       if (extendingPose_.rows ()) {
 	const core::Configuration_t q_trunk_max = (*path) (u_max*pathLength, success);
-	const core::Configuration_t q = fillConfiguration (q_trunk_max, extendingPose_); // now q is extending_ at the good top-trunk-configuration
+	q = fillConfiguration (q_trunk_max, extendingPose_); // now q is extending_ at the good top-trunk-configuration
 	q_top = blendPoses (q, q_interp_top, r);
       } else {
 	q_top = q_interp_top;
 	hppDout (info, "no extending pose");
       }
       hppDout (info, "q_top= " << displayConfig(q_top));
-      
+
+      // If q_top is in collision, try random stuff to find a collision-free one
+      core::ValidationReportPtr_t validationReport;
+      if (!problem_->configValidations ()->validate (q_top, validationReport)) {
+	const core::ConfigurationShooterPtr_t configurationShooter = core::BasicConfigurationShooter::create (robot_->device_);
+	hppDout (info, "q_top is NOT valid");
+	core::Configuration_t qtmp = q_top;
+	std::size_t count = 0;
+	const T_Limb& robotLimbs = robot_->GetLimbs();
+	rbprm::RbPrmLimbPtr_t limb;
+	r = 0.2;
+	do{
+	  count ++;
+	  // try to move the limb that is in collision...
+	  core::CollisionValidationReportPtr_t colValRep = boost::dynamic_pointer_cast<core::CollisionValidationReport> (validationReport);
+	  std::string limbName = colValRep->object1->name ();
+	  hppDout (info, "limb in collision= " << limbName);
+	  const std::size_t sz = limbName.size ();
+	  limbName.resize (sz - 2); // remove "_0" part
+	  hppDout (info, "limb in collision (resized)= " << limbName);
+	  for(rbprm::T_Limb::const_iterator cit = robotLimbs.begin(); cit != robotLimbs.end(); cit++) {
+	    hppDout (info, "cit->first= " << cit->first);
+	    if (cit->first.compare (limbName) == 0) {
+	      limb = cit->second;
+	      break;
+	    }
+	  }
+	  assert(limb);
+	  std::vector <RbPrmLimbPtr_t> limbsvec; // just to use function
+	  limbsvec.push_back (limb);
+	  core::Configuration_t qrand = *configurationShooter->shoot ();
+	  if (q.rows ())
+	    q_top = blendPoses (q, qrand, r);
+	  qtmp = replaceLimbConfigsInFullConfig (qtmp, qrand, limbsvec);
+	  q_top = qtmp;
+	} while (!problem_->configValidations ()->validate (qtmp, validationReport) && count < 10000);
+	hppDout (info, "valid q_top now: " << displayConfig(qtmp));
+      }
+
       state.configuration_ = q_top;
       // test : 
      /* for( rbprm::T_Limb::const_iterator lit = robot_->GetLimbs().begin();lit != robot_->GetLimbs().end(); ++lit){
@@ -545,7 +595,7 @@ namespace hpp {
       State state1, state2;
       State contactState1,contactState2,stateTop,contactTransition1,contactTransition2;
       core::value_type lenghtTop,lenghtTakeoff,lenghtLanding,lenghtLanding6DOF,lenghtTakeoff6DOF;
-
+      core::ValidationReportPtr_t validationReport;
 
       for (std::size_t i = 0; i < subPathNumber - 1; i++) {
 	stateFrames.clear();      
@@ -616,6 +666,11 @@ namespace hpp {
 
 	//bp1max = Interpolate (q1contact, q_max,    lenghtTop, subpath->coefficients ());
 	//bp2max = Interpolate (q_max, q2contact,  bp->length()-lenghtTop,subpath->coefficients ());
+
+	hppDout (info, "topState validity: " << problem_->configValidations ()->validate (stateTop.configuration_, validationReport));
+	hppDout (info, "state1 validity: " << problem_->configValidations ()->validate (state1.configuration_, validationReport));
+	hppDout (info, "state2 validity: " << problem_->configValidations ()->validate (state2.configuration_, validationReport));
+
 	stateFrames.clear();
 	stateFrames.push_back(std::make_pair(0,state1));
 	contactState1 = computeOffsetContactConfig (bp, state1,stateFrames, u_offset, true,lenghtTakeoff,lenghtTakeoff6DOF);
@@ -666,6 +721,7 @@ namespace hpp {
 	hppDout(notice,"test last root index interpolate = "<<bp->lastRootIndex());
     
 	hppDout (info, "before interpolateStates in fullpath");
+	hppDout (info, "number of states= " << stateFrames.size ());
 	pathLimb = rbprm::interpolation::interpolateStates
 	  (robot_,problem_,bp,stateFrames.begin(),stateFrames.end()-1,2);
 	newPath->appendPath(pathLimb);
@@ -687,6 +743,10 @@ namespace hpp {
 	  stateTop = computeTopExtendingPose (subpath, bp,lenghtTop);
 	  //bp1max = Interpolate (q1contact, q_max,	lenghtTop,	subpath->coefficients ());
 	  //bp2max = Interpolate (q_max, q2contact,	bp->length()-lenghtTop,	subpath->coefficients ());
+
+	  hppDout (info, "topState validity: " << problem_->configValidations ()->validate (stateTop.configuration_, validationReport));
+	  hppDout (info, "state1 validity: " << problem_->configValidations ()->validate (state1.configuration_, validationReport));
+	  hppDout (info, "state2 validity: " << problem_->configValidations ()->validate (state2.configuration_, validationReport));
     
 	  stateFrames.clear();
 	  stateFrames.push_back(std::make_pair(0,state1));
@@ -735,6 +795,7 @@ namespace hpp {
 	  hppDout(notice, "TIME final state frame  = "<<bp->length());
 	  hppDout(notice,"test last root index interpolate = "<<bp->lastRootIndex());
     
+	  hppDout (info, "number of states= " << stateFrames.size ());
 	  pathLimb = rbprm::interpolation::interpolateStates
 	    (robot_,problem_,bp,stateFrames.begin(),stateFrames.end()-1,2);
 	  hppDout (info, "after interpolateStates final subpath");
@@ -764,6 +825,7 @@ namespace hpp {
       const core::PathPtr_t path = path_->pathAtRank (0);
       const value_type pathLength = path->length ();
       const vector_t pathCoefs = path->coefficients ();
+      core::ValidationReportPtr_t validationReport;
 
       bp = Interpolate (qStart, qEnd, pathLength, pathCoefs);
       stateTop = computeTopExtendingPose (path, bp,lenghtTop);
@@ -772,6 +834,10 @@ namespace hpp {
       hppDout(notice,"lenght top = "<<lenghtTop);
       //bp1max = Interpolate (qStart, q_max, lenghtTop, pathCoefs);
       //bp2max = Interpolate (q_max, qEnd, bp->length()-lenghtTop,  pathCoefs);
+
+      hppDout (info, "topState validity: " << problem_->configValidations ()->validate (stateTop.configuration_, validationReport));
+      hppDout (info, "start_ validity: " << problem_->configValidations ()->validate (start_.configuration_, validationReport));
+      hppDout (info, "end_ validity: " << problem_->configValidations ()->validate (end_.configuration_, validationReport));
 
       stateFrames.clear();
       stateFrames.push_back(std::make_pair(0,start_));
