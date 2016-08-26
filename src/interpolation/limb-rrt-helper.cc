@@ -14,6 +14,8 @@
 // received a copy of the GNU Lesser General Public License along with
 // hpp-rbprm. If not, see <http://www.gnu.org/licenses/>.
 
+#include <hpp/util/debug.hh>
+
 #include <hpp/rbprm/interpolation/limb-rrt-helper.hh>
 #include <hpp/rbprm/interpolation/limb-rrt-shooter.hh>
 #include <hpp/rbprm/interpolation/limb-rrt-path-validation.hh>
@@ -21,6 +23,7 @@
 #include <hpp/core/steering-method-straight.hh>
 #include <hpp/core/problem-target/goal-configurations.hh>
 #include <hpp/core/bi-rrt-planner.hh>
+#include <hpp/core/config-validations.hh>
 #include <hpp/core/random-shortcut.hh>
 #include <hpp/core/constraint-set.hh>>
 #include <hpp/constraints/generic-transformation.hh>
@@ -39,6 +42,7 @@ using namespace core;
 using namespace model;
     namespace rbprm {
     namespace interpolation {
+      using model::displayConfig;
 
     namespace{
     core::DevicePtr_t DeviceFromLimb(const std::string& name, RbPrmLimbPtr_t limb)
@@ -83,8 +87,9 @@ using namespace model;
         else{
           rootProblem_.steeringMethod(LimbRRTSteering::create(&rootProblem_,fullBodyDevice_->configSize()-1));
           hppDout(notice,"create steering method without ballistic path.");
-
         }
+	rootProblem_.plannerIterLimit (referenceProblem->plannerIterLimit ());
+	hppDout (info, "initial plannerIterLimit_ (from referenceProblem)= " << rootProblem_.plannerIterLimit ());
           
     }
 
@@ -165,7 +170,9 @@ using namespace model;
     void AddContactConstraints(LimbRRTHelper& helper, const State& from, const State& to)
     {
         std::vector<bool> cosntraintsR = setMaintainRotationConstraints();
-        const rbprm::T_Limb& limbs = helper.fullbody_->GetLimbs();        
+        const rbprm::T_Limb& limbs = helper.fullbody_->GetLimbs();
+	hppDout (info, "fix from contacts");
+	hppDout (info, "from= " << displayConfig(from.configuration_));
         std::vector<std::string> fixed = to.allFixedContacts(from,extractEffectorsName(limbs));
         core::Problem& problem = helper.rootProblem_;
         model::DevicePtr_t device = problem.robot();
@@ -179,11 +186,13 @@ using namespace model;
             const fcl::Vec3f& ppos  = from.contactPositions_.at(*cit);
 
             JointPtr_t effectorJoint = device->getJointByName(limb->effector_->name());
+	    hppDout (info, "create contact position constraint");
             proj->add(core::NumericalConstraint::create (
                                     constraints::deprecated::Position::create("",device,
                                                                   effectorJoint,fcl::Vec3f(0,0,0), ppos)));
             if(limb->contactType_ == hpp::rbprm::_6_DOF && !to.ignore6DOF)
             {
+	      hppDout (info, "create contact rotation constraint");
                 const fcl::Matrix3f& rotation = from.contactRotation_.at(*cit);
 
                 proj->add(core::NumericalConstraint::create (constraints::deprecated::Orientation::create("", device,
@@ -216,25 +225,40 @@ using namespace model;
         const rbprm::T_Limb& limbs = helper.fullbody_->GetLimbs();
         // get limbs that moved
         std::vector<std::string> variations = to.allVariations(from,extractEffectorsName(limbs));
-        
+	hppDout (info, "variation number: " << variations.size ());
+        core::ValidationReportPtr_t validationReport;
+	
         //std::vector<std::string> variations = extractEffectorsName(limbs);
         for(std::vector<std::string>::const_iterator cit = variations.begin();
             cit != variations.end(); ++cit)
         {
+	  hppDout (info, "variation: " << *cit);
             SetPathValidation(helper);
             //DisableUnNecessaryCollisions(helper.rootProblem_, limbs.at(*cit));
             SetConfigShooter(helper,limbs.at(*cit),rootPath);
 
             ConfigurationPtr_t start = limbRRTConfigFromDevice(helper, from, 0.);
             ConfigurationPtr_t end   = limbRRTConfigFromDevice(helper, to  ,rootPath->length());
+	    hppDout (info, "BiRRT planner start: " << displayConfig (from.configuration_));
+	    hppDout (info, "BiRRT planner end: " << displayConfig (to.configuration_));
+	    const model::DevicePtr_t robot = helper.fullbody_->device_;
+
+	    if (!helper.rootProblem_.configValidations ()->validate (*start, validationReport))
+	      hppDout (info, "start config NOT valid");
+	    if (!helper.rootProblem_.configValidations ()->validate (*end, validationReport))
+	      hppDout (info, "end config NOT valid");
             helper.rootProblem_.initConfig(start);
+	    hppDout (info, "create BiRRT planner");
             BiRRTPlannerPtr_t planner = BiRRTPlanner::create(helper.rootProblem_);
             ProblemTargetPtr_t target = problemTarget::GoalConfigurations::create (planner);
             helper.rootProblem_.target (target);
             helper.rootProblem_.addGoalConfig(end);
             AddContactConstraints(helper, from, to);
 
-            res = planner->solve();
+	    hppDout (info, "before BiRRT planner solve");
+	    // PROBLEM: planner may not converge... accept directPath even if invalid in that case ?
+	    res = planner->solve();
+	    hppDout (info, "after BiRRT planner solve");
             helper.rootProblem_.resetGoalConfigs();
         }
         return res;
@@ -259,6 +283,7 @@ using namespace model;
             {
                if (!valid[i])
                {
+		 hppDout (info, "not valid= " << i);
                     numValid= i;
                     break;
                }
@@ -294,23 +319,28 @@ using namespace model;
         PathVectorPtr_t res[100];
         bool valid[100];
         std::size_t distance = std::distance(startState,endState);
-        hppDout(notice,"InterpolateState distance = "<<distance);
+        hppDout(notice,"InterpolateState rootpath distance = "<<distance);
         assert(distance < 100);
         // treat each interpolation between two states separatly
         // in a different thread
         //#pragma omp parallel for
         for(std::size_t i = 0; i < distance; ++i)
         {
+	  hppDout (info, "limbRRT interpolation from state= " << i);
             CIT_StateFrame a, b;
             a = (startState+i);
             b = (startState+i+1);
+	    hppDout (info, "extract path");
             PathPtr_t extractedPath = rootPath->extract(core::interval_t(a->first, b->first));
             hppDout(notice," extracted path length = "<<extractedPath->length());
+	    hppDout (info, "create local helper");
             LimbRRTHelper helper(fullbody, referenceProblem,
                                  rootPath->extract(core::interval_t(a->first, b->first)));
+	    hppDout (info, "create partial path from interpolateStates");
             PathVectorPtr_t partialPath = interpolateStates(helper, a->second, b->second);
             if(partialPath)
             {
+	      hppDout (info, "optimize partial path");
                 res[i] = optimize(helper,partialPath, numOptimizations);
                 //res[i] =partialPath;
                 valid[i]=true;
@@ -318,9 +348,12 @@ using namespace model;
             else
             {
                 valid[i] = false;
+		hppDout (info, "partial path from interpolateStates is empty");
             }
         }
+	hppDout (info, "check path");
         std::size_t numValid = checkPath(distance, valid);
+	hppDout (info, "ConcatenateAndResizePath");
         return ConcatenateAndResizePath(res, numValid);
     }
 
@@ -330,6 +363,7 @@ using namespace model;
         PathVectorPtr_t res[100];
         bool valid[100];
         std::size_t distance = std::distance(startState,endState);
+	hppDout(notice,"InterpolateState distance = "<<distance);
         assert(distance < 100);
         // treat each interpolation between two states separatly
         // in a different thread
