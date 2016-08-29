@@ -427,6 +427,7 @@ namespace hpp {
       const bool parabTallEnough = (robotName.compare ("ant") == 0 &&  z_x_theta_max > 0.44) || (robotName.compare ("spiderman") == 0 &&  z_x_theta_max > 1.1) || (robotName.compare ("frog") == 0 &&  z_x_theta_max > 0.2) || (robotName.compare ("armlessSkeleton") == 0 &&  z_x_theta_max > 0.6) || (robotName.compare ("lamp") == 0 &&  z_x_theta_max > 0.75);
       value_type r = 0.5; // blending coefficient of extending key-frame
       const Configuration_t q_interp_top = (*bp) (u_max*pathLength, success);
+      hppDout (info, "q_interp_top= " << displayConfig(q_interp_top));
       core::Configuration_t q;
       lenght = u_max*pathLength;
       if (parabTallEnough)
@@ -437,6 +438,7 @@ namespace hpp {
       
       if (extendingPose_.rows ()) {
 	const core::Configuration_t q_trunk_max = (*path) (u_max*pathLength, success);
+	hppDout (info, "q_trunk_max= " << displayConfig(q_trunk_max));
 	q = fillConfiguration (q_trunk_max, extendingPose_); // now q is extending_ at the good top-trunk-configuration
 	q_top = blendPoses (q, q_interp_top, r);
       } else {
@@ -455,7 +457,7 @@ namespace hpp {
 	const T_Limb& robotLimbs = robot_->GetLimbs();
 	rbprm::RbPrmLimbPtr_t limb;
 	r = 0.2;
-	do{
+	do{ 
 	  count ++;
 	  // try to move the limb that is in collision...
 	  core::CollisionValidationReportPtr_t colValRep = boost::dynamic_pointer_cast<core::CollisionValidationReport> (validationReport);
