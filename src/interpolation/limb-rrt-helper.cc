@@ -15,7 +15,7 @@
 // hpp-rbprm. If not, see <http://www.gnu.org/licenses/>.
 
 #include <hpp/util/debug.hh>
-
+#include <hpp/model/configuration.hh>
 #include <hpp/rbprm/interpolation/limb-rrt-helper.hh>
 #include <hpp/rbprm/interpolation/limb-rrt-shooter.hh>
 #include <hpp/rbprm/interpolation/limb-rrt-path-validation.hh>
