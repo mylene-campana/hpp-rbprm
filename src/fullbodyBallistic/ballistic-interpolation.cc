@@ -16,6 +16,7 @@
 
 #include <hpp/util/debug.hh>
 #include <hpp/model/configuration.hh>
+#include <hpp/model/body.hh>
 #include <hpp/model/joint.hh>
 #include <hpp/constraints/generic-transformation.hh>
 #include <hpp/core/basic-configuration-shooter.hh>
@@ -416,6 +417,13 @@ namespace hpp {
       const value_type x_theta_max = - 0.5 * coefs (1) / coefs (0);
       const value_type x_theta_init = cos(theta)*init (0) + sin(theta)*init (1);
       const value_type x_theta_end = cos(theta)*end (0) + sin(theta)*end (1);
+      hppDout (info, "x_theta_init" << x_theta_init);
+      hppDout (info, "x_theta_end" << x_theta_end);
+      hppDout (info, "x_theta_max" << x_theta_max);
+      if (x_theta_max < x_theta_init || x_theta_max > x_theta_end) {
+	hppDout (info, "q_top is not relevant");
+	return state;
+      }
       const value_type u_max = (x_theta_max - x_theta_init)
 	/ (x_theta_end - x_theta_init); // in [0,1]
       const value_type z_x_theta_max = coefs (0)*x_theta_max*x_theta_max +
@@ -460,20 +468,11 @@ namespace hpp {
 	do{ 
 	  count ++;
 	  // try to move the limb that is in collision...
-	  core::CollisionValidationReportPtr_t colValRep = boost::dynamic_pointer_cast<core::CollisionValidationReport> (validationReport);
-	  std::string limbName = colValRep->object1->name ();
-	  hppDout (info, "limb in collision= " << limbName);
-	  const std::size_t sz = limbName.size ();
-	  limbName.resize (sz - 2); // remove "_0" part
-	  hppDout (info, "limb in collision (resized)= " << limbName);
-	  for(rbprm::T_Limb::const_iterator cit = robotLimbs.begin(); cit != robotLimbs.end(); cit++) {
-	    hppDout (info, "cit->first= " << cit->first);
-	    if (cit->first.compare (limbName) == 0) {
-	      limb = cit->second;
-	      break;
-	    }
+	  limb = findLimbInCollision (validationReport);
+	  if (!limb) { // weird collision, return empty state
+	    hppDout (info, "no limb found in collision, return empty topState");
+	    return state;
 	  }
-	  assert(limb);
 	  std::vector <RbPrmLimbPtr_t> limbsvec; // just to use function
 	  limbsvec.push_back (limb);
 	  core::Configuration_t qrand = *configurationShooter->shoot ();
@@ -541,6 +540,36 @@ namespace hpp {
       hppDout (info, "blendPoses q2= " << displayConfig(q2));
       Configuration_t result = r*q1 + (1-r)*q2;
       return result;
+    }
+
+    rbprm::RbPrmLimbPtr_t BallisticInterpolation::findLimbInCollision
+    (const core::ValidationReportPtr_t validationReport) {
+      rbprm::RbPrmLimbPtr_t limb, emptyLimb;
+      const T_Limb& robotLimbs = robot_->GetLimbs();
+      const core::DevicePtr_t device = robot_->device_;
+      core::CollisionValidationReportPtr_t colValRep = boost::dynamic_pointer_cast<core::CollisionValidationReport> (validationReport);
+	  std::string collisionName = colValRep->object1->name ();
+	  hppDout (info, "body in collision= " << collisionName);
+	  const std::size_t sz = collisionName.size ();
+	  collisionName.resize (sz - 2); // remove "_0" part
+	  hppDout (info, "body in collision (resized)= " << collisionName);
+	  for(rbprm::T_Limb::const_iterator cit = robotLimbs.begin(); cit != robotLimbs.end(); cit++) {
+	    hppDout (info, "limb= " << cit->first);
+	    limb = cit->second;
+	    model::JointPtr_t effectorClone = device->getJointByName(limb->effector_->name ());
+	    const std::size_t startRank (limb->limb_->rankInConfiguration());
+	    const std::size_t limbLength (computeLimbLength (limb->limb_, effectorClone));
+	    for (std::size_t i = 0; i < limbLength; i++) {
+	      std::size_t rank = startRank + i;
+	      const std::string bodyName = device->getJointAtConfigRank (rank)->linkedBody ()->name ();
+	      hppDout (info, "bodyName= " << bodyName);
+	      if (collisionName.compare (bodyName) == 0) { // limb found
+		hppDout (info, "found limb in collision");
+		return limb;
+	      }
+	    }
+	  }
+	  return emptyLimb;
     }
 
     // ========================================================================
@@ -669,14 +698,16 @@ namespace hpp {
 	//bp1max = Interpolate (q1contact, q_max,    lenghtTop, subpath->coefficients ());
 	//bp2max = Interpolate (q_max, q2contact,  bp->length()-lenghtTop,subpath->coefficients ());
 
-	hppDout (info, "topState validity: " << problem_->configValidations ()->validate (stateTop.configuration_, validationReport));
+	if (stateTop.configuration_.rows())
+	  hppDout (info, "topState validity: " << problem_->configValidations ()->validate (stateTop.configuration_, validationReport));
 	hppDout (info, "state1 validity: " << problem_->configValidations ()->validate (state1.configuration_, validationReport));
 	hppDout (info, "state2 validity: " << problem_->configValidations ()->validate (state2.configuration_, validationReport));
 
 	stateFrames.clear();
 	stateFrames.push_back(std::make_pair(0,state1));
 	contactState1 = computeOffsetContactConfig (bp, state1,stateFrames, u_offset, true,lenghtTakeoff,lenghtTakeoff6DOF);
-	stateFrames.push_back(std::make_pair(lenghtTop,stateTop));
+	if (stateTop.configuration_.rows())
+	  stateFrames.push_back(std::make_pair(lenghtTop,stateTop));
 	contactState2 = computeOffsetContactConfig (bp, state2,stateFrames, u_offset, false,lenghtLanding,lenghtLanding6DOF);
 	stateFrames.push_back(std::make_pair(bp->length(),state2));
 	/*
@@ -746,14 +777,16 @@ namespace hpp {
 	  //bp1max = Interpolate (q1contact, q_max,	lenghtTop,	subpath->coefficients ());
 	  //bp2max = Interpolate (q_max, q2contact,	bp->length()-lenghtTop,	subpath->coefficients ());
 
-	  hppDout (info, "topState validity: " << problem_->configValidations ()->validate (stateTop.configuration_, validationReport));
+	  if (stateTop.configuration_.rows())
+	    hppDout (info, "topState validity: " << problem_->configValidations ()->validate (stateTop.configuration_, validationReport));
 	  hppDout (info, "state1 validity: " << problem_->configValidations ()->validate (state1.configuration_, validationReport));
 	  hppDout (info, "state2 validity: " << problem_->configValidations ()->validate (state2.configuration_, validationReport));
     
 	  stateFrames.clear();
 	  stateFrames.push_back(std::make_pair(0,state1));
 	  contactState1 = computeOffsetContactConfig (bp, state1,stateFrames, u_offset, true,lenghtTakeoff,lenghtTakeoff6DOF);
-	  stateFrames.push_back(std::make_pair(lenghtTop,stateTop));
+	  if (stateTop.configuration_.rows())
+	    stateFrames.push_back(std::make_pair(lenghtTop,stateTop));
 	  contactState2 = computeOffsetContactConfig (bp, state2,stateFrames, u_offset, false,lenghtLanding,lenghtLanding6DOF);
 	  stateFrames.push_back(std::make_pair(bp->length(),state2));
 	  /*
@@ -837,14 +870,16 @@ namespace hpp {
       //bp1max = Interpolate (qStart, q_max, lenghtTop, pathCoefs);
       //bp2max = Interpolate (q_max, qEnd, bp->length()-lenghtTop,  pathCoefs);
 
-      hppDout (info, "topState validity: " << problem_->configValidations ()->validate (stateTop.configuration_, validationReport));
+      if (stateTop.configuration_.rows())
+	hppDout (info, "topState validity: " << problem_->configValidations ()->validate (stateTop.configuration_, validationReport));
       hppDout (info, "start_ validity: " << problem_->configValidations ()->validate (start_.configuration_, validationReport));
       hppDout (info, "end_ validity: " << problem_->configValidations ()->validate (end_.configuration_, validationReport));
 
       stateFrames.clear();
       stateFrames.push_back(std::make_pair(0,start_));
       contactState1 = computeOffsetContactConfig (bp, start_,stateFrames, u_offset, true,lenghtTakeoff,lenghtTakeoff6DOF);
-      stateFrames.push_back(std::make_pair(lenghtTop,stateTop));
+      if (stateTop.configuration_.rows())
+	stateFrames.push_back(std::make_pair(lenghtTop,stateTop));
       contactState2 = computeOffsetContactConfig (bp, end_,stateFrames, u_offset, false,lenghtLanding,lenghtLanding6DOF);
       stateFrames.push_back(std::make_pair(bp->length(),end_));
 

@@ -225,6 +225,10 @@ namespace hpp {
       core::Configuration_t blendPoses (const core::Configuration_t q1,
 					const core::Configuration_t q2,
 					const core::value_type r);
+
+      /// Find which limb is detected in collision and return it
+      rbprm::RbPrmLimbPtr_t findLimbInCollision
+	(const core::ValidationReportPtr_t validationReport);
       
     private:
       core::ProblemPtr_t problem_;
