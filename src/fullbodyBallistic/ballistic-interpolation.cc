@@ -700,16 +700,20 @@ namespace hpp {
 
 	if (stateTop.configuration_.rows())
 	  hppDout (info, "topState validity: " << problem_->configValidations ()->validate (stateTop.configuration_, validationReport));
-	hppDout (info, "state1 validity: " << problem_->configValidations ()->validate (state1.configuration_, validationReport));
-	hppDout (info, "state2 validity: " << problem_->configValidations ()->validate (state2.configuration_, validationReport));
+	const bool state1validity = problem_->configValidations ()->validate (state1.configuration_, validationReport);
+	const bool state2validity = problem_->configValidations ()->validate (state2.configuration_, validationReport);
+	hppDout (info, "state1 validity: " << state1validity);
+	hppDout (info, "state2 validity: " << state2validity);
 
 	stateFrames.clear();
-	stateFrames.push_back(std::make_pair(0,state1));
+	if (state1validity)
+	  stateFrames.push_back(std::make_pair(0,state1));
 	contactState1 = computeOffsetContactConfig (bp, state1,stateFrames, u_offset, true,lenghtTakeoff,lenghtTakeoff6DOF);
 	if (stateTop.configuration_.rows())
 	  stateFrames.push_back(std::make_pair(lenghtTop,stateTop));
 	contactState2 = computeOffsetContactConfig (bp, state2,stateFrames, u_offset, false,lenghtLanding,lenghtLanding6DOF);
-	stateFrames.push_back(std::make_pair(bp->length(),state2));
+	if (state2validity)
+	  stateFrames.push_back(std::make_pair(bp->length(),state2));
 	/*
 	  bp1 = Interpolate (q1contact, q_contact_offset1,
 	  lenghtTakeoff,
@@ -779,16 +783,20 @@ namespace hpp {
 
 	  if (stateTop.configuration_.rows())
 	    hppDout (info, "topState validity: " << problem_->configValidations ()->validate (stateTop.configuration_, validationReport));
-	  hppDout (info, "state1 validity: " << problem_->configValidations ()->validate (state1.configuration_, validationReport));
-	  hppDout (info, "state2 validity: " << problem_->configValidations ()->validate (state2.configuration_, validationReport));
+	  const bool state1validity = problem_->configValidations ()->validate (state1.configuration_, validationReport);
+	  const bool state2validity = problem_->configValidations ()->validate (state2.configuration_, validationReport);
+	  hppDout (info, "state1 validity: " << state1validity);
+	  hppDout (info, "state2 validity: " << state2validity);
     
 	  stateFrames.clear();
-	  stateFrames.push_back(std::make_pair(0,state1));
+	  if (state1validity)
+	    stateFrames.push_back(std::make_pair(0,state1));
 	  contactState1 = computeOffsetContactConfig (bp, state1,stateFrames, u_offset, true,lenghtTakeoff,lenghtTakeoff6DOF);
 	  if (stateTop.configuration_.rows())
 	    stateFrames.push_back(std::make_pair(lenghtTop,stateTop));
 	  contactState2 = computeOffsetContactConfig (bp, state2,stateFrames, u_offset, false,lenghtLanding,lenghtLanding6DOF);
-	  stateFrames.push_back(std::make_pair(bp->length(),state2));
+	  if (state2validity)
+	    stateFrames.push_back(std::make_pair(bp->length(),state2));
 	  /*
 	    bp1 = Interpolate (q1contact, q_contact_offset1,
 	    lenghtTakeoff,
