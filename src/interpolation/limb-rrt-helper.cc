@@ -256,11 +256,11 @@ using namespace model;
             AddContactConstraints(helper, from, to);
 
 	    hppDout (info, "before BiRRT planner solve");
-	    // PROBLEM: planner may not converge... accept directPath even if invalid in that case ?
 	    res = planner->solve();
 	    hppDout (info, "after BiRRT planner solve");
             helper.rootProblem_.resetGoalConfigs();
         }
+	hppDout (info, "number of subpaths in res= " << res->numberPaths ());
         return res;
     }
 

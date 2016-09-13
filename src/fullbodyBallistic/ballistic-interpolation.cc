@@ -657,7 +657,12 @@ namespace hpp {
 	robot_->V0dir_ = V0;
 	robot_->Vfdir_ = Vimp;
 	state2 = ComputeContacts(robot_, q2, collisionObjects, dir);
+	hppDout (info, "state2 config= " << displayConfig(state2.configuration_));
 	q2contact = computeContactPose(state2);
+	if (problem_->configValidations ()->validate (q2contact, validationReport))
+	  state2.configuration_ = q2contact; // sometimes, state2.configuration_ is "a little" in collision whereas q2contact is not
+	else
+	  hppDout (error, "q2contact is abnormally in collision");
 	// compute average-normal corresponding to new contacts
 	const std::size_t contactNumber = state2.contacts_.size ();
 	fcl::Vec3f normalAv = (0,0,0);
