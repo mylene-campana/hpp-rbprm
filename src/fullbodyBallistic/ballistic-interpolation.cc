@@ -85,6 +85,7 @@ namespace hpp {
 	//dir [i] = V0 [i] - Vimp [i];
 	dir [i] = Vimp [i] - V0 [i]; // inversion for EFORT_normal
       }
+      dir.normalize ();
       return dir;
     }
 
@@ -229,6 +230,8 @@ namespace hpp {
       value_type u;
       T_StateFrame reverseFrame;
       core::ValidationReportPtr_t validationReport;
+      const std::size_t ecsSize = 
+	robot_->device_->extraConfigSpace ().dimension ();
       for( rbprm::T_Limb::const_iterator lit = robot_->GetLimbs().begin();lit != robot_->GetLimbs().end(); ++lit){
         if(lastState.contacts_[lit->first]){ // limb is in contact
          contactingLimbs.push_back(lit->first);
@@ -262,6 +265,7 @@ namespace hpp {
         hppDout (info, "iteration= " << iteration);
         hppDout (info, "currentLenght = " << currentLenght);
         q_trunk_offset = (*bp) (currentLenght, success);
+	hppDout (info, "q_trunk_offset= " << displayConfig(q_trunk_offset));
         dir = bp->evaluateVelocity (currentLenght);
         //state = MaintainPreviousContacts (lastState, limbColVal, q_trunk_offset, contactMaintained, multipleBreaks, successLimbs);
         //state = robot_->MaintainPreviousContacts (lastState, robot_, limbColVal, q_trunk_offset, contactMaintained, multipleBreaks,0.);
@@ -303,6 +307,15 @@ namespace hpp {
             
             lastState.configuration_ = replaceFixedLimb(lastState.configuration_,lastfixedLimb);
             lastfixedLimb = fixedLimb;
+	    // TODO: replace ECS if any
+	    if (ecsSize > 0) {
+	      const std::size_t size1 = lastState.configuration_.size () - ecsSize;
+	      const std::size_t size2 = lastState.configuration_.size () - ecsSize;
+	      hppDout (info, "size1= " << size1 << "  size2= " << size2); // not sure if they are the same ...
+	      for (std::size_t k = 0; k < ecsSize; k++) {
+		lastState.configuration_ [size1 + k] = q_trunk_offset [size2 + k];
+	      }
+	    }
 
 	    bool isValid = problem_->configValidations ()->validate (lastState.configuration_, validationReport);
 	    hppDout (info, "isValid lastState= " << isValid);
@@ -381,6 +394,14 @@ namespace hpp {
       lastState.ignore6DOF = ignore6DOF;
       
       lastState.configuration_ = replaceFixedLimb(lastState.configuration_,lastfixedLimb);
+      if (ecsSize > 0) {
+	const std::size_t size1 = lastState.configuration_.size () - ecsSize;
+	const std::size_t size2 = lastState.configuration_.size () - ecsSize;
+	hppDout (info, "size1= " << size1 << "  size2= " << size2); // not sure if they are the same ...
+	for (std::size_t k = 0; k < ecsSize; k++) {
+	  lastState.configuration_ [size1 + k] = q_trunk_offset [size2 + k];
+	}
+      }
 
       bool isValid = problem_->configValidations ()->validate (lastState.configuration_, validationReport);
       hppDout (info, "isValid lastState= " << isValid);
@@ -648,12 +669,19 @@ namespace hpp {
 	  q1contact = q2contact;
 	  state1 = state2;
 	}
+	if (contactPose_.size () != 0)
+	  q2 = fillConfiguration (subpath->end (), contactPose_);
+	else if (flexionPose_.size () != 0)
+	  q2 = fillConfiguration (subpath->end (), flexionPose_);
+	else
 	q2 = fillConfiguration (subpath->end (), robot->configSize ());
 	hppDout (info, "q2: " << displayConfig(q2));
 	V0 = pp_next->V0_; // V0_i+1
 	Vimp = pp->Vimp_; // Vimp_i
-	dir = computeDir (V0, Vimp);
-	hppDout (info, "dir (Vimp-V0)= " << dir);
+	//dir = computeDir (V0, Vimp);
+	dir [0] = 0; dir [1] = 0; dir [2] = 1;
+	hppDout (info, "dir= " << dir);
+	hppDout (info, "(Vimp-V0)= " << -computeDir (V0, Vimp));
 	robot_->V0dir_ = V0;
 	robot_->Vfdir_ = Vimp;
 	state2 = ComputeContacts(robot_, q2, collisionObjects, dir);
@@ -661,8 +689,10 @@ namespace hpp {
 	q2contact = computeContactPose(state2);
 	if (problem_->configValidations ()->validate (q2contact, validationReport))
 	  state2.configuration_ = q2contact; // sometimes, state2.configuration_ is "a little" in collision whereas q2contact is not
-	else
+	else {
 	  hppDout (error, "q2contact is abnormally in collision");
+	  throw std::runtime_error ("q2contact is abnormally in collision");
+	}
 	// compute average-normal corresponding to new contacts
 	const std::size_t contactNumber = state2.contacts_.size ();
 	fcl::Vec3f normalAv = (0,0,0);

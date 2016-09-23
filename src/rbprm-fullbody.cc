@@ -14,6 +14,7 @@
 // received a copy of the GNU Lesser General Public License along with
 // hpp-rbprm. If not, see <http://www.gnu.org/licenses/>.
 
+#include <hpp/model/configuration.hh>
 #include <hpp/rbprm/rbprm-fullbody.hh>
 #include <hpp/model/joint.hh>
 #include <hpp/rbprm/tools.hh>
@@ -37,6 +38,7 @@
 namespace hpp {
   namespace rbprm {
 
+    using model::displayConfig;
     const double epsilon = 10e-3;
 
     bool isCentroidalConeValid (const core::vector_t& n,
@@ -103,6 +105,8 @@ namespace hpp {
                 collisionValidation_->addObstacle(*cit);
             }
             limbcollisionValidation_->addObstacle(*cit);
+	    hppDout (info, "limb collisionValidation:" << limb->limb_->name());
+	    hppDout (info, "obst collisionValidation:" << (*cit)->name());
             //remove effector collision
             if(disableEffectorCollision)
             {
@@ -242,12 +246,21 @@ namespace hpp {
       for(sampling::T_OctreeReport::const_iterator it = finalSet.begin() ; it != finalSet.end(); ++it){ // ordered by best static value ??
         sampling::Load(*it->sample_, configuration);
         hpp::core::ValidationReportPtr_t valRep (new hpp::core::CollisionValidationReport);
+	hppDout (info, "classic validation test= " << validation->validate(configuration, valRep));
+	core::CollisionValidationReport* report = static_cast <core::CollisionValidationReport*> (valRep.get());
+	if (!report) {
+	  hppDout (info, "collision with:"<<report->object1->name ());
+	  hppDout (info, "collision with:"<<report->object2->name ());
+	}
+	//hppDout (info, "other coll test= " << problem_->configValidations ()->validate(configuration, valRep)); // no problem_ here....
         if(validation->validate(configuration, valRep) && (!stability || stability::IsStable(body,current) >=robustnessTreshold))
         {
             current.configuration_ = configuration;
+	    hppDout (info, "coll-free config= " << displayConfig(current.configuration_));
             return true;
         }
       }
+      hppDout (info, "no coll-free config computed");
       return false;
       
       
@@ -393,6 +406,7 @@ namespace hpp {
       for(model::ObjectVector_t::const_iterator oit = collisionObjects.begin();
           oit != collisionObjects.end(); ++oit, ++i)
       {
+	hppDout (info, "collision obj= " << (*oit)->name ());
           if(eval)
             sampling::GetCandidates(limb->sampleContainer_, transform, *oit, direction, reports[i], eval);
           else
@@ -569,8 +583,12 @@ else
     #endif*/
           if(!found_sample)
           {
+	    hppDout (info, "current.configuration_ (before ComputeCollisionFree)= " << displayConfig(current.configuration_));
               ComputeCollisionFreeConfiguration(body, current, validation, limb, configuration,robustnessTreshold,false);
 	      hppDout (info, "sample not found, coll-free config");
+	      hppDout (info, "current.configuration_= " << displayConfig(current.configuration_));
+	      core::ValidationReportPtr_t valReport;
+	      hppDout (info, "collision test= " << validation->validate(current.configuration_,valReport));
           }
       }
       if(found_sample || unstableContact)
@@ -581,7 +599,10 @@ else
           current.contactRotation_[limbId] = rotation;
           current.configuration_ = configuration;
           current.contactOrder_.push(limbId);
+	  hppDout (info, "found sample or unstableContact -> update state");
+	  hppDout (info, "current.configuration_= " << displayConfig(current.configuration_));
       }
+      hppDout (info, "ComputeStableContact status= " << status);
       return status;
     }
 
@@ -666,8 +687,10 @@ else
 	      {
                 hppDout(info,"No Contact exist within group");
                 fcl::Vec3f normal, position;
+		core::ValidationReportPtr_t valRep;
                 ComputeStableContact(body,result,body->limbcollisionValidations_.at(lit->first), lit->first, lit->second, configuration, result.configuration_, collisionObjects, direction, position, normal, robustnessTreshold, true, false);
-            }else{
+		hppDout (info, "collision test after ComputeStableContact= " << body->limbcollisionValidations_.at(lit->first)->validate(result.configuration_,valRep));
+}else{
                 hppDout(info,"Contact exist within group");
             }
             result.nbContacts = result.contactNormals_.size();
