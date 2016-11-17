@@ -58,7 +58,7 @@ SET(${LIBRARY_NAME}_SOURCES
         fullbodyBallistic/timed-ballistic-path.cc
  ${PROJECT_SOURCE_DIR}/include/hpp/rbprm/fullbodyBallistic/timed-ballistic-path.hh
         fullbodyBallistic/ballistic-planner.cc ${PROJECT_SOURCE_DIR}/include/hpp/rbprm/fullbodyBallistic/ballistic-planner.hh
-
+		fullbodyBallistic/convex-cone-intersection.cc ${PROJECT_SOURCE_DIR}/include/hpp/rbprm/fullbodyBallistic/convex-cone-intersection.hh
   )
 
 INCLUDE_DIRECTORIES(${PROJECT_SOURCE_DIR}/src)

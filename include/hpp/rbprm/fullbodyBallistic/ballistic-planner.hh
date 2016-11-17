@@ -95,15 +95,15 @@ namespace hpp {
 
     private:
 
-      /**
-       * @brief computeGIWC compute the GIWC for the configuration and fill the node attribut, get validation report and call the second method
-       * @param x the node
-       */
-      void computeGIWC (const core::Configuration_t q);
-
       /// return "average" direction of CoM cone, as average of contact cone 
       /// directions, if these cones are in the middle of the contact areas
       fcl::Vec3f computeMiddleContacts (const core::Configuration_t q) const;
+
+      fcl::Vec3f vectorToVec3f (const polytope::vector3_t vector) const {
+	fcl::Vec3f result;
+	for (std::size_t i = 0; i < 3; i++) result [i] = vector [i];
+	return result;
+      }
 
       core::ProblemPtr_t problem_;
       core::ConfigurationShooterPtr_t configurationShooter_;

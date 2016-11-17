@@ -50,9 +50,11 @@ namespace hpp {
       const size_type index = robot->configSize ()
 	- robot->extraConfigSpace ().dimension ();
 
-      const value_type nx = q [index];
-      const value_type ny = q [index + 1];
-      const value_type nz = q [index + 2];
+      const value_type Nnorm = sqrt(pow(q [index],2) + pow(q [index+1],2) + pow(q [index+2],2));
+      const value_type nx = q [index]/Nnorm;
+      const value_type ny = q [index + 1]/Nnorm;
+      const value_type nz = q [index + 2]/Nnorm;
+      //hppDout (info, "nx= " << nx << ", ny= " << ny << ", nz= " << nz);
       //const value_type theta = atan2 (2*qw*qz - 2*qx*qy, 1-2*qy*qy-2*qz*qz);
       const value_type theta = q [index + 3];
       //hppDout (info, "theta: " << theta);
@@ -111,15 +113,15 @@ namespace hpp {
       const value_type qy = quat.y ();
       const value_type qz = quat.z ();
       const value_type magnitude = sqrt(qw*qw + qx*qx + qy*qy + qz*qz);
-      hppDout (info, "quat: " << " " << qw << " " << qx << " " << qy << " " << qz);
-      hppDout (info, "quaternion magnitude= " << magnitude);
+      //hppDout (info, "quat: " << " " << qw << " " << qx << " " << qy << " " << qz);
+      //hppDout (info, "quaternion magnitude= " << magnitude);
       
       // re-normalize (not needed but sometimes, loss of accuracy...)
       qtest [indexSO3] = qw / magnitude;
       qtest [indexSO3 + 1] = qx / magnitude;
       qtest [indexSO3 + 2] = qy / magnitude;
       qtest [indexSO3 + 3] = qz / magnitude;
-      hppDout (info, "qtest: " << displayConfig (qtest));
+      //hppDout (info, "qtest: " << displayConfig (qtest));
       return qtest;
     }
 

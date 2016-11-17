@@ -100,6 +100,7 @@ SET(${PROJECT_NAME}_HEADERS
     include/hpp/rbprm/fullbodyBallistic/ballistic-interpolation.hh
     include/hpp/rbprm/fullbodyBallistic/ballistic-path.hh
     include/hpp/rbprm/fullbodyBallistic/ballistic-planner.hh
+    include/hpp/rbprm/fullbodyBallistic/convex-cone-intersection.hh
     include/utils/algorithms.h
   )
 
