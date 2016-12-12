@@ -208,8 +208,7 @@ namespace hpp {
       core::vector_t Vimp_; // final velocity
       std::vector <std::string> initialROMnames_; // active ROM list at begining
       std::vector <std::string> endROMnames_; // active ROM list at end
-      
-     
+           
     protected:
       /// Print path in a stream
       virtual std::ostream& print (std::ostream &os) const
@@ -269,6 +268,7 @@ namespace hpp {
       ParabolaPathWkPtr_t weak_;
       mutable core::vector_t coefficients_; // parabola coefficients
       mutable core::value_type length_;
+
     }; // class ParabolaPath
   } //   namespace rbprm
 } // namespace hpp

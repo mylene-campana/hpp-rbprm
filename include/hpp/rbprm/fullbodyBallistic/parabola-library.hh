@@ -194,8 +194,9 @@ namespace hpp {
 	      vertices2.push_back(Eigen::Vector3d(model2->vertices[i][0], model2->vertices[i][1], model2->vertices[i][2]));
 	    }
         
-	  /// warning: plane normal harcoded to (0,0,1) here ->
-	  geom::T_Point hull = geom::intersectPolygonePlane(model1,model2,fcl::Vec3f(0,0,1),geom::ZJUMP,result);
+	  /// warning: plane normal harcoded to (0,0,1) here (still true ?)
+	  geom::Point pn;
+	  geom::T_Point hull = geom::intersectPolygonePlane(model1,model2,pn);
 
 	  if(hull.size() == 0){
 	    hppDout(error,"No intersection between rom and environnement");

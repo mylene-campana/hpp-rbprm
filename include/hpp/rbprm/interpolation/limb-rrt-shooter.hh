@@ -20,8 +20,7 @@
 # define HPP_RBPRM_LIMB_RRT_SHOOTER_HH
 
 # include <hpp/rbprm/config.hh>
-# include <hpp/core/configuration-shooter.hh>
-# include <hpp/core/basic-configuration-shooter.hh>
+# include <hpp/rbprm/interpolation/time-constraint-shooter.hh>
 # include <hpp/rbprm/rbprm-fullbody.hh>
 # include <hpp/core/path.hh>
 # include <hpp/model/device.hh>
@@ -32,9 +31,14 @@
 namespace hpp {
     namespace rbprm {
     namespace interpolation {
-    HPP_PREDEF_CLASS (LimbRRTShooter);
-    typedef boost::shared_ptr <LimbRRTShooter>
-    LimbRRTShooterPtr_t;
+      HPP_PREDEF_CLASS (LimbRRTShooter);
+      typedef boost::shared_ptr <LimbRRTShooter> LimbRRTShooterPtr_t;
+    struct LimbRRTShooterFactory
+    {
+        TimeConstraintShooterPtr_t operator()(const RbPrmFullBodyPtr_t fullBody, const hpp::core::PathPtr_t path,
+                        const std::size_t pathDofRank, const hpp::rbprm::State &from, const hpp::rbprm::State &to,
+                                              const T_TimeDependant& tds, core::ConfigProjectorPtr_t projector) const;
+    };
 
 /// \addtogroup configuration_sampling
 /// \{

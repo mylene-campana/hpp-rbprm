@@ -15,6 +15,7 @@
 // hpp-rbprm. If not, see <http://www.gnu.org/licenses/>.
 
 #include <hpp/rbprm/interpolation/limb-rrt-shooter.hh>
+#include <hpp/rbprm/interpolation/time-constraint-utils.hh>
 #include <hpp/rbprm/rbprm-limb.hh>
 #include <hpp/rbprm/sampling/sample.hh>
 
@@ -51,8 +52,25 @@ using namespace core;
         // NOTHING
     }
 
-    hpp::core::ConfigurationPtr_t LimbRRTShooter::shoot () const
+  rbprm::T_Limb GetVaryingLimb(const RbPrmFullBodyPtr_t fullBody, const hpp::rbprm::State &from, const hpp::rbprm::State &to)
+  {
+      rbprm::T_Limb res;
+      const rbprm::T_Limb& limbs = fullBody->GetLimbs();
+      std::vector<std::string> variations = to.allVariations(from, extractEffectorsName(limbs));
+      if(!variations.empty())
+      {
+          const std::string limbName = *(variations.begin());
+          rbprm::RbPrmLimbPtr_t limb = limbs.at(limbName);
+          res.insert(std::make_pair(limbName,limb));
+      }
+      return res;
+  }
+
+    TimeConstraintShooterPtr_t LimbRRTShooterFactory::operator()(const RbPrmFullBodyPtr_t fullBody, const hpp::core::PathPtr_t path,
+                    const std::size_t pathDofRank, const hpp::rbprm::State &from, const hpp::rbprm::State &to,
+                    const T_TimeDependant& tds, core::ConfigProjectorPtr_t projector) const
     {
+	/* // Mylene branch (old)
         // edit path sampling dof
         value_type a = path_->timeRange().first; value_type b = path_->timeRange().second;
         value_type u = value_type(rand()) / value_type(RAND_MAX);
@@ -69,6 +87,8 @@ using namespace core;
         const sampling::Sample& sample = *(limb_->sampleContainer_.samples_.begin() + (rand() % (int) (limb_->sampleContainer_.samples_.size() -1)));
         sampling::Load(sample,*config);
         return config;
+	*/
+        return TimeConstraintShooter::create(fullBody->device_,path,pathDofRank,tds, projector, GetVaryingLimb(fullBody, from, to));
     }
   }// namespace interpolation
   }// namespace rbprm

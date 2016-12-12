@@ -90,14 +90,14 @@ namespace hpp {
         // NOTHING
     }
 
-    model::value_type ComputeExtraDofValue(const std::size_t dofRank,
-                              const Configuration_t init,
-                              const Configuration_t end,
-                              const model::value_type normalizedValue)
+    
+    model::value_type LimbRRTPath::ComputeExtraDofValue
+    (const std::size_t dofRank, const Configuration_t init,
+     const Configuration_t end, const model::value_type normalizedValue) const
     {
-        double a = init[dofRank];
-        double b = end[dofRank];
-        return (b-a)* normalizedValue + a;
+      double a = init[dofRank];
+      double b = end[dofRank];
+      return (b-a)* normalizedValue + a;
     }
 
     bool LimbRRTPath::impl_compute (ConfigurationOut_t result,

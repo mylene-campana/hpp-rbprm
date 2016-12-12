@@ -4,6 +4,17 @@
 
 namespace geom
 {
+
+  /// Computes the normal vector of a triangle based on the
+  /// global position of its vertices. The normal is subject to convention!
+  /// \param tri The global position of a triangles vertices
+  Point TriangleNormal(TrianglePoints& tri)
+  {
+    Point normal = (tri.p2 - tri.p1).cross(tri.p3 - tri.p1);
+    normal.normalize();
+    hppDout(notice,"normal, in geom :: "<<normal);
+    return normal;
+  }
   
   BVHModelOBConst_Ptr_t GetModel(const fcl::CollisionObjectConstPtr_t object)
   {
@@ -388,11 +399,12 @@ namespace geom
     }
     return res;
   }
-  
+
+  /*
   T_Point intersectPolygonePlane(BVHModelOBConst_Ptr_t polygone, BVHModelOBConst_Ptr_t model2, fcl::Vec3f n , double t, fcl::CollisionResult result, bool useT, double epsilon){
     T_Point res,triRes,sortedRes;
     std::ostringstream ss;
-   // ss<<"[";
+    ss<<"[";
     
     
     for(size_t c = 0 ; c < result.numContacts() ; ++c){
@@ -423,20 +435,93 @@ namespace geom
     } // for each contact point
     if(res.empty()){
       hppDout(notice,"~ Intersection between polygon and plane is empty");
+      std::cout<<"~ Intersection between polygon and plane is empty"<<std::endl;
       return res;
     }
     sortedRes = convexHull(res.begin(),res.end());
-   /* hppDout(notice,"clipped point : ");        
+    hppDout(notice,"clipped point : ");
     for(size_t i = 0; i < sortedRes.size() ; ++i){
       ss<<"["<<sortedRes[i][0]<<","<<sortedRes[i][1]<<","<<sortedRes[i][2]<<"]";
       if(i< (sortedRes.size() -1))
         ss<<",";
     }
     ss<<"]";
+    std::cout<<"intersection : "<<std::endl;
     std::cout<<ss.str()<<std::endl;
-    hppDout(notice,"area = "<<area(sortedRes.begin(),sortedRes.end()));*/
+    hppDout(notice,"area = "<<area(sortedRes.begin(),sortedRes.end()));
     return sortedRes;
   }
-  
+  */
+
+  // cf http://geomalgorithms.com/a05-_intersect-1.html
+  T_Point intersectSegmentPlane(Point s0, Point s1, Eigen::Vector3d pn, Point p0 ){
+    T_Point res;
+    Point u = s1 - s0;
+    Point w = s0 - p0;
+
+    double d = pn.dot(u);
+    double n = - pn.dot(w);
+
+    if(fabs(d) < EPSILON){ // segment parrallel to plane
+      if(fabs(n) < EPSILON){ //segment in plane
+        res.insert(res.end(),s0);
+        res.insert(res.end(),s1);
+        return res;
+      }else
+        return res; // no intersection
+    }
+    // there ONE intersection point :
+    double di = n/d;
+    if(di < 0 || di > 1)
+      return res; // unknow error ?
+
+    Point si = s0 + di*u;
+    res.insert(res.end(),si);
+    return res;
+  }
+
+
+  T_Point intersectPolygonePlane(BVHModelOBConst_Ptr_t polygone, BVHModelOBConst_Ptr_t plane, Eigen::Ref<Point> Pn){
+    T_Point res, sortedRes;
+    T_Point intersection;
+    // compute plane equation (normal, point inside the plan)
+    Point P0;
+    TrianglePoints triPlane;
+    triPlane.p1 = plane->vertices[plane->tri_indices[0][0]]; // FIXME : always use the first triangle, is it an issue ?
+    triPlane.p2 = plane->vertices[plane->tri_indices[0][1]];
+    triPlane.p3 = plane->vertices[plane->tri_indices[0][2]];
+    Pn = TriangleNormal(triPlane);
+    P0 = triPlane.p1; //FIXME : better point ?
+
+    for(size_t i = 0 ; i < polygone->num_tris ; i++){ // FIXME : can test 2 times the same line (in both triangles), avoid this ?
+      //hppDout(info,"triangle : "<<i);
+      for(size_t j = 0 ; j < 3 ; j++){
+       // hppDout(info,"couple : "<<j);
+        intersection = intersectSegmentPlane(polygone->vertices[polygone->tri_indices[i][j]],
+                                             polygone->vertices[polygone->tri_indices[i][((j == 2) ? 0 : (j+1))]], Pn,P0);
+        if(intersection.size() > 0)
+          res.insert(res.end(),intersection.begin(),intersection.end());
+      }
+    }
+
+
+
+    // ordonate the point in the vector (clockwise) first point and last point are the same
+    sortedRes = convexHull(res.begin(),res.end());
+    hppDout(notice,"clipped point : ");
+    std::ostringstream ss;
+    ss<<"[";
+    for(size_t i = 0; i < sortedRes.size() ; ++i){
+      ss<<"["<<sortedRes[i][0]<<","<<sortedRes[i][1]<<","<<sortedRes[i][2]<<"]";
+      if(i< (sortedRes.size() -1))
+        ss<<",";
+    }
+    ss<<"]";
+    std::cout<<"intersection : "<<std::endl;
+    std::cout<<ss.str()<<std::endl;
+    hppDout(notice,"area = "<<area(sortedRes.begin(),sortedRes.end()));
+    return sortedRes;
+  }
+
 } //namespace geom
 

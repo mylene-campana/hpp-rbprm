@@ -30,7 +30,7 @@ SET(PROJECT_DESCRIPTION
 
 
 # Set to 1 for profiling
- add_definitions(-DPROFILE)
+ # add_definitions(-DPROFILE)
 
 # Where to compile shared objects
 SET(LIBRARY_OUTPUT_PATH ${PROJECT_BINARY_DIR}/lib)
@@ -65,11 +65,25 @@ SET(${PROJECT_NAME}_HEADERS
     include/hpp/rbprm/rbprm-fullbody.hh
     include/hpp/rbprm/rbprm-limb.hh
     include/hpp/rbprm/interpolation/rbprm-path-interpolation.hh
+    include/hpp/rbprm/interpolation/time-constraint-helper.hh
+    include/hpp/rbprm/interpolation/time-constraint-helper.inl
+    include/hpp/rbprm/interpolation/time-constraint-steering.hh
+    include/hpp/rbprm/interpolation/limb-rrt.hh
+    include/hpp/rbprm/interpolation/com-rrt.hh
+    include/hpp/rbprm/interpolation/com-rrt-shooter.hh
+    include/hpp/rbprm/interpolation/time-constraint-shooter.hh
     include/hpp/rbprm/interpolation/limb-rrt-shooter.hh
     include/hpp/rbprm/interpolation/limb-rrt-helper.hh
     include/hpp/rbprm/interpolation/limb-rrt-path-validation.hh
     include/hpp/rbprm/interpolation/limb-rrt-steering.hh
     include/hpp/rbprm/interpolation/limb-rrt-path.hh
+    include/hpp/rbprm/interpolation/time-constraint-utils.hh
+    include/hpp/rbprm/interpolation/time-constraint-path-validation.hh
+    include/hpp/rbprm/interpolation/time-constraint-path.hh
+    include/hpp/rbprm/interpolation/com-trajectory.hh
+    include/hpp/rbprm/interpolation/time-dependant.hh
+    include/hpp/rbprm/interpolation/interpolation-constraints.hh
+    include/hpp/rbprm/interpolation/spline/effector-rrt.hh
     include/hpp/rbprm/rbprm-shooter.hh
     include/hpp/rbprm/rbprm-state.hh
     include/hpp/rbprm/rbprm-validation.hh
@@ -87,21 +101,27 @@ SET(${PROJECT_NAME}_HEADERS
     include/hpp/rbprm/rbprm-profiler.hh
     include/utils/Stdafx.hh
     include/utils/stop-watch.hh
+    include/spline/curve_abc.h
+    include/spline/bezier_curve.h
+    include/spline/exact_cubic.h
+    include/spline/cubic_function.h
+    include/spline/MathDefs.h
+#    include/hpp/rbprm/planner/parabola-planner.hh
     include/hpp/rbprm/planner/dynamic-planner.hh
     include/hpp/rbprm/planner/steering-dynamic.hh
     include/hpp/rbprm/planner/parabola-path.hh
-    include/hpp/rbprm/fullbodyBallistic/timed-ballistic-path.hh
     include/hpp/rbprm/planner/steering-method-parabola.hh
     include/hpp/rbprm/planner/rbprm-node.hh
     include/hpp/rbprm/planner/rbprm-roadmap.hh
-    include/hpp/rbprm/planner/prm-planner.hh
-    include/hpp/rbprm/projection-shooter.hh
+    include/hpp/rbprm/planner/rbprm-steering-kinodynamic.hh
+    include/utils/algorithms.h
+    
     include/hpp/rbprm/fullbodyBallistic/parabola-library.hh
     include/hpp/rbprm/fullbodyBallistic/ballistic-interpolation.hh
     include/hpp/rbprm/fullbodyBallistic/ballistic-path.hh
     include/hpp/rbprm/fullbodyBallistic/ballistic-planner.hh
     include/hpp/rbprm/fullbodyBallistic/convex-cone-intersection.hh
-    include/utils/algorithms.h
+    #    include/hpp/rbprm/projection-shooter.hh
   )
 
 # Activate hpp-util logging if requested
@@ -118,6 +138,8 @@ ENDIF()
 ADD_SUBDIRECTORY(src)
 #ADD_SUBDIRECTORY(tools)
 #ADD_SUBDIRECTORY(tests)
+
+PKG_CONFIG_APPEND_LIBS(${PROJECT_NAME})
 
 SETUP_PROJECT_FINALIZE()
 SETUP_PROJECT_CPACK()

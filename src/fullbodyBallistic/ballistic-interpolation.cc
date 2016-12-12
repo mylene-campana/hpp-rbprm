@@ -221,7 +221,6 @@ namespace hpp {
       for(size_t i = 0 ; i < lastfixedLimb.size() ; i ++){lastfixedLimb[i] = 0;}
       Configuration_t fixedLimb(lastfixedLimb);
       
-      bool ignore6DOF = false;
       std::size_t iteration = 0;
       fcl::Vec3f dir;
       State state,lastState;
@@ -232,6 +231,10 @@ namespace hpp {
       core::ValidationReportPtr_t validationReport;
       const std::size_t ecsSize = 
 	robot_->device_->extraConfigSpace ().dimension ();
+      const affMap_t affordances; // TODO !
+      const std::map<std::string, std::vector<std::string> > affFilters; //TODO
+
+
       for( rbprm::T_Limb::const_iterator lit = robot_->GetLimbs().begin();lit != robot_->GetLimbs().end(); ++lit){
         if(lastState.contacts_[lit->first]){ // limb is in contact
          contactingLimbs.push_back(lit->first);
@@ -255,8 +258,6 @@ namespace hpp {
         state.configuration_ = q_interp;
         return state;
       }
-      hppDout (info, "bp->length()/3.= " << bp->length()/3.);
-      hppDout (info, "bp->length()2./3.= " << bp->length()*2./3.);
       
       while (contact_OK && iteration < maxIter && ((((currentLenght<bp->length())/3.)&&increase_u_offset) || ((currentLenght > (bp->length()*2./3.))&&(!increase_u_offset)))){ 
         hppDout (info, "currentLenght= " << currentLenght);        
@@ -267,19 +268,9 @@ namespace hpp {
         q_trunk_offset = (*bp) (currentLenght, success);
 	hppDout (info, "q_trunk_offset= " << displayConfig(q_trunk_offset));
         dir = bp->evaluateVelocity (currentLenght);
-        //state = MaintainPreviousContacts (lastState, limbColVal, q_trunk_offset, contactMaintained, multipleBreaks, successLimbs);
-        //state = robot_->MaintainPreviousContacts (lastState, robot_, limbColVal, q_trunk_offset, contactMaintained, multipleBreaks,0.);
-        state = rbprm::ComputeContacts(lastState,robot_,q_trunk_offset,problem_->collisionObstacles(),dir,contactMaintained,multipleBreaks,true,0.,ignore6DOF,false);
-        /*if(!contactMaintained && !ignore6DOF){ // after the first fail with rotationnal constraint, we relax the problem for longer path
-          ignore6DOF = true;
-          transitionDOFstate = state;
-          if(increase_u_offset)
-            lenghtTransition = currentLenght-u;
-          else
-            lenghtTransition = bp->length()-currentLenght+u;
-          state = rbprm::ComputeContacts(lastState,robot_,q_trunk_offset,problem_->collisionObstacles(),dir,contactMaintained,multipleBreaks,true,0.,ignore6DOF,false);
-          hppDout(notice,"Relax 6DOF constraints after "<<iteration<<" iterations");
-        }*/
+        state = rbprm::ComputeContacts(lastState,robot_,q_trunk_offset,
+				       affordances, affFilters,
+				       dir,contactMaintained,multipleBreaks,true,0.);
         if(contactMaintained){
           contact_OK = true;
           lastState = state;
@@ -389,9 +380,6 @@ namespace hpp {
         lenght = currentLenght-u;
       else
         lenght = bp->length()-currentLenght-u;
-
-
-      lastState.ignore6DOF = ignore6DOF;
       
       lastState.configuration_ = replaceFixedLimb(lastState.configuration_,lastfixedLimb);
       if (ecsSize > 0) {
@@ -659,6 +647,8 @@ namespace hpp {
 	  boost::dynamic_pointer_cast<ParabolaPath>(subpath_next);
 	const value_type pathLength = subpath->length ();
 	core::PathPtr_t pathLimb;
+	const affMap_t affordances; // TODO !
+      const std::map<std::string, std::vector<std::string> > affFilters; //TODO
 	
 	if (i == 0) { // keep qStart config which already has contacts
 	  hppDout (info, "keep start config");
@@ -684,7 +674,7 @@ namespace hpp {
 	hppDout (info, "(Vimp-V0)= " << -computeDir (V0, Vimp));
 	robot_->V0dir_ = V0;
 	robot_->Vfdir_ = Vimp;
-	state2 = ComputeContacts(robot_, q2, collisionObjects, dir);
+	state2 = ComputeContacts(robot_, q2, affordances, affFilters, dir);
 	hppDout (info, "state2 config= " << displayConfig(state2.configuration_));
 	q2contact = computeContactPose(state2);
 	if (problem_->configValidations ()->validate (q2contact, validationReport))

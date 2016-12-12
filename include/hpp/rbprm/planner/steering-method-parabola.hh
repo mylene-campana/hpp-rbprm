@@ -36,6 +36,7 @@ namespace hpp {
     // Planner objects are manipulated only via shared pointers
     typedef boost::shared_ptr <SteeringMethodParabola> SteeringMethodParabolaPtr_t;
 
+
     /// Steering method that creates StraightPath instances
     ///
     class HPP_CORE_DLLAPI SteeringMethodParabola : public core::SteeringMethod
@@ -97,6 +98,7 @@ namespace hpp {
       /// between them = 2*delta.
       /// Equations have been obtained using Matlab.
       bool fiveth_constraint (const core::ConfigurationIn_t q,
+
 			      const value_type theta,
 			      const int number,
 			      value_type *delta) const;
@@ -126,6 +128,7 @@ namespace hpp {
         SteeringMethod::init (weak);
         weak_ = weak;
       }
+
 
     private:
       /// 3D impl_compute

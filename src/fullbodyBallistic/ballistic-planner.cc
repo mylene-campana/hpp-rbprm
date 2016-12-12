@@ -79,7 +79,7 @@ namespace hpp {
       core::PathPtr_t fwdPath, bwdPath;
       DelayedEdge_t fwdDelayedEdge, bwdDelayedEdge;
       DelayedEdges_t delayedEdges; // store valid forward and backward
-      const size_type indexECS = robot->configSize () - robot->extraConfigSpace ().dimension ();
+      //const size_type indexECS = robot->configSize () - robot->extraConfigSpace ().dimension ();
 
       // shoot a RB-valid random configuration using rbprm-shooter
       core::ConfigurationPtr_t q_rand;
@@ -193,7 +193,7 @@ namespace hpp {
         core::PathPtr_t fwdPath, bwdPath;
         std::vector<std::string> filter;
         core::NodePtr_t initNode = roadmap ()->initNode();
-        const size_type indexECS = problem().robot()->configSize () - problem().robot()->extraConfigSpace ().dimension ();
+        //const size_type indexECS = problem().robot()->configSize () - problem().robot()->extraConfigSpace ().dimension ();
 
       for (core::Nodes_t::const_iterator itn = roadmap ()->goalNodes ().begin();itn != roadmap ()->goalNodes ().end (); ++itn) {
         core::ConfigurationPtr_t q1 ((initNode)->configuration ());
@@ -294,7 +294,10 @@ namespace hpp {
 	    }*/
         
 	  // TODO: replace by affordance
-	  geom::T_Point hull = geom::intersectPolygonePlane(model1,model2,-result.getContact(0).normal,0,result,false); // do not set 2 last params if DEBUG groundcrouch (ZJUMP = 0)
+	  //geom::T_Point hull = geom::intersectPolygonePlane(model1,model2,-result.getContact(0).normal,0,result,false); // do not set 2 last params if DEBUG groundcrouch (ZJUMP = 0)
+	  geom::Point pn;
+	  geom::T_Point hull = geom::intersectPolygonePlane(model1,model2,pn);
+	  
 	  
 	  if(hull.size() == 0){
 	    hppDout(error,"No intersection between rom and environnement");

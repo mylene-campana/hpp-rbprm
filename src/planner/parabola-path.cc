@@ -78,6 +78,7 @@ namespace hpp {
     {
       hppDout (info, "V0_= " << V0_.transpose () << " Vimp_= " << Vimp_.transpose ());
       hppDout (info, "initialROMnames size= " << initialROMnames_.size ());
+
     }
 
     bool ParabolaPath::impl_compute (core::ConfigurationOut_t result,

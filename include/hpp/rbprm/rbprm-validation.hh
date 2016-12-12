@@ -35,16 +35,15 @@ namespace hpp {
     /// \addtogroup validation
     /// \{
 
-    /// Validate a configuration with respect to the reachability condition;
+	/// Validate a configuration with respect to the reachability condition;
     /// a Configuration is valid if the trunk robot is collision free while
     /// the Range Of Motion of the is colliding.
-    ///
+    /// With affordance
+	///
     class HPP_RBPRM_DLLAPI RbPrmValidation : public core::ConfigValidation
     {
     public:
-      static RbPrmValidationPtr_t create (const model::RbPrmDevicePtr_t& robot,
-                                          const std::vector<std::string>& filter = std::vector<std::string>(),
-                                          const std::map<std::string, rbprm::NormalFilter>& normalFilters = std::map<std::string, rbprm::NormalFilter>(), std::size_t nbFilterMatch = 0);
+      static RbPrmValidationPtr_t create (const model::RbPrmDevicePtr_t& robot, const std::vector<std::string>& filter = std::vector<std::string>(), const std::map<std::string, std::vector<std::string> >& affFilters = std::map<std::string, std::vector<std::string> >(), const std::map<std::string, std::vector<model::CollisionObjectPtr_t> >& affordances = std::map<std::string, std::vector<model::CollisionObjectPtr_t> >(), const core::ObjectVector_t& geometries = core::ObjectVector_t(), std::size_t nbFilterMatch = 0);
 
       /// Compute whether the configuration is valid
       ///
@@ -83,12 +82,15 @@ namespace hpp {
                  core::ValidationReportPtr_t& validationReport,
                  const std::vector<std::string>& filter);
 
-      /// Add an obstacle
+
+
+
+      /// Add an obstacle to validation
       /// \param object obstacle added
       /// Store obstacle and build a collision pair with each body of the robot.
-      /// \notice This is applied for both trunk and rom shapes. This can be done for a single
-      /// shape through trunkValidation_ and romValidation_ attributes.
-      virtual void addObstacle (const core::CollisionObjectPtr_t& object);
+      /// \notice this function has to be called for trunk validation and rom 
+			/// validation separately unless they use same obstacles (not usually the case)
+			virtual void addObstacle (const core::CollisionObjectPtr_t& object);
 
       /// Remove a collision pair between a joint and an obstacle
       /// \param the joint that holds the inner objects,
@@ -97,6 +99,20 @@ namespace hpp {
       /// shape through trunkValidation_ and romValidation_ attributes.
       virtual void removeObstacleFromJoint
     (const core::JointPtr_t& joint, const core::CollisionObjectPtr_t& obstacle);
+
+
+
+      /// Compute whether the roms configurations are valid
+      /// \param config the config to check for validity,
+      /// \return whether the whole config is valid.
+      bool validateRoms(const core::Configuration_t& config);
+
+      /// Compute whether the roms configurations are valid
+      /// \param config the config to check for validity,
+      /// \param validationReport the report (can be cast to rbprmValidationReport) with info on the trunk and ROM states,
+      /// \return whether the whole config is valid.
+      bool validateRoms(const core::Configuration_t& config,
+                         core::ValidationReportPtr_t &validationReport);
 
       /// Compute whether the roms configurations are valid
       /// \param config the config to check for validity,
@@ -113,16 +129,14 @@ namespace hpp {
       bool validateRoms(const core::Configuration_t& config,
                         const std::vector<std::string>& filter);
 
-      /// \return whether the whole config is valid,
-      /// and fill validation-report.
+      /// \param config the config to check for validity,
+      /// \param filter specify constraints on all roms required to be in contact, will return
+      /// \param validationReport the report (can be cast to rbprmValidationReport) with info on the trunk and ROM states,
+      /// \return whether the whole config is valid.
       bool validateRoms(const core::Configuration_t& config,
                         const std::vector<std::string>& filter,
-			core::ValidationReportPtr_t& validationReport);
+                         core::ValidationReportPtr_t &validationReport);
 
-      /// Compute whether the roms configurations are valid
-      /// \param config the config to check for validity,
-      /// \return whether the whole config is valid.
-      bool validateRoms(const core::Configuration_t& config);
 
       /// \return whether the config is valid for the trunk only,
       /// and fill validation-report.
@@ -140,14 +154,17 @@ namespace hpp {
       const std::vector<std::string> defaultFilter_;
 
     protected:
-      /// Constructor
+      /// Constructor with nbFilterMatch
+
+    /// Constructor with affordance
       RbPrmValidation (const model::RbPrmDevicePtr_t& robot,
                        const std::vector<std::string>& filter,
-                       const std::map<std::string, rbprm::NormalFilter>& normalFilters, const std::size_t nbFilterMatch);
-
+                       const std::map<std::string, std::vector<std::string> >& affFilters, const std::map<std::string, std::vector<model::CollisionObjectPtr_t> >& affordances, const core::ObjectVector_t& geometries, const std::size_t nbFilterMatch);
+	
     private:
       std::size_t nbFilterMatch_; // number of filters that have to match
       core::ValidationReportPtr_t unusedReport_;
+
     }; // class RbPrmValidation
     /// \}
   } // namespace rbprm

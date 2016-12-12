@@ -71,16 +71,17 @@ namespace hpp {
       /// \param init, end Start and end configurations of the path
       /// \param length Distance between the configurations.
       static BallisticPathPtr_t create (const core::DevicePtr_t& device,
-                                       core::ConfigurationIn_t init,
-                                       core::ConfigurationIn_t end,
-                                       core::value_type length,
-                                       core::vector_t coefficients,core::value_type lastRootIndex)
+					core::ConfigurationIn_t init,
+					core::ConfigurationIn_t end,
+					core::value_type length,
+					core::vector_t coefficients,
+					const size_t lastRootIndex)
       {
 	BallisticPath* ptr = new BallisticPath (device, init, end, length,
 					      coefficients);
 	BallisticPathPtr_t shPtr (ptr);
 	ptr->init (shPtr);
-  shPtr->lastRootIndex(lastRootIndex);
+	shPtr->lastRootIndex(lastRootIndex);
 	return shPtr;
       }
 
@@ -196,7 +197,7 @@ namespace hpp {
       
       size_t lastRootIndex(){return lastRootIndex_;}
       
-      void lastRootIndex(size_t index){ lastRootIndex_ = index;}
+      void lastRootIndex(const size_t index){ lastRootIndex_ = index;}
 
       core::value_type computeLength (const core::ConfigurationIn_t q1,
 				      const core::ConfigurationIn_t q2) const;

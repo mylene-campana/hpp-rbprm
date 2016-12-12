@@ -250,7 +250,12 @@ namespace interpolation {
       }
 
       virtual bool impl_compute (core::ConfigurationOut_t result,
-                 core::value_type param) const;
+				 core::value_type param) const;
+
+      model::value_type ComputeExtraDofValue
+	(const std::size_t dofRank, const core::Configuration_t init,
+	 const core::Configuration_t end,
+	 const model::value_type normalizedValue) const;
 
     private:
       core::DevicePtr_t device_;
