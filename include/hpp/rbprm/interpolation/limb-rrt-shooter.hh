@@ -31,14 +31,15 @@
 namespace hpp {
     namespace rbprm {
     namespace interpolation {
-      HPP_PREDEF_CLASS (LimbRRTShooter);
-      typedef boost::shared_ptr <LimbRRTShooter> LimbRRTShooterPtr_t;
     struct LimbRRTShooterFactory
     {
         TimeConstraintShooterPtr_t operator()(const RbPrmFullBodyPtr_t fullBody, const hpp::core::PathPtr_t path,
                         const std::size_t pathDofRank, const hpp::rbprm::State &from, const hpp::rbprm::State &to,
                                               const T_TimeDependant& tds, core::ConfigProjectorPtr_t projector) const;
     };
+
+      HPP_PREDEF_CLASS (LimbRRTShooter);
+      typedef boost::shared_ptr <LimbRRTShooter> LimbRRTShooterPtr_t;
 
 /// \addtogroup configuration_sampling
 /// \{
@@ -58,7 +59,7 @@ namespace hpp {
                                                             const hpp::core::PathPtr_t path,
                                                             const std::size_t pathDofRank);
 
-        virtual core::ConfigurationPtr_t shoot () const;
+	virtual core::ConfigurationPtr_t shoot () const;
 
     public:
         const hpp::rbprm::RbPrmLimbPtr_t limb_;

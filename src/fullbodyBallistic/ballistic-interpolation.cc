@@ -231,9 +231,8 @@ namespace hpp {
       core::ValidationReportPtr_t validationReport;
       const std::size_t ecsSize = 
 	robot_->device_->extraConfigSpace ().dimension ();
-      const affMap_t affordances; // TODO !
+      const affMap_t affordances; //= problemSolver_->map <std::vector<boost::shared_ptr<model::CollisionObject> > > ();
       const std::map<std::string, std::vector<std::string> > affFilters; //TODO
-
 
       for( rbprm::T_Limb::const_iterator lit = robot_->GetLimbs().begin();lit != robot_->GetLimbs().end(); ++lit){
         if(lastState.contacts_[lit->first]){ // limb is in contact
@@ -647,7 +646,7 @@ namespace hpp {
 	  boost::dynamic_pointer_cast<ParabolaPath>(subpath_next);
 	const value_type pathLength = subpath->length ();
 	core::PathPtr_t pathLimb;
-	const affMap_t affordances; // TODO !
+	const affMap_t affordances; //= problemSolver_->map <std::vector<boost::shared_ptr<model::CollisionObject> > > ();
       const std::map<std::string, std::vector<std::string> > affFilters; //TODO
 	
 	if (i == 0) { // keep qStart config which already has contacts

@@ -25,32 +25,32 @@ using namespace core;
   namespace interpolation {
 
     LimbRRTShooterPtr_t LimbRRTShooter::create (hpp::rbprm::RbPrmLimbPtr_t limb,
-                                                const hpp::core::PathPtr_t path,
-                                                const std::size_t pathDofRank)
-    {
-        LimbRRTShooter* ptr = new LimbRRTShooter (limb, path, pathDofRank);
-        LimbRRTShooterPtr_t shPtr (ptr);
-        ptr->init (shPtr);
-        return shPtr;
-    }
+      const hpp::core::PathPtr_t path,
+      const std::size_t pathDofRank)
+      {
+      LimbRRTShooter* ptr = new LimbRRTShooter (limb, path, pathDofRank);
+      LimbRRTShooterPtr_t shPtr (ptr);
+      ptr->init (shPtr);
+      return shPtr;
+      }
 
-    void LimbRRTShooter::init (const LimbRRTShooterPtr_t& self)
-    {
-        ConfigurationShooter::init (self);
-        weak_ = self;
-    }
+      void LimbRRTShooter::init (const LimbRRTShooterPtr_t& self)
+      {
+      ConfigurationShooter::init (self);
+      weak_ = self;
+      }
 
-    LimbRRTShooter::LimbRRTShooter (const hpp::rbprm::RbPrmLimbPtr_t limb,
-                                    const hpp::core::PathPtr_t path,
-                                    const std::size_t pathDofRank)
-    : core::ConfigurationShooter()
-    , limb_(limb)
-    , path_(path)
-    , pathDofRank_(pathDofRank)
-    , configSize_(pathDofRank+1)
-    {
-        // NOTHING
-    }
+      LimbRRTShooter::LimbRRTShooter (const hpp::rbprm::RbPrmLimbPtr_t limb,
+      const hpp::core::PathPtr_t path,
+      const std::size_t pathDofRank)
+      : core::ConfigurationShooter()
+      , limb_(limb)
+      , path_(path)
+      , pathDofRank_(pathDofRank)
+      , configSize_(pathDofRank+1)
+      {
+      // NOTHING
+      }
 
   rbprm::T_Limb GetVaryingLimb(const RbPrmFullBodyPtr_t fullBody, const hpp::rbprm::State &from, const hpp::rbprm::State &to)
   {
@@ -66,29 +66,32 @@ using namespace core;
       return res;
   }
 
+    // deleted in Pierre branch
+    hpp::core::ConfigurationPtr_t LimbRRTShooter::shoot () const
+    {
+      // edit path sampling dof
+      value_type a = path_->timeRange().first; value_type b = path_->timeRange().second;
+      value_type u = value_type(rand()) / value_type(RAND_MAX);
+      value_type pathDofVal = (b-a)* u + a;
+      ConfigurationPtr_t config (new Configuration_t(configSize_));
+      config->head(configSize_-1) =  (*path_)(pathDofVal);
+      (*config) [pathDofRank_] = pathDofVal;
+      // choose random limb configuration
+      (*config)[pathDofRank_-1] = 0.;
+      (*config)[pathDofRank_-2] = 1.;
+      (*config)[pathDofRank_-3] = 0.;
+      (*config)[pathDofRank_-4] = 0.;
+        
+      const sampling::Sample& sample = *(limb_->sampleContainer_.samples_.begin() + (rand() % (int) (limb_->sampleContainer_.samples_.size() -1)));
+      sampling::Load(sample,*config);
+      return config;
+    }
+
     TimeConstraintShooterPtr_t LimbRRTShooterFactory::operator()(const RbPrmFullBodyPtr_t fullBody, const hpp::core::PathPtr_t path,
                     const std::size_t pathDofRank, const hpp::rbprm::State &from, const hpp::rbprm::State &to,
                     const T_TimeDependant& tds, core::ConfigProjectorPtr_t projector) const
-    {
-	/* // Mylene branch (old)
-        // edit path sampling dof
-        value_type a = path_->timeRange().first; value_type b = path_->timeRange().second;
-        value_type u = value_type(rand()) / value_type(RAND_MAX);
-        value_type pathDofVal = (b-a)* u + a;
-        ConfigurationPtr_t config (new Configuration_t(configSize_));
-        config->head(configSize_-1) =  (*path_)(pathDofVal);
-        (*config) [pathDofRank_] = pathDofVal;
-        // choose random limb configuration
-        (*config)[pathDofRank_-1] = 0.;
-        (*config)[pathDofRank_-2] = 1.;
-        (*config)[pathDofRank_-3] = 0.;
-        (*config)[pathDofRank_-4] = 0.;
-        
-        const sampling::Sample& sample = *(limb_->sampleContainer_.samples_.begin() + (rand() % (int) (limb_->sampleContainer_.samples_.size() -1)));
-        sampling::Load(sample,*config);
-        return config;
-	*/
-        return TimeConstraintShooter::create(fullBody->device_,path,pathDofRank,tds, projector, GetVaryingLimb(fullBody, from, to));
+    {       
+      return TimeConstraintShooter::create(fullBody->device_,path,pathDofRank,tds, projector, GetVaryingLimb(fullBody, from, to));
     }
   }// namespace interpolation
   }// namespace rbprm
