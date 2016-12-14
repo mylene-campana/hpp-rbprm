@@ -118,7 +118,22 @@ namespace hpp {
       core::Configuration_t contactPose () {
 	return contactPose_;
       }
+
+      std::map<std::string, std::vector<std::string> > affordanceFilters () {
+	return affFilters_;
+      }
       
+      affMap_t affordanceMap () { // often called "affordances"
+	return affMap_;
+      }
+
+      void affordanceFilters (const std::map<std::string, std::vector<std::string> > affFilters) {
+	affFilters_ = affFilters;
+      }
+      
+      void affordanceMap (const affMap_t affMap) { // often called "affordances"
+	affMap_ = affMap;
+      }
 
       const core::PathVectorConstPtr_t path_;
       const State start_;
@@ -238,6 +253,8 @@ namespace hpp {
       core::Configuration_t flexionPose_;
       core::Configuration_t contactPose_;
       size_t lastRootIndex_;
+      affMap_t affMap_;
+      std::map<std::string, std::vector<std::string> > affFilters_;
     }; // class BallisticInterpolation
     
     core::Configuration_t computeContactPose(const State &state, core::Configuration_t contactPose,rbprm::RbPrmFullBodyPtr_t robot); 

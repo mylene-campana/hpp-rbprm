@@ -121,14 +121,14 @@ namespace hpp {
         if(!limbPath_){
           for (core::size_type i = freeflyerDim; i<nbConfig-ecsDim; i++) {
             /* monopod leg interpolation
-      if (u <= u_max) {
-      const value_type u_prime = u / u_max;
-      result (i) = (1 - u_prime) * initial_ (i) + u_prime * maxVal;
-    }
-    else {
-      const value_type u_prime = (u - u_max) / (1 - u_max);
-      result (i) = (1 - u_prime) * maxVal + u_prime * end_ (i);
-      }*/
+	       if (u <= u_max) {
+	       const value_type u_prime = u / u_max;
+	       result (i) = (1 - u_prime) * initial_ (i) + u_prime * maxVal;
+	       }
+	       else {
+	       const value_type u_prime = (u - u_max) / (1 - u_max);
+	       result (i) = (1 - u_prime) * maxVal + u_prime * end_ (i);
+	       }*/
             /* classical interpolation for robot trunk and limbs */
             result (i) = (1 - u) * initial_ (i) + u * end_ (i);
           }
@@ -139,15 +139,12 @@ namespace hpp {
           }
         }
       }
-        /* Normal vector interpolation
-   result (nbConfig-ecsDim) = (1 - u) *
-   initial_(nbConfig-ecsDim) + u*end_(nbConfig-ecsDim);
-   result (nbConfig-ecsDim+1) = (1 - u) *
-   initial_(nbConfig-ecsDim+1) + u*end_(nbConfig-ecsDim+1);
-   result (nbConfig-ecsDim+2) = (1 - u) *
-   initial_(nbConfig-ecsDim+2) + u*end_(nbConfig-ecsDim+2);*/
-        return true;
-      }
+      /* Normal vector interpolation (avoid NaN) */
+      for (std::size_t k = 0; k < ecsDim; k++)
+      result (nbConfig - ecsDim + k) = (1 - u) *
+	initial_(nbConfig - ecsDim + k) + u*end_(nbConfig - ecsDim + k);
+      return true;
+    }
 
 
     core::PathPtr_t BallisticPath::extract (const interval_t& subInterval) const throw (hpp::core::projection_error)
@@ -184,7 +181,7 @@ namespace hpp {
       const value_type theta = coefficients_ (3);
       value_type x1 = cos(theta) * q1 (0)  + sin(theta) * q1 (1); // x_theta_0
       value_type x2 = cos(theta) * q2 (0) + sin(theta) * q2 (1); // x_theta_imp
-      hppDout(notice,"xTheta0 = "<<x1<<"   xThetaImp = "<<x2);
+      //hppDout(notice,"xTheta0 = "<<x1<<"   xThetaImp = "<<x2);
       // Define integration bounds
       if (x1 > x2) { // re-order integration bounds
         const value_type xtmp = x1;
@@ -199,7 +196,7 @@ namespace hpp {
                        + 0.166666667*lengthFunction (x1 + (i+1)*dx ));
         // apparently, 1/6 and 2/3 are not recognized as floats ...
       }
-      hppDout (notice, "length = " << length);
+      //hppDout (notice, "length = " << length);
       return length;
     }
 

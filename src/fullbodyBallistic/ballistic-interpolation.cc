@@ -231,13 +231,11 @@ namespace hpp {
       core::ValidationReportPtr_t validationReport;
       const std::size_t ecsSize = 
 	robot_->device_->extraConfigSpace ().dimension ();
-      const affMap_t affordances; //= problemSolver_->map <std::vector<boost::shared_ptr<model::CollisionObject> > > ();
-      const std::map<std::string, std::vector<std::string> > affFilters; //TODO
 
       for( rbprm::T_Limb::const_iterator lit = robot_->GetLimbs().begin();lit != robot_->GetLimbs().end(); ++lit){
         if(lastState.contacts_[lit->first]){ // limb is in contact
-         contactingLimbs.push_back(lit->first);
-         hppDout(notice,"contacting limbs : "<<lit->first);
+	  contactingLimbs.push_back(lit->first);
+	  hppDout(notice,"contacting limbs : "<<lit->first);
         } 
       }
       
@@ -267,8 +265,13 @@ namespace hpp {
         q_trunk_offset = (*bp) (currentLenght, success);
 	hppDout (info, "q_trunk_offset= " << displayConfig(q_trunk_offset));
         dir = bp->evaluateVelocity (currentLenght);
+	if (increase_u_offset) {
+	  // for takeoff, inverse dir  AS DONE IN CORBA (V0) !!
+	  dir = - dir;
+	}
+	hppDout (info, "dir computeOffsetContactConfig= " << dir);
         state = rbprm::ComputeContacts(lastState,robot_,q_trunk_offset,
-				       affordances, affFilters,
+				       affMap_, affFilters_,
 				       dir,contactMaintained,multipleBreaks,true,0.);
         if(contactMaintained){
           contact_OK = true;
@@ -277,9 +280,21 @@ namespace hpp {
           hppDout(notice,"contact released");
           contact_OK = false;
           for( rbprm::T_Limb::const_iterator lit = robot_->GetLimbs().begin();lit != robot_->GetLimbs().end(); ++lit){
-            if( state.contacts_[lit->first]){ // limb is in contact
-             contact_OK = true;
-            }else{ // limb not in contact
+	    value_type diffNorm = 1;
+            if(state.contacts_[lit->first]){ // get limbs still in contact
+	      // PROBLEM !!! their contact may be different of lastState
+	      const fcl::Vec3f& scp = state.contactPositions_[lit->first];
+	      const fcl::Vec3f& lscp = lastState.contactPositions_[lit->first];
+	      diffNorm = sqrt(pow(scp[0] - lscp[0],2) + pow(scp[1] - lscp[1],2) + pow(scp[2] - lscp[2],2));
+	      hppDout (info, "state.contactPositions_[lit->first]= " << scp);
+	      hppDout (info, "lastState.contactPositions_[lit->first]= " << lscp);
+	      hppDout (info, "diffNorm= " << diffNorm);
+	      if (diffNorm <= 1e-3) {
+		// limb contact is OK -> at least one contact OK for this state
+		contact_OK = true;
+	      }
+	    }
+	    else if (!state.contacts_[lit->first] || diffNorm > 1e-3) { // limb not in contact or contact is NOT OK
               if(lastState.contacts_[lit->first]){ // limb just loose the contact
                 for(size_t i=robot_->GetLimbs().at(lit->first)->limb_->rankInConfiguration() ; i < robot_->GetLimbs().at(lit->first)->effector_->rankInConfiguration() ; i++){
                   fixedLimb[i] = lastState.configuration_[i];
@@ -288,7 +303,7 @@ namespace hpp {
               }
             }
           }
-          if(contact_OK){ // there is another limb in contact
+          if(contact_OK) { // there is another limb in contact
             hppDout(notice,"another limb in contact, add intermediate state : "<<displayConfig(lastState.configuration_)); 
             if(increase_u_offset)
               lenght = currentLenght-u;
@@ -297,13 +312,10 @@ namespace hpp {
             
             lastState.configuration_ = replaceFixedLimb(lastState.configuration_,lastfixedLimb);
             lastfixedLimb = fixedLimb;
-	    // TODO: replace ECS if any
 	    if (ecsSize > 0) {
-	      const std::size_t size1 = lastState.configuration_.size () - ecsSize;
-	      const std::size_t size2 = lastState.configuration_.size () - ecsSize;
-	      hppDout (info, "size1= " << size1 << "  size2= " << size2); // not sure if they are the same ...
+	      const std::size_t ecIndex = lastState.configuration_.size () - ecsSize;
 	      for (std::size_t k = 0; k < ecsSize; k++) {
-		lastState.configuration_ [size1 + k] = q_trunk_offset [size2 + k];
+		lastState.configuration_ [ecIndex + k] = q_trunk_offset [ecIndex + k];
 	      }
 	    }
 
@@ -581,35 +593,6 @@ namespace hpp {
     }
 
     // ========================================================================
-    
-    /*std::vector<Configuration_t>
-    BallisticInterpolation::InterpolateConfigs (const double timeStep)
-    {
-      if(!path_) throw std::runtime_error ("Can not interpolate; not path given to interpolator ");
-      std::vector<Configuration_t> configs;
-      bool success;
-      Configuration_t qStart = start_.configuration_;
-      Configuration_t qEnd = end_.configuration_;
-      core::DevicePtr_t robot = robot_->device_; // device of fullbody
-      const std::size_t subPathNumber = path_->numberPaths ();
-      hppDout (info, "number of sub-paths: " << subPathNumber);
-      core::PathVectorPtr_t newPath = core::PathVector::create 
-	(robot->configSize (), robot->numberDof ());
-
-      for (std::size_t i=0; i<subPathNumber; i++) {
-	core::PathPtr_t subpath = path_->pathAtRank (i);
-	Configuration_t q1 = subpath->initial ();
-	Configuration_t q2 = subpath->end ();
-	BallisticPathPtr_t bp = Interpolate (q1, q2, subpath->length (),
-					     subpath->coefficients ());
-	const core::interval_t& range = path_->timeRange();
-	for(value_type t = range.first; t< range.second; t += timeStep)
-	  {
-	    configs.push_back( bp->operator () (t, success));
-	  }
-      }
-      return configs;
-      }*/
 
     core::PathVectorPtr_t BallisticInterpolation::InterpolateFullPath
     (const core::value_type u_offset) {
@@ -646,8 +629,6 @@ namespace hpp {
 	  boost::dynamic_pointer_cast<ParabolaPath>(subpath_next);
 	const value_type pathLength = subpath->length ();
 	core::PathPtr_t pathLimb;
-	const affMap_t affordances; //= problemSolver_->map <std::vector<boost::shared_ptr<model::CollisionObject> > > ();
-      const std::map<std::string, std::vector<std::string> > affFilters; //TODO
 	
 	if (i == 0) { // keep qStart config which already has contacts
 	  hppDout (info, "keep start config");
@@ -667,13 +648,13 @@ namespace hpp {
 	hppDout (info, "q2: " << displayConfig(q2));
 	V0 = pp_next->V0_; // V0_i+1
 	Vimp = pp->Vimp_; // Vimp_i
-	//dir = computeDir (V0, Vimp);
-	dir [0] = 0; dir [1] = 0; dir [2] = 1;
-	hppDout (info, "dir= " << dir);
+	dir = computeDir (V0, Vimp);
+	//dir [0] = 0; dir [1] = 0; dir [2] = 1;
+	hppDout (info, "dir = " << dir);
 	hppDout (info, "(Vimp-V0)= " << -computeDir (V0, Vimp));
 	robot_->V0dir_ = V0;
 	robot_->Vfdir_ = Vimp;
-	state2 = ComputeContacts(robot_, q2, affordances, affFilters, dir);
+	state2 = ComputeContacts(robot_, q2, affMap_, affFilters_, dir);
 	hppDout (info, "state2 config= " << displayConfig(state2.configuration_));
 	q2contact = computeContactPose(state2);
 	if (problem_->configValidations ()->validate (q2contact, validationReport))

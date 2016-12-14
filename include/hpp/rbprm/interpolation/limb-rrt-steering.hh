@@ -117,7 +117,7 @@ namespace hpp {
           q11[rankParamRoot] = 0.;
           core::Configuration_t q22(q2);
           q22[rankParamRoot] = length;
-          hppDout(notice,"create path with ballistic root");
+          //hppDout(notice,"create path with ballistic root");
           BallisticPathPtr_t bpExtract =  BallisticPath::create(bp_->device(),q11,q22,length,bp_->coefficients());
           bpExtract->lastRootIndex(bp_->lastRootIndex());
           path = LimbRRTPath::create
