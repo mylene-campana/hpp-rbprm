@@ -1,6 +1,7 @@
 #ifndef HPP_RBPRM_NODE_HH
 #define HPP_RBPRM_NODE_HH
 
+#include <hpp/util/debug.hh>
 #include <hpp/core/node.hh>
 #include <hpp/rbprm/rbprm-validation-report.hh>
 #include <polytope/stability_margin.h>
@@ -110,6 +111,10 @@ namespace hpp {
 
       int getNumberOfContacts(){return numberOfContacts_;}
 
+      void contactCones (std::vector<fcl::Vec3f>* contactConesPt) {contactConesPt_ = contactConesPt;}
+
+      std::vector<fcl::Vec3f>* contactCones () {return contactConesPt_;}
+
     private:
       fcl::Vec3f normal_;
       RbprmValidationReportPtr_t collisionReport_;
@@ -130,6 +135,7 @@ namespace hpp {
       double Xtheta_;   // for parent node ! not for this node
       double Z_;        // for parent node ! not for this node
       
+      std::vector<fcl::Vec3f>* contactConesPt_;
 
     }; // class
 

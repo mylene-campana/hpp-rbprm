@@ -538,6 +538,7 @@ namespace convexCone
     value_type angle = 0;
     vector_t result (4);
     const std::size_t Ncones = cones.size ();
+    hppDout (info, "Number of contact cones= " << Ncones);
     std::vector<fcl::Vec3f> M_vec;
     if (force_closure (cones, mu)) {
       // force-closure case, return max angle as if no sliding constraint
@@ -545,34 +546,46 @@ namespace convexCone
       result [0] = angle;
       result [1] = 0;
       result [2] = 0;
-      result [3] = 1;
+      result [3] = 0;
       return result;
     }
-	
-    for (std::size_t i = 0; i < Ncones; i++) {
-      for (std::size_t j = i + 1; j < Ncones; j++) {
-	hppDout (info, "i= " << i << ", j= " << j << " **********");
-	fcl::Vec3f n = cones [i];
-	fcl::Vec3f n2 = cones [j];
-	fcl::Vec3f Mplus; fcl::Vec3f Mminus;
-	if (cone_plane_inter (n, theta, mu)) {
-	  cone_circle_plane_inter (&Mplus, &Mminus, n, theta, mu);
-	  M_vec.push_back (Mplus);
-	  if (Mplus != Mminus)
-	    M_vec.push_back (Mminus);
-	}
-	if (cone_plane_inter (n2, theta, mu)) {
-	  cone_circle_plane_inter (&Mplus, &Mminus, n2, theta, mu);
-	  M_vec.push_back (Mplus);
-	  if (Mplus != Mminus)
-	    M_vec.push_back (Mminus);
-	}
-	if (!is_parallel_plane_theta (cones [i], cones [j], theta)) {
-	  //intersection_existence_zone (n, n2, theta, mu); // NOT USED
-	  // If t is not parallel to plan_theta, allow to compute P->M points
-	  compute_M_points (&Mplus, &Mminus, n, n2, theta, mu);
-	  M_vec.push_back (Mplus);
+
+    if (Ncones == 1) {
+      fcl::Vec3f n = cones [0];
+      fcl::Vec3f Mplus; fcl::Vec3f Mminus;
+      if (cone_plane_inter (n, theta, mu)) {
+	cone_circle_plane_inter (&Mplus, &Mminus, n, theta, mu);
+	M_vec.push_back (Mplus);
+	if (Mplus != Mminus)
 	  M_vec.push_back (Mminus);
+      }
+    }
+    else {
+      for (std::size_t i = 0; i < Ncones; i++) {
+	for (std::size_t j = i + 1; j < Ncones; j++) {
+	  hppDout (info, "i= " << i << ", j= " << j << " **********");
+	  fcl::Vec3f n = cones [i];
+	  fcl::Vec3f n2 = cones [j];
+	  fcl::Vec3f Mplus; fcl::Vec3f Mminus;
+	  if (cone_plane_inter (n, theta, mu)) {
+	    cone_circle_plane_inter (&Mplus, &Mminus, n, theta, mu);
+	    M_vec.push_back (Mplus);
+	    if (Mplus != Mminus)
+	      M_vec.push_back (Mminus);
+	  }
+	  if (cone_plane_inter (n2, theta, mu)) {
+	    cone_circle_plane_inter (&Mplus, &Mminus, n2, theta, mu);
+	    M_vec.push_back (Mplus);
+	    if (Mplus != Mminus)
+	      M_vec.push_back (Mminus);
+	  }
+	  if (!is_parallel_plane_theta (cones [i], cones [j], theta)) {
+	    //intersection_existence_zone (n, n2, theta, mu); // NOT USED
+	    // If t is not parallel to plan_theta, allow to compute P->M points
+	    compute_M_points (&Mplus, &Mminus, n, n2, theta, mu);
+	    M_vec.push_back (Mplus);
+	    M_vec.push_back (Mminus);
+	  }
 	}
       }
     }

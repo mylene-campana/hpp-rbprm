@@ -30,6 +30,8 @@
 # include <hpp/rbprm/rbprm-device.hh>
 # include <hpp/rbprm/rbprm-path-validation.hh>
 # include <hpp/rbprm/rbprm-validation-report.hh>
+# include <hpp/rbprm/fullbodyBallistic/convex-cone-intersection.hh>
+# include <hpp/rbprm/planner/rbprm-node.hh>
 
 namespace hpp {
   namespace rbprm {
@@ -62,10 +64,29 @@ namespace hpp {
       hppDout (info, "q_goal: " << displayConfig (q2));
       hppDout (info, "g_: " << g_ << " , mu_: " << mu_ << " , V0max: " <<
 	       V0max_ << " , Vimpmax: " << Vimpmax_);
-
       core::PathPtr_t pp = compute_3D_path (q1, q2);
       return pp;
     }
+
+    core::PathPtr_t SteeringMethodParabola::impl_compute
+    (core::NodePtr_t n1, core::NodePtr_t n2)
+      const {
+      V0max_ = problem_->vmaxTakeoff_; // may have changed
+      Vimpmax_ = problem_->vmaxLanding_;
+      mu_ = problem_->mu_;
+      core::ConfigurationIn_t q1 = *(n1->configuration ());
+      core::ConfigurationIn_t q2 = *(n2->configuration ());
+      hppDout (info, "Parabola-steering-method with nodes");
+      hppDout (info, "q_init: " << displayConfig (q1));
+      hppDout (info, "q_goal: " << displayConfig (q2));
+      hppDout (info, "g_: " << g_ << " , mu_: " << mu_ << " , V0max: " <<
+	       V0max_ << " , Vimpmax: " << Vimpmax_);
+
+      core::PathPtr_t pp = compute_3D_path (n1, n2);
+      return pp;
+    }
+
+    // ------------------------------------------------------------------
 
     core::PathPtr_t
     SteeringMethodParabola::compute_3D_path (core::ConfigurationIn_t q1,
@@ -341,6 +362,292 @@ namespace hpp {
       if (hasCollisions || !maxHeightRespected) return core::PathPtr_t ();
       return pp;
     }
+
+    // ------------------------------------------------------------------
+
+    core::PathPtr_t
+    SteeringMethodParabola::compute_3D_path (core::NodePtr_t n1,
+					     core::NodePtr_t n2) 
+      const {
+      core::ConfigurationIn_t q1 = *(n1->configuration ());
+      core::ConfigurationIn_t q2 = *(n2->configuration ());
+      std::vector<std::string> filter;
+      core::PathPtr_t validPart;
+      const core::PathValidationPtr_t pathValidation
+	(problem_->pathValidation ());
+      RbPrmPathValidationPtr_t rbPathValidation = boost::dynamic_pointer_cast<RbPrmPathValidation>(pathValidation);
+      model::RbPrmDevicePtr_t rbDevice =
+	boost::dynamic_pointer_cast<model::RbPrmDevice> (device_.lock ());
+      core::PathValidationReportPtr_t pathReport;
+      if (!rbDevice)
+	hppDout (error, "Device cannot be cast");
+      if (!rbPathValidation)
+	hppDout (error, "PathValidation cannot be cast");
+
+      /* Define some constants */
+      const value_type x_0 = q1(0);
+      const value_type y_0 = q1(1);
+      const value_type z_0 = q1(2);
+      const value_type x_imp = q2(0);
+      const value_type y_imp = q2(1);
+      const value_type z_imp = q2(2);
+      const value_type X = x_imp - x_0;
+      const value_type Y = y_imp - y_0;
+      const value_type Z = z_imp - z_0;
+      const value_type theta = atan2 (Y, X);
+      const value_type x_theta_0 = cos(theta) * x_0 +  sin(theta) * y_0;
+      const value_type x_theta_imp = cos(theta) * x_imp +  sin(theta) * y_imp;
+      const value_type X_theta = X*cos(theta) + Y*sin(theta);
+      const value_type phi = atan (mu_);
+      hppDout (info, "x_0: " << x_0);
+      hppDout (info, "y_0: " << y_0);
+      hppDout (info, "z_0: " << z_0);
+      hppDout (info, "x_imp: " << x_imp);
+      hppDout (info, "y_imp: " << y_imp);
+      hppDout (info, "z_imp: " << z_imp);
+      hppDout (info, "X: " << X);
+      hppDout (info, "Y: " << Y);
+      hppDout (info, "Z: " << Z);
+      hppDout (info, "theta: " << theta);
+      hppDout (info, "x_theta_0: " << x_theta_0);
+      hppDout (info, "x_theta_imp: " << x_theta_imp);
+      hppDout (info, "X_theta: " << X_theta);
+      hppDout (info, "phi: " << phi);
+
+      // Get contact-cones
+      core::RbprmNodePtr_t n1rb = static_cast<core::RbprmNodePtr_t>(n1);
+      if(!n1rb) hppDout(error, "Impossible to cast node 1 to rbprmNode");
+      core::RbprmNodePtr_t n2rb = static_cast<core::RbprmNodePtr_t>(n2);
+      if(!n2rb) hppDout(error, "Impossible to cast node 2 to rbprmNode");
+      hppDout(info, "Retrieve contact-cones");
+      const std::vector<fcl::Vec3f>* cones1 = n1rb->contactCones();
+      const std::vector<fcl::Vec3f>* cones2 = n2rb->contactCones();
+
+      /* Compute 2D Convex-Cones */
+      vector_t dir2DCC1 = convexCone::compute_convex_cone_inter (*cones1, theta,
+								 mu_);
+      vector_t dir2DCC2 = convexCone::compute_convex_cone_inter (*cones2, theta,
+								 mu_);
+      if (dir2DCC1.norm () == 0) {
+	hppDout (info, "plane_theta not intersecting first cone");
+	initialConstraint_ = false;
+	problem_->parabolaResults_ [1] ++;
+	return core::PathPtr_t ();
+      }
+      if (dir2DCC2.norm () == 0) {
+	hppDout (info, "plane_theta not intersecting second cone");
+	initialConstraint_ = false;
+	problem_->parabolaResults_ [1] ++;
+	return core::PathPtr_t ();
+      }
+      value_type delta1 = dir2DCC1 [0];
+      value_type delta2 = dir2DCC2 [0];
+      if (delta1 == M_PI) { // no non-sliding constraints
+	delta1 = 100.; // act as if no friction
+      }
+      if (delta2 == M_PI) { // no non-sliding constraints
+	delta2 = 100.; // act as if no friction
+      }
+      // Only for demo without friction :
+      // delta1 = 100.;
+      // delta2 = 100.;
+      hppDout (info, "delta1: " << delta1);
+      hppDout (info, "delta2: " << delta2);
+	  
+      /* Definition of gamma_theta angles */
+      const value_type nx1 = dir2DCC1 [1]; const value_type ny1 = dir2DCC1 [2];
+      const value_type nz1 = dir2DCC1 [3]; const value_type nx2 = dir2DCC2 [1];
+      const value_type ny2 = dir2DCC2 [2]; const value_type nz2 = dir2DCC2 [3];
+      const value_type n1_angle = atan2(nz1, cos(theta)*nx1 +sin(theta)*ny1);
+      const value_type n2_angle = atan2(nz2, cos(theta)*nx2 +sin(theta)*ny2);
+      hppDout (info, "n1_angle: " << n1_angle);
+      hppDout (info, "n2_angle: " << n2_angle);
+
+      /* Definition of constraint angles */
+      const value_type alpha_0_min = n1_angle - delta1;
+      const value_type alpha_0_max = n1_angle + delta1;
+      alpha_0_min_ = alpha_0_min; alpha_0_max_ = alpha_0_max;
+      hppDout (info, "alpha_0_min: " << alpha_0_min);
+      hppDout (info, "alpha_0_max: " << alpha_0_max);
+
+      value_type alpha_inf4;
+      alpha_inf4 = atan (Z/X_theta);
+      hppDout (info, "alpha_inf4: " << alpha_inf4);
+
+      value_type alpha_imp_min = n2_angle - M_PI - delta2;
+      value_type alpha_imp_max = n2_angle - M_PI + delta2;
+      if (n2_angle < 0) {
+	alpha_imp_min = n2_angle + M_PI - delta2;
+	alpha_imp_max = n2_angle + M_PI + delta2;
+      }
+      hppDout (info, "alpha_imp_min: " << alpha_imp_min);
+      hppDout (info, "alpha_imp_max: " << alpha_imp_max);
+
+      value_type alpha_lim_plus;
+      value_type alpha_lim_minus;
+      bool fail = second_constraint (X_theta, Z, &alpha_lim_plus,
+				     &alpha_lim_minus);
+      if (fail) {
+	hppDout (info, "failed to apply 2nd constraint");
+	problem_->parabolaResults_ [3] ++;
+	return core::PathPtr_t ();
+      }
+
+      hppDout (info, "alpha_lim_plus: " << alpha_lim_plus);
+      hppDout (info, "alpha_lim_minus: " << alpha_lim_minus);
+
+      value_type alpha_imp_plus;
+      value_type alpha_imp_minus;
+      bool fail6 = sixth_constraint (X_theta, Z, &alpha_imp_plus,
+				     &alpha_imp_minus);
+      if (fail6) {
+	hppDout (info, "failed to apply 6th constraint");
+	problem_->parabolaResults_ [3] ++;
+	return core::PathPtr_t ();
+      }
+
+      hppDout (info, "alpha_imp_plus: " << alpha_imp_plus);
+      hppDout (info, "alpha_imp_minus: " << alpha_imp_minus);
+
+      value_type alpha_imp_inf;
+      value_type alpha_imp_sup;
+      bool fail3 = third_constraint (fail, X_theta, Z, alpha_imp_min,
+				     alpha_imp_max, &alpha_imp_sup,
+				     &alpha_imp_inf, n2_angle);
+      if (fail3) {
+	hppDout (info, "failed to apply 3rd constraint");
+	problem_->parabolaResults_ [2] ++;
+	return core::PathPtr_t ();
+      }
+
+      hppDout (info, "alpha_imp_inf: " << alpha_imp_inf);
+      hppDout (info, "alpha_imp_sup: " << alpha_imp_sup);
+
+      value_type alpha_inf_bound = 0;
+      value_type alpha_sup_bound = 0;
+
+      /* Define alpha_0 interval satisfying constraints */
+      if (n2_angle > 0) {
+	alpha_lim_minus = std::max(alpha_lim_minus, alpha_imp_minus);
+	alpha_inf_bound = std::max (std::max(alpha_imp_inf,alpha_lim_minus),
+				    std::max(alpha_0_min, alpha_inf4 +Dalpha_));
+
+	if (alpha_imp_min < -M_PI/2) {
+	  alpha_lim_plus = std::min(alpha_lim_plus, alpha_imp_plus);
+	  alpha_sup_bound = std::min(alpha_0_max,
+				     std::min(alpha_lim_plus,M_PI/2));
+	}
+	else { // alpha_imp_sup is worth
+	  alpha_lim_plus = std::min(alpha_lim_plus, alpha_imp_plus);
+	  alpha_sup_bound = std::min(std::min(alpha_0_max, M_PI/2),
+				     std::min(alpha_lim_plus, alpha_imp_sup));
+	}
+      }
+      else { // down-oriented cone
+	if (alpha_imp_max < M_PI/2) {
+	  alpha_lim_minus = std::max(alpha_lim_minus, alpha_imp_minus);
+	  alpha_inf_bound = std::max (std::max(alpha_imp_inf, alpha_lim_minus),
+				      std::max(alpha_0_min, alpha_inf4 +
+					       Dalpha_));
+	}
+	else { // alpha_imp_max >= M_PI/2 so alpha_imp_inf inaccurate
+	  alpha_lim_minus = std::max(alpha_lim_minus, alpha_imp_minus);
+	  alpha_inf_bound = std::max (std::max(alpha_0_min, alpha_inf4 +
+					       Dalpha_) , alpha_lim_minus);
+	}
+	alpha_lim_plus = std::min(alpha_lim_plus, alpha_imp_plus);
+	alpha_sup_bound = std::min(std::min(alpha_0_max, M_PI/2),
+				   std::min(alpha_lim_plus, alpha_imp_sup));
+      }
+
+      hppDout (info, "alpha_inf_bound: " << alpha_inf_bound);
+      hppDout (info, "alpha_sup_bound: " << alpha_sup_bound);
+
+      if (alpha_inf_bound > alpha_sup_bound) {
+	hppDout (info, "Constraints intersection is empty");
+	problem_->parabolaResults_ [2] ++;
+	return core::PathPtr_t ();
+      }
+
+      /* Select alpha_0 as middle of ]alpha_inf_bound,alpha_sup_bound[ */
+      value_type alpha = 0.5*(alpha_inf_bound + alpha_sup_bound);
+      // for demo only :
+     /* alpha = alpha_inf_bound + 0.1*(alpha_sup_bound - alpha_inf_bound);
+      if(alpha < 0)
+          alpha = 0;
+      hppDout (info, "alpha: " << alpha);*/
+      
+      /* Compute Parabola coefficients */
+      vector_t coefs = computeCoefficients (alpha, theta, X_theta, Z, 
+					    x_theta_0, z_0);
+      hppDout (info, "coefs: " << coefs.transpose ());
+
+      /* Verify that maximal heigh of smaller parab is not out of the bounds */
+      const vector_t coefsInf = computeCoefficients (alpha_inf_bound, theta,
+						     X_theta, Z, x_theta_0,
+						     z_0);
+      bool maxHeightRespected = parabMaxHeightRespected (coefsInf, x_theta_0,
+							 x_theta_imp);
+      if (!maxHeightRespected) {
+	hppDout (info, "Path always out of the bounds");
+	problem_->parabolaResults_ [0] ++;
+	return core::PathPtr_t ();
+      }
+      maxHeightRespected = parabMaxHeightRespected (coefs, x_theta_0,
+						    x_theta_imp);
+
+      // fill ROM report, loop on ROM
+      initialROMnames_.clear (); endROMnames_.clear ();
+      fillROMnames (q1, &initialROMnames_);
+      fillROMnames (q2, &endROMnames_);
+      hppDout (info, "initialROMnames_ size= " << initialROMnames_.size ());
+      hppDout (info, "endROMnames_ size= " << endROMnames_.size ());
+    
+      // parabola path with alpha_0 as the middle of alpha_0 bounds
+      ParabolaPathPtr_t pp = ParabolaPath::create (device_.lock(), q1, q2,
+						   computeLength (q1, q2,coefs),
+						   coefs, V0_, Vimp_,
+						   initialROMnames_,
+						   endROMnames_);
+      // checks
+      hppDout (info, "pp->V0_= " << pp->V0_);
+      hppDout (info, "pp->Vimp_= " << pp->Vimp_);
+      hppDout (info, "pp->initialROMnames_ size= " << pp->initialROMnames_.size ());
+      hppDout (info, "pp->endROMnames_ size= " << pp->endROMnames_.size ());
+
+      bool hasCollisions = !rbPathValidation->validateTrunk (pp, false,
+							     validPart,
+							     pathReport);
+      std::size_t n = 0;
+      if (hasCollisions || !maxHeightRespected) {
+	problem_->parabolaResults_ [0] ++; // not increased during dichotomy
+	hppDout (info, "parabola has collisions, start dichotomy");
+    while ((hasCollisions || !maxHeightRespected) && n < nLimit_ /*alpha <= alpha_sup_bound*/) { // for demo
+      alpha = dichotomy (alpha_inf_bound, alpha_sup_bound, n);
+
+      /*if(alpha <= 0)
+          alpha += 0.1;
+       alpha *= 1.1;      // for demo : use the min of alpha :
+*/
+	  hppDout (info, "alpha= " << alpha);
+	  coefs = computeCoefficients (alpha, theta, X_theta, Z, x_theta_0,z_0);
+	  maxHeightRespected = parabMaxHeightRespected (coefs, x_theta_0,
+							x_theta_imp);
+	  pp = ParabolaPath::create (device_.lock (), q1, q2,
+				     computeLength (q1, q2, coefs), coefs, V0_,
+				     Vimp_, initialROMnames_, endROMnames_);
+	  hasCollisions = !rbPathValidation->validateTrunk (pp, false,
+							    validPart,
+							    pathReport);
+	  hppDout (info, "Dichotomy iteration: " << n);
+	  n++;
+	}//while
+      }
+      if (hasCollisions || !maxHeightRespected) return core::PathPtr_t ();
+      return pp;
+    }
+
+    // ------------------------------------------------------------------
 
     // From Pierre
     core::PathPtr_t SteeringMethodParabola::compute_random_3D_path

@@ -48,8 +48,6 @@ namespace convexCone
 			 const value_type mu);
 
   /// Compute the intersection between a cone-circle and plane_theta.
-  /// TODO !!!!!
-  /// SEE IF RESULT OF EXISTENCE IF COHERENT WITH IROS
   bool cone_circle_plane_inter (fcl::Vec3f* Mplus, fcl::Vec3f* Mminus,
 				const fcl::Vec3f n, const value_type theta,
 				const value_type mu);
@@ -59,11 +57,15 @@ namespace convexCone
   value_type compute_angle (std::vector<fcl::Vec3f> M_vec,
 			    const value_type theta);
 
-  /// Full algorithm computing the angle of the intersection between the
-  /// convex cone and the plane_theta
+  /// Full algorithm computing the angle and the direction of the
+  /// intersection between the convex-cone and the plane_theta.
+  /// Returned vector possible values:
+  ///  [0,0,0,0] intersection reduced to the point O.
+  ///  [M_PI, 0, 0, 0] force-closure case, sliding constraints disabled.
+  ///  [angle, direction] 2D convex-cone correctly computed.
   vector_t compute_convex_cone_inter (const Cones cones,
-					const value_type theta,
-					const value_type mu);
+				      const value_type theta,
+				      const value_type mu);
 
 } //namespace convexCone
 

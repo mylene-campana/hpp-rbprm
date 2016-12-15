@@ -292,7 +292,8 @@ namespace hpp {
 	      if (diffNorm <= 1e-3) {
 		// limb contact is OK -> at least one contact OK for this state
 		contact_OK = true;
-	      }
+	      } else
+		hppDout (info, "contact could not be maintained (another was created)");
 	    }
 	    else if (!state.contacts_[lit->first] || diffNorm > 1e-3) { // limb not in contact or contact is NOT OK
               if(lastState.contacts_[lit->first]){ // limb just loose the contact

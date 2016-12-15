@@ -25,6 +25,7 @@
 # include <hpp/rbprm/rbprm-fullbody.hh>
 # include <hpp/rbprm/planner/steering-method-parabola.hh>
 # include <hpp/rbprm/planner/rbprm-roadmap.hh>
+# include <hpp/rbprm/planner/rbprm-node.hh>
 
 namespace hpp {
   namespace rbprm {
@@ -74,10 +75,6 @@ namespace hpp {
         return roadmap_;
       }
 
-      virtual const core::RbprmRoadmapPtr_t& rbprmRoadmap() const {
-        return rbRoadmap_;
-      }
-
     protected:
       /// Constructor with roadmap
       BallisticPlanner (const core::Problem& problem,
@@ -95,9 +92,11 @@ namespace hpp {
 
     private:
 
-      /// return "average" direction of CoM cone, as average of contact cone 
-      /// directions, if these cones are in the middle of the contact areas
-      fcl::Vec3f computeMiddleContacts (const core::Configuration_t q) const;
+      /// Return list of contact-cone directions (contacts are in the 
+      /// middle of ROM-obstacle intersection, using affordances.
+      /// (Old MIG version: return "average" direction from contact-cones)
+      std::vector<fcl::Vec3f> computeContactCones 
+	(const core::Configuration_t q) const;
 
       fcl::Vec3f vectorToVec3f (const polytope::vector3_t vector) const {
 	fcl::Vec3f result;
@@ -109,7 +108,6 @@ namespace hpp {
       core::ConfigurationShooterPtr_t configurationShooter_;
       BallisticPlannerWkPtr_t weakPtr_;
       SteeringMethodParabolaPtr_t smParabola_;
-      core::RbprmRoadmapPtr_t rbRoadmap_;
       const core::RoadmapPtr_t roadmap_;
       const RbPrmFullBodyPtr_t fullRobot_; // for contact generation
       core::vector_t contactSize_; // should depend on the ROM

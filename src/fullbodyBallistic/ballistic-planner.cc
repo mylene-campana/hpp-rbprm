@@ -21,21 +21,21 @@
 #include <hpp/model/device.hh>
 #include <hpp/core/basic-configuration-shooter.hh>
 #include <hpp/core/connected-component.hh>
+#include <hpp/core/config-validations.hh>
+#include <hpp/core/path-validation-report.hh>
 #include <hpp/core/node.hh>
 #include <hpp/core/edge.hh>
 #include <hpp/core/path.hh>
 #include <hpp/core/problem.hh>
 #include <hpp/core/roadmap.hh>
+#include <hpp/rbprm/rbprm-path-validation.hh>
+#include <hpp/rbprm/rbprm-validation-report.hh>
 #include <hpp/rbprm/rbprm-state.hh>
 #include <hpp/rbprm/fullbodyBallistic/ballistic-planner.hh>
 #include <polytope/stability_margin.h>
 #include "utils/algorithms.h"
-
-#include <hpp/core/path-validation-report.hh>
-#include <hpp/rbprm/rbprm-path-validation.hh>
-#include <hpp/rbprm/rbprm-validation-report.hh>
 #include <hpp/rbprm/fullbodyBallistic/parabola-library.hh>
-#include <hpp/core/config-validations.hh>
+
 
 namespace hpp {
   namespace rbprm {
@@ -48,7 +48,7 @@ namespace hpp {
       PathPlanner (problem), problem_ (core::ProblemPtr_t(&problem)),
       configurationShooter_ (problem.configurationShooter()),
       smParabola_(rbprm::SteeringMethodParabola::create((core::ProblemPtr_t(&problem)))),
-      rbRoadmap_(core::RbprmRoadmap::create (problem.distance (),problem.robot())), roadmap_(boost::dynamic_pointer_cast<core::Roadmap>(rbRoadmap_)),
+      roadmap_(boost::dynamic_pointer_cast<core::Roadmap>(core::RbprmRoadmap::create (problem.distance (),problem.robot()))),
       fullRobot_ (RbPrmFullBody::create(problem.robot ())),
       contactSize_ (core::vector_t(2))
     {
@@ -60,17 +60,12 @@ namespace hpp {
       PathPlanner (problem, roadmap), problem_ (core::ProblemPtr_t(&problem)),
       configurationShooter_ (problem.configurationShooter()),
       smParabola_(rbprm::SteeringMethodParabola::create((core::ProblemPtr_t(&problem)))),
-      rbRoadmap_(boost::dynamic_pointer_cast<core::RbprmRoadmap>(roadmap)),
-      roadmap_(roadmap), fullRobot_ (RbPrmFullBody::create(problem.robot ())),
+      roadmap_(roadmap),
+      fullRobot_ (RbPrmFullBody::create(problem.robot ())),
       contactSize_ (core::vector_t(2))
     {
       hppDout(notice,"Constructor ballistic-planner with Roadmap");
       hppDout(info,"contactSize_= " << contactSize_);
-      if (!rbRoadmap_) {
-	hppDout (info, "Problem with RbPrmRoadmap cast, create new one");
-	rbRoadmap_ = core::RbprmRoadmap::create (problem.distance (),problem.robot());
-      }
-      
     }
 
     void BallisticPlanner::oneStep ()
@@ -86,6 +81,7 @@ namespace hpp {
       core::Configuration_t q_tmp;
       core::ValidationReportPtr_t report;
       bool valid = false;
+      std::vector<fcl::Vec3f>* contactCones;
       
       hppDout(notice,"# oneStep BEGIN");
       while (!valid) {
@@ -93,34 +89,17 @@ namespace hpp {
 	valid = problem ().configValidations()->validate(*q_rand,report);
       }
       hppDout (info, "q_rand: " << displayConfig (*q_rand));
-      /*fcl::Vec3f normalAv = computeMiddleContacts (*q_rand);
-      if (normalAv.norm () > 0.9) {
-	// contactNormalAverage_ correctly computed and can be used
-	// else, keep previous normal in extra-config
-	for (std::size_t i = 0; i < 3; i++)
-	  (*q_rand) [i + indexECS] = normalAv [i];
-      }
-      else
-      hppDout (info, "contactNormalAverage could not be computed");*/
-      hppDout (info, "q_rand after avNormal: " << displayConfig (*q_rand));
-      
-      // update q_rand orientation with new normal IF it is valid
-      q_tmp = setOrientation (robot, *q_rand);
-      if (problem ().configValidations()->validate(q_tmp,report))
-	*q_rand = q_tmp;
-      else
-	hppDout (info, "average normal + setOrientation => not valid");
-      hppDout (info, "q_rand after setOrient: " << displayConfig (*q_rand));
+      *contactCones = computeContactCones (*q_rand);
+      // Note: orientation not updated with 2D-CC direction since not computed
 
       // Add q_rand as a new node: here for the parabola, as the impact node
       core::NodePtr_t impactNode = roadmap ()->addNode (q_rand);
       impactNode->indexInRM (roadmap ()->nodeIndex_);
       roadmap ()->nodeIndex_++;
-      //core::RbprmNodePtr_t impactNodeRb = static_cast<core::RbprmNodePtr_t>(impactNode);
-      //if(impactNodeRb) hppDout(notice,"Node correctly casted to rbprmNode");
-      //else hppDout(notice,"Impossible to cast node to rbprmNode");
-      // TODO: call computeMiddleContacts and STORE "Cones" in impactNodeRb ...
-      //rbprmRoadmap()->addNode(q_rand);
+      core::RbprmNodePtr_t impactNodeRb = static_cast<core::RbprmNodePtr_t>(impactNode);
+      if(impactNodeRb) hppDout(notice, "Node correctly casted to rbprmNode");
+      else hppDout(error, "Impossible to cast node to rbprmNode");
+      impactNodeRb->contactCones (contactCones);
 
       // try to connect the random configuration to each connected component
       // of the roadmap.
@@ -134,30 +113,30 @@ namespace hpp {
 	  // iteration on each node of the current connected-component
 	  for (core::NodeVector_t::const_iterator n_it = cc->nodes ().begin (); 
 	       n_it != cc->nodes ().end (); ++n_it){
+	    core::RbprmNodePtr_t n_itRb = static_cast<core::RbprmNodePtr_t>(*n_it);
+	    if(!impactNodeRb) hppDout(error, "Impossible to cast node to rbprmNode");
 	    core::ConfigurationPtr_t qCC = (*n_it)->configuration ();
 	    hppDout (info, "qCC: " << displayConfig (*qCC));
 
 	    // Create forward and backward paths
-	    fwdPath = (*smParabola_) (*qCC, *q_rand);
-	    bwdPath = (*smParabola_) (*q_rand, *qCC);
+	    //fwdPath = (*smParabola_) (*qCC, *q_rand);
+	    fwdPath = (*smParabola_) (n_itRb, impactNodeRb);
+	    //bwdPath = (*smParabola_) (*q_rand, *qCC);
+	    bwdPath = (*smParabola_) (impactNodeRb, n_itRb);
 	    // if a path is returned (i.e. not null), then it is valid
 
 	    if (fwdPath) {
 	      hppDout (info, "forward path is valid");
-        if(fwdPath->length() > 3){
-          hppDout (info, "forward path long enough");          
-          fwdDelayedEdge = DelayedEdge_t (*n_it, impactNode, fwdPath);
-          delayedEdges.push_back (fwdDelayedEdge);
-        }
+	      hppDout (info, "forward path long enough");          
+	      fwdDelayedEdge = DelayedEdge_t (*n_it, impactNode, fwdPath);
+	      delayedEdges.push_back (fwdDelayedEdge);
 	    }
 
 	    if (bwdPath) {
 	      hppDout (info, "backward path is valid");
-        if(bwdPath->length() > 3){
-          hppDout (info, "backward path long enough");          
-          bwdDelayedEdge = DelayedEdge_t (impactNode, *n_it, bwdPath);
-          delayedEdges.push_back (bwdDelayedEdge);
-        }
+	      hppDout (info, "backward path long enough");          
+	      bwdDelayedEdge = DelayedEdge_t (impactNode, *n_it, bwdPath);
+	      delayedEdges.push_back (bwdDelayedEdge);
 	    }
 	  }//for nodes in cc
 	}//avoid impactNode cc
@@ -191,71 +170,58 @@ namespace hpp {
         // call steering method here to build a direct conexion
         core::PathPtr_t path;
         core::PathPtr_t fwdPath, bwdPath;
-        std::vector<std::string> filter;
-        core::NodePtr_t initNode = roadmap ()->initNode();
-        //const size_type indexECS = problem().robot()->configSize () - problem().robot()->extraConfigSpace ().dimension ();
+        const core::ConfigurationPtr_t q_init = roadmap ()->initNode()->configuration ();
+        const core::RbprmNodePtr_t initNode = static_cast<core::RbprmNodePtr_t>(roadmap ()->initNode());
+	if (!initNode) hppDout (error, "problem to cast RbprmNode");
+	std::vector<fcl::Vec3f> cones;
+	cones= computeContactCones (*q_init);
+	initNode->contactCones (&cones);
 
       for (core::Nodes_t::const_iterator itn = roadmap ()->goalNodes ().begin();itn != roadmap ()->goalNodes ().end (); ++itn) {
-        core::ConfigurationPtr_t q1 ((initNode)->configuration ());
-        core::ConfigurationPtr_t q2 ((*itn)->configuration ());
-        assert (*q1 != *q2);
-
-	/*fcl::Vec3f normalAv = computeMiddleContacts (*q1);
-        if (normalAv.norm () > 0.9) {
-            // contactNormalAverage_ correctly computed and can be used
-            // else, keep previous normal in extra-config
-            for (std::size_t i = 0; i < 3; i++)
-                (*q1) [i + indexECS] = normalAv [i];
-        }
-        else
-            hppDout (info, "contactNormalAverage could not be computed");
-        normalAv = computeMiddleContacts (*q2);
-        if (normalAv.norm () > 0.9) {
-            // contactNormalAverage_ correctly computed and can be used
-            // else, keep previous normal in extra-config
-            for (std::size_t i = 0; i < 3; i++)
-                (*q2) [i + indexECS] = normalAv [i];
-        }
-        else
-	hppDout (info, "contactNormalAverage could not be computed");*/
+	if (!*itn) hppDout (error, "problem to get goal node");
+        const core::RbprmNodePtr_t goalNode = static_cast<core::RbprmNodePtr_t>(*itn);
+	if (!goalNode) hppDout (error, "problem to cast RbprmNode");
+	const core::ConfigurationPtr_t q_goal = (*itn)->configuration ();
+	cones = computeContactCones (*q_goal);
+	goalNode->contactCones (&cones);
+        assert (*q_init != *q_goal);
 
         // Create forward and backward paths
-        fwdPath = (*smParabola_) (*q1, *q2);
-        bwdPath = (*smParabola_) (*q2, *q1);
+	fwdPath = (*smParabola_) (initNode, goalNode);
+	bwdPath = (*smParabola_) (goalNode, initNode);
         // if a path is returned (i.e. not null), then it is valid
         if (fwdPath) {
           hppDout (info, "forward path is valid");
-          roadmap ()->addEdge(initNode, *itn, fwdPath);
+          roadmap ()->addEdge(roadmap ()->initNode(), *itn, fwdPath);
         }
         if (bwdPath) {
           hppDout (info, "backward path is valid");
-          roadmap ()->addEdge(*itn, initNode, bwdPath);
+          roadmap ()->addEdge(*itn, roadmap ()->initNode(), bwdPath);
         }
       } //for qgoals
     }
 
-    // TODO CC: return cones
-    fcl::Vec3f BallisticPlanner::computeMiddleContacts 
-(const core::Configuration_t q) const {
+    std::vector<fcl::Vec3f> BallisticPlanner::computeContactCones 
+    (const core::Configuration_t q) const {
       fcl::Vec3f normalAv (0,0,0);
-      std::vector<fcl::Vec3f> Cones;
+      std::vector<fcl::Vec3f> Cones; // list of contact-cones for CC
       core::ValidationReportPtr_t report;
       const core::DevicePtr_t& robot (problem_->robot ());
       model::RbPrmDevicePtr_t rbDevice =
 	boost::dynamic_pointer_cast<model::RbPrmDevice> (robot);
       if (!rbDevice) {
 	hppDout(error,"~~ Device cast in RB problem");
-	return normalAv;
+	return Cones;
       }
 
       const bool isValid = problem ().configValidations()->validate(q,report);
       if(!isValid) {
 	hppDout(warning,"~~ config is not valid");
-	return normalAv;
+	return Cones;
       }
       if (!report) {
 	hppDout(error,"~~ Report problem");
-	return normalAv;
+	return Cones;
       }
       core::RbprmValidationReportPtr_t rbReport =
 	boost::dynamic_pointer_cast<core::RbprmValidationReport> (report);
@@ -263,13 +229,12 @@ namespace hpp {
       if(!rbReport)
 	{
 	  hppDout(error,"~~ Validation Report cannot be cast");
-	  return normalAv;
+	  return Cones;
 	}
       
       // get the 2 object in contact for each ROM :
       hppDout(info,"~~ Number of roms in collision : "<<rbReport->ROMReports.size());
       const std::size_t nbNormalAv = rbReport->ROMReports.size();
-      size_t indexRom = 0;
       for(std::map<std::string,core::CollisionValidationReportPtr_t>::const_iterator it = rbReport->ROMReports.begin() ; it != rbReport->ROMReports.end() ; ++it)
 	{
 	  hppDout(info,"~~ for rom : "<<it->first);
@@ -279,52 +244,42 @@ namespace hpp {
 	  fcl::CollisionResult result = it->second->result;
         
 	  // get intersection between the two objects :
-	  //geom::T_Point vertices1; // debug display only
+	  geom::T_Point vertices1;
 	  geom::BVHModelOBConst_Ptr_t model1 =  geom::GetModel(obj1->fcl());
-	  /*for(int i = 0 ; i < model1->num_vertices ; ++i)
+	  for(int i = 0 ; i < model1->num_vertices ; ++i)
 	    {
 	      vertices1.push_back(Eigen::Vector3d(model1->vertices[i][0], model1->vertices[i][1], model1->vertices[i][2]));
-	    }*/
+	    }
         
-	 // geom::T_Point vertices2; // debug display only
+	  geom::T_Point vertices2;
 	  geom::BVHModelOBConst_Ptr_t model2 =  geom::GetModel(obj2->fcl());
-	 /* for(int i = 0 ; i < model2->num_vertices ; ++i)
+	  for(int i = 0 ; i < model2->num_vertices ; ++i)
 	    {
 	      vertices2.push_back(Eigen::Vector3d(model2->vertices[i][0], model2->vertices[i][1], model2->vertices[i][2]));
-	    }*/
+	    }
         
-	  // TODO: replace by affordance
-	  //geom::T_Point hull = geom::intersectPolygonePlane(model1,model2,-result.getContact(0).normal,0,result,false); // do not set 2 last params if DEBUG groundcrouch (ZJUMP = 0)
-	  geom::Point pn;
+	  geom::Point pn; // normal
 	  geom::T_Point hull = geom::intersectPolygonePlane(model1,model2,pn);
-	  
 	  
 	  if(hull.size() == 0){
 	    hppDout(error,"No intersection between rom and environnement");
 	  }else{
-      geom::Point center = geom::center(hull.begin(),hull.end());
-      hppDout(notice,"Center = "<<center);
-    }
-    hppDout(info,"number of contacts : "<<result.numContacts());
-    polytope::vector3_t normal;
-   /* for(size_t k=0 ; k < result.numContacts() ; k++){
-      normal = -result.getContact(k).normal; // of contact surface
-     // hppDout(info,"normal =  : "<<normal);
-      for (std::size_t i = 0; i < 3; i++) {
-          normalAv [i] += normal [i]/result.numContacts();
-      }
-    }*/
-    normal = -result.getContact(0).normal; // of contact surface
-    normal.normalize ();
-    hppDout (info, "normal of contact surface= " << normal);
-    Cones.push_back (vectorToVec3f (normal));
-    for (std::size_t i = 0; i < 3; i++) {
-        normalAv [i] += normal [i]/nbNormalAv;
-    }
-  } // for each ROMS
-  normalAv.normalize ();
-  hppDout (info, "normed normalAv= " << normalAv);
-  return normalAv;
+	    geom::Point center = geom::center(hull.begin(),hull.end());
+	    hppDout(notice,"Center = "<<center.transpose());
+	    hppDout(notice,"Normal : "<<pn.transpose());
+	    polytope::vector3_t normal = pn;
+	    normal.normalize ();
+	    fcl::Vec3f normal_vec3f = vectorToVec3f (normal);
+	    hppDout (info, "normal_vec3f= " << normal_vec3f);
+	    Cones.push_back (normal_vec3f);
+	    for (std::size_t i = 0; i < 3; i++) { // old MIG version
+	      normalAv [i] += pn [i]/nbNormalAv;
+	    }
+	  }
+	} // for each ROMS
+      normalAv.normalize ();
+      hppDout (info, "normed normalAv (not used)= " << normalAv);
+      return Cones;
     }
 
   } // namespace core
