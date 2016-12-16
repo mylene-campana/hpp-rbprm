@@ -12,7 +12,7 @@ namespace geom
   {
     Point normal = (tri.p2 - tri.p1).cross(tri.p3 - tri.p1);
     normal.normalize();
-    hppDout(notice,"normal, in geom :: "<<normal);
+    //hppDout(notice,"normal, in geom :: "<<normal);
     return normal;
   }
   
@@ -508,7 +508,7 @@ namespace geom
 
     // ordonate the point in the vector (clockwise) first point and last point are the same
     sortedRes = convexHull(res.begin(),res.end());
-    hppDout(notice,"clipped point : ");
+    //hppDout(notice,"clipped point : ");
     std::ostringstream ss;
     ss<<"[";
     for(size_t i = 0; i < sortedRes.size() ; ++i){
@@ -517,9 +517,9 @@ namespace geom
         ss<<",";
     }
     ss<<"]";
-    std::cout<<"intersection : "<<std::endl;
-    std::cout<<ss.str()<<std::endl;
-    hppDout(notice,"area = "<<area(sortedRes.begin(),sortedRes.end()));
+    //std::cout<<"intersection : "<<std::endl;
+    //std::cout<<ss.str()<<std::endl;
+    //hppDout(notice,"area = "<<area(sortedRes.begin(),sortedRes.end()));
     return sortedRes;
   }
 

@@ -74,9 +74,10 @@ namespace hpp {
       : trunkValidation_(tuneFclValidation(robot))
       , romValidations_(createRomValidations(robot, affFilters))
       , defaultFilter_(filter)
-      , unusedReport_(new CollisionValidationReport)
+      , nbFilterMatch_ (nbFilterMatch)
+      , unusedReport_(new CollisionValidationReport)	
     {
-      hppDout (info, "nbFilterMatch= " << nbFilterMatch);
+      hppDout (info, "nbFilterMatch_= " << nbFilterMatch_);
       for(std::vector<std::string>::const_iterator cit = defaultFilter_.begin();
 	  cit != defaultFilter_.end(); ++cit)
         {
@@ -196,7 +197,7 @@ namespace hpp {
     bool RbPrmValidation::validate (const Configuration_t& config,
                const std::vector<std::string> &filter)
     {
-        return trunkValidation_->validate(config, unusedReport_)
+      return trunkValidation_->validate(config, unusedReport_)
                 && validateRoms(config, filter);
     }
 

@@ -420,13 +420,13 @@ namespace hpp {
       core::RbprmNodePtr_t n2rb = static_cast<core::RbprmNodePtr_t>(n2);
       if(!n2rb) hppDout(error, "Impossible to cast node 2 to rbprmNode");
       hppDout(info, "Retrieve contact-cones");
-      const std::vector<fcl::Vec3f>* cones1 = n1rb->contactCones();
-      const std::vector<fcl::Vec3f>* cones2 = n2rb->contactCones();
+      std::vector<fcl::Vec3f> cones1 = *(n1rb->contactCones());
+      std::vector<fcl::Vec3f> cones2 = *(n2rb->contactCones());
 
       /* Compute 2D Convex-Cones */
-      vector_t dir2DCC1 = convexCone::compute_convex_cone_inter (*cones1, theta,
+      vector_t dir2DCC1 = convexCone::compute_convex_cone_inter (cones1, theta,
 								 mu_);
-      vector_t dir2DCC2 = convexCone::compute_convex_cone_inter (*cones2, theta,
+      vector_t dir2DCC2 = convexCone::compute_convex_cone_inter (cones2, theta,
 								 mu_);
       if (dir2DCC1.norm () == 0) {
 	hppDout (info, "plane_theta not intersecting first cone");

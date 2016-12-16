@@ -92,18 +92,6 @@ namespace hpp {
 
     private:
 
-      /// Return list of contact-cone directions (contacts are in the 
-      /// middle of ROM-obstacle intersection, using affordances.
-      /// (Old MIG version: return "average" direction from contact-cones)
-      std::vector<fcl::Vec3f> computeContactCones 
-	(const core::Configuration_t q) const;
-
-      fcl::Vec3f vectorToVec3f (const polytope::vector3_t vector) const {
-	fcl::Vec3f result;
-	for (std::size_t i = 0; i < 3; i++) result [i] = vector [i];
-	return result;
-      }
-
       core::ProblemPtr_t problem_;
       core::ConfigurationShooterPtr_t configurationShooter_;
       BallisticPlannerWkPtr_t weakPtr_;

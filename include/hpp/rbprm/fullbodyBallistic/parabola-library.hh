@@ -38,7 +38,6 @@ namespace hpp {
     using core::value_type;
     using core::vector_t;
 
-
     /// Arrange robot orientation according to the surface normal direction
     /// So that the robot is "on" the surface, rotated
     inline core::Configuration_t setOrientation
@@ -244,6 +243,99 @@ namespace hpp {
       return giwc;
     }
 
+    // ---------------------------------------------------------------------
+
+    /// Return list of contact-cone directions (contacts are in the 
+    /// middle of ROM-obstacle intersection, using affordances.
+    /// (Old MIG version: return "average" direction from contact-cones)
+
+    namespace library {
+      inline fcl::Vec3f vectorToVec3f (const polytope::vector3_t vector) {
+	fcl::Vec3f result;
+	for (std::size_t i = 0; i < 3; i++) result [i] = vector [i];
+	return result;
+      }
+
+      inline std::vector<fcl::Vec3f> computeContactCones 
+      (const core::ProblemPtr_t& problem, const core::Configuration_t q) {
+	fcl::Vec3f normalAv (0,0,0);
+	std::vector<fcl::Vec3f> Cones; // list of contact-cones for CC
+	core::ValidationReportPtr_t report;
+	const core::DevicePtr_t& robot (problem->robot ());
+	model::RbPrmDevicePtr_t rbDevice =
+	  boost::dynamic_pointer_cast<model::RbPrmDevice> (robot);
+	if (!rbDevice) {
+	  hppDout(error,"~~ Device cast in RB problem");
+	  return Cones;
+	}
+
+	const bool isValid = problem->configValidations()->validate(q,report);
+	if(!isValid) {
+	  hppDout(warning,"~~ config is not valid");
+	  return Cones;
+	}
+	if (!report) {
+	  hppDout(error,"~~ Report problem");
+	  return Cones;
+	}
+	core::RbprmValidationReportPtr_t rbReport =
+	  boost::dynamic_pointer_cast<core::RbprmValidationReport> (report);
+	// checks :
+	if(!rbReport)
+	  {
+	    hppDout(error,"~~ Validation Report cannot be cast");
+	    return Cones;
+	  }
+      
+	// get the 2 object in contact for each ROM :
+	hppDout(info,"~~ Number of roms in collision : "<<rbReport->ROMReports.size());
+	const std::size_t nbNormalAv = rbReport->ROMReports.size();
+	for(std::map<std::string,core::CollisionValidationReportPtr_t>::const_iterator it = rbReport->ROMReports.begin() ; it != rbReport->ROMReports.end() ; ++it)
+	  {
+	    hppDout(info,"~~ for rom : "<<it->first);
+	    core::CollisionObjectPtr_t obj1 = it->second->object1;
+	    core::CollisionObjectPtr_t obj2 = it->second->object2;
+	    hppDout(notice,"~~ collision between : "<<obj1->name() << " and "<<obj2->name());
+	    fcl::CollisionResult result = it->second->result;
+        
+	    // get intersection between the two objects :
+	    geom::T_Point vertices1;
+	    geom::BVHModelOBConst_Ptr_t model1 =  geom::GetModel(obj1->fcl());
+	    for(int i = 0 ; i < model1->num_vertices ; ++i)
+	      {
+		vertices1.push_back(Eigen::Vector3d(model1->vertices[i][0], model1->vertices[i][1], model1->vertices[i][2]));
+	      }
+        
+	    geom::T_Point vertices2;
+	    geom::BVHModelOBConst_Ptr_t model2 =  geom::GetModel(obj2->fcl());
+	    for(int i = 0 ; i < model2->num_vertices ; ++i)
+	      {
+		vertices2.push_back(Eigen::Vector3d(model2->vertices[i][0], model2->vertices[i][1], model2->vertices[i][2]));
+	      }
+        
+	    geom::Point pn; // normal
+	    geom::T_Point hull = geom::intersectPolygonePlane(model1,model2,pn);
+	  
+	    if(hull.size() == 0){
+	      hppDout(error,"No intersection between rom and environnement");
+	    }else{
+	      geom::Point center = geom::center(hull.begin(),hull.end());
+	      hppDout(notice,"Center = "<<center.transpose());
+	      hppDout(notice,"Normal : "<<pn.transpose());
+	      polytope::vector3_t normal = pn;
+	      normal.normalize ();
+	      fcl::Vec3f normal_vec3f = vectorToVec3f (normal);
+	      Cones.push_back (normal_vec3f);
+	      for (std::size_t i = 0; i < 3; i++) { // old MIG version
+		normalAv [i] += pn [i]/nbNormalAv;
+	      }
+	    }
+	  } // for each ROMS
+	normalAv.normalize ();
+	//hppDout (info, "normed normalAv (not used)= " << normalAv);
+	return Cones;
+      }
+    } // namespace library
   } //   namespace rbprm
 } // namespace hpp
 

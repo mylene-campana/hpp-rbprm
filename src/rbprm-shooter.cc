@@ -232,9 +232,9 @@ namespace
       , eulerSo3_(initSo3())
     {
       hppDout (info, "constructor RbPrmShooter");
-      for (std::size_t i = 0; i < filter_.size (); i++) {
+      hppDout (info, "nbFilterMatch= " << nbFilterMatch);
+      for (std::size_t i = 0; i < filter_.size (); i++)
 	hppDout (info, "rbShooter filter= " << filter_[i]);
-      }
       for(hpp::core::ObjectVector_t::const_iterator cit = geometries.begin();
 	  cit != geometries.end(); ++cit)
         {
@@ -335,7 +335,7 @@ namespace
 	  hppDout (info, "normal= " << normal);
 	  //set configuration position to sampled point
 	  SetConfigTranslation(robot_,config, p);
-	//hppDout (info, "config= " << displayConfig (*config));
+	  hppDout (info, "config= " << displayConfig (*config));
 	  if (hasECS && fullOrientationMode_) {
 	    if (!validator_->trunkValidation_->validate(*config, reportShPtr)) {
 	      report = static_cast<CollisionValidationReport*>(reportShPtr.get());
@@ -351,7 +351,7 @@ namespace
 	    SampleRotation(eulerSo3_, config, jv);
 	    hppDout (info, "random rotation was sampled");
 	  }
-	  //hppDout (info, "config= " << displayConfig (*config));
+	  hppDout (info, "config= " << displayConfig (*config));
 	  // rotate and translate randomly until valid configuration found or
 	  // no obstacle is reachable
 	  std::size_t limitDis = displacementLimit_;
@@ -380,14 +380,20 @@ namespace
 			SampleRotation(eulerSo3_, config, jv);
 			hppDout (info, "random rotation was sampled");
 		      }
-		      //hppDout (info, "config= " << displayConfig(*config));
-		      found = validator_->validate(*config, filter_);
+		      hppDout (info, "config= " << displayConfig(*config));
+		      found = validator_->validate(*config, filter_); // NOT WORKING CORRECTLY !!!!!
+
+
+
 		      if(!found)
 			{
+			  hppDout (info, "config unvalid, found false, transl");
 			  Translate(robot_, config, -lastDirection *
 				    1 * ((double) rand() / (RAND_MAX)));
 			}
 		      found = validator_->validate(*config, filter_);
+		      if (!found)
+			hppDout (info, "config unvalid, found false, transl failed");
 		    }
 		  if(!found) break;
 		}
@@ -428,8 +434,11 @@ namespace
 	      (*config) [index + i] = lastDirection [i];
 	    if (fullOrientationMode_)
 	      *config = setOrientation (robot_, *config);
+	    hppDout (info, "config= " << displayConfig(*config));
 	  }
 	  valid = validator_->trunkValidation_->validate(*config, reportShPtr);
+	  if (!valid)
+	    hppDout (info, "config unvalid, valid false");
 	  limit--;
 	}
       if (!found) std::cout << "no config found" << std::endl;
