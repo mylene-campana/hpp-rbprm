@@ -30,6 +30,9 @@
 
 namespace hpp {
   namespace rbprm {
+
+    core::Configuration_t computeContactPose(const State &state, core::Configuration_t contactPose,rbprm::RbPrmFullBodyPtr_t robot);
+
     HPP_PREDEF_CLASS(BallisticInterpolation);
 
     /// Interpolation class for transforming a path computed by RB-PRM into
@@ -111,12 +114,20 @@ namespace hpp {
 	return flexionPose_;
       }
       
-      void contactPose (const core::Configuration_t contactPose) {
-	contactPose_ = contactPose;
+      void takeoffContactPose (const core::Configuration_t takeoffContactPose) {
+	takeoffContactPose_ = takeoffContactPose;
       }
 
-      core::Configuration_t contactPose () {
-	return contactPose_;
+      void landingContactPose (const core::Configuration_t landingContactPose) {
+	landingContactPose_ = landingContactPose;
+      }
+
+      core::Configuration_t takeoffContactPose () {
+	return takeoffContactPose_;
+      }
+
+      core::Configuration_t landingContactPose () {
+	return landingContactPose_;
       }
 
       std::map<std::string, std::vector<std::string> > affordanceFilters () {
@@ -225,14 +236,45 @@ namespace hpp {
 
       
       /**
-       * @brief computeContactPose compute the configuration of a waypoint. In contact with the environnement.
-       * Must be called after COmputeContact for the given State.
+       * @brief computeTakeoffContactPose compute the configuration of a waypoint. In contact with the environnement.
+       * Must be called after ComputeContact for the given State.
        * It return the configuration of the state exept for the trunk DOF and the limb which aren't in contact
        * @param state 
        * @return the configuration
        */
-      core::Configuration_t computeContactPose(const State &state); 
+      core::Configuration_t computeTakeoffContactPose(const State& state) {
+	if(takeoffContactPose_.size() == 0)
+	  return state.configuration_;
+	else
+	  return rbprm::computeContactPose(state,takeoffContactPose_,robot_);
+      }
 
+/**
+       * @brief computeLandingContactPose compute the configuration of a waypoint. In contact with the environnement.
+       * Must be called after ComputeContact for the given State.
+       * It return the configuration of the state exept for the trunk DOF and the limb which aren't in contact
+       * @param state 
+       * @return the configuration
+       */
+      core::Configuration_t computeLandingContactPose (const State& state) {
+	if(landingContactPose_.size() == 0)
+	  return state.configuration_;
+	else
+	  return rbprm::computeContactPose (state,landingContactPose_,robot_);
+      }
+      /**
+       * @brief computeFlexionContactPose compute the configuration of a waypoint. In contact with the environnement.
+       * Must be called after ComputeContact for the given State.
+       * It return the configuration of the state exept for the trunk DOF and the limb which aren't in contact
+       * @param state 
+       * @return the configuration
+       */
+      core::Configuration_t computeFlexionContactPose (const State& state) {
+	if(flexionPose_.size() == 0)
+	  return state.configuration_;
+	else
+	  return rbprm::computeContactPose(state,flexionPose_,robot_);
+      }
 
       
       /// Blend the two configurations with a as ratio:
@@ -249,16 +291,15 @@ namespace hpp {
       core::ProblemPtr_t problem_;
       RbPrmFullBodyPtr_t robot_; // device of fullbody
       BallisticInterpolationWkPtr_t weakPtr_;
-      core::Configuration_t extendingPose_;
-      core::Configuration_t flexionPose_;
-      core::Configuration_t contactPose_;
+      // order of poses in parabola: flexion -> takeoffContact -> extending -> landingContact -> flexion
+      core::Configuration_t extendingPose_; // parabola apex
+      core::Configuration_t flexionPose_; // parabola extremity
+      core::Configuration_t takeoffContactPose_; // when releasing contact
+      core::Configuration_t landingContactPose_; // when starting contact
       size_t lastRootIndex_;
       affMap_t affMap_;
       std::map<std::string, std::vector<std::string> > affFilters_;
     }; // class BallisticInterpolation
-    
-    core::Configuration_t computeContactPose(const State &state, core::Configuration_t contactPose,rbprm::RbPrmFullBodyPtr_t robot); 
-
     
   } // namespace rbprm
 } // namespace hpp

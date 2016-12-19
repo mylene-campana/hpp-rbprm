@@ -69,20 +69,17 @@ namespace hpp {
     }
 
     core::PathPtr_t SteeringMethodParabola::impl_compute
-    (core::NodePtr_t n1, core::NodePtr_t n2)
-      const {
+    (core::ConfigurationIn_t q1, core::ConfigurationIn_t q2,
+     std::vector<fcl::Vec3f>* cones1, std::vector<fcl::Vec3f>* cones2) const {
       V0max_ = problem_->vmaxTakeoff_; // may have changed
       Vimpmax_ = problem_->vmaxLanding_;
       mu_ = problem_->mu_;
-      core::ConfigurationIn_t q1 = *(n1->configuration ());
-      core::ConfigurationIn_t q2 = *(n2->configuration ());
-      hppDout (info, "Parabola-steering-method with nodes");
+      hppDout (info, "Parabola-steering-method with contact-cones");
       hppDout (info, "q_init: " << displayConfig (q1));
       hppDout (info, "q_goal: " << displayConfig (q2));
       hppDout (info, "g_: " << g_ << " , mu_: " << mu_ << " , V0max: " <<
 	       V0max_ << " , Vimpmax: " << Vimpmax_);
-
-      core::PathPtr_t pp = compute_3D_path (n1, n2);
+      core::PathPtr_t pp = compute_3D_path (q1, q2, cones1, cones2);
       return pp;
     }
 
@@ -366,11 +363,11 @@ namespace hpp {
     // ------------------------------------------------------------------
 
     core::PathPtr_t
-    SteeringMethodParabola::compute_3D_path (core::NodePtr_t n1,
-					     core::NodePtr_t n2) 
+    SteeringMethodParabola::compute_3D_path (core::ConfigurationIn_t q1,
+					     core::ConfigurationIn_t q2,
+					     std::vector<fcl::Vec3f>* cones1,
+					     std::vector<fcl::Vec3f>* cones2) 
       const {
-      core::ConfigurationIn_t q1 = *(n1->configuration ());
-      core::ConfigurationIn_t q2 = *(n2->configuration ());
       std::vector<std::string> filter;
       core::PathPtr_t validPart;
       const core::PathValidationPtr_t pathValidation
@@ -414,19 +411,10 @@ namespace hpp {
       hppDout (info, "X_theta: " << X_theta);
       hppDout (info, "phi: " << phi);
 
-      // Get contact-cones
-      core::RbprmNodePtr_t n1rb = static_cast<core::RbprmNodePtr_t>(n1);
-      if(!n1rb) hppDout(error, "Impossible to cast node 1 to rbprmNode");
-      core::RbprmNodePtr_t n2rb = static_cast<core::RbprmNodePtr_t>(n2);
-      if(!n2rb) hppDout(error, "Impossible to cast node 2 to rbprmNode");
-      hppDout(info, "Retrieve contact-cones");
-      std::vector<fcl::Vec3f> cones1 = *(n1rb->contactCones());
-      std::vector<fcl::Vec3f> cones2 = *(n2rb->contactCones());
-
       /* Compute 2D Convex-Cones */
-      vector_t dir2DCC1 = convexCone::compute_convex_cone_inter (cones1, theta,
+      vector_t dir2DCC1 = convexCone::compute_convex_cone_inter (*cones1, theta,
 								 mu_);
-      vector_t dir2DCC2 = convexCone::compute_convex_cone_inter (cones2, theta,
+      vector_t dir2DCC2 = convexCone::compute_convex_cone_inter (*cones2, theta,
 								 mu_);
       if (dir2DCC1.norm () == 0) {
 	hppDout (info, "plane_theta not intersecting first cone");

@@ -80,7 +80,7 @@ namespace hpp {
       core::Configuration_t q_tmp;
       core::ValidationReportPtr_t report;
       bool valid = false;
-      std::vector<fcl::Vec3f> contactCones;
+      std::vector<fcl::Vec3f> contactConesCC, contactConesImp;
       
       hppDout(notice,"# oneStep BEGIN");
       while (!valid) {
@@ -93,12 +93,8 @@ namespace hpp {
       core::NodePtr_t impactNode = roadmap ()->addNode (q_rand);
       impactNode->indexInRM (roadmap ()->nodeIndex_);
       roadmap ()->nodeIndex_++;
-      core::RbprmNodePtr_t impactNodeRb = static_cast<core::RbprmNodePtr_t>(impactNode);
-      if(impactNodeRb) hppDout(notice, "Node correctly casted to rbprmNode");
-      else hppDout(error, "Impossible to cast node to rbprmNode");
-      contactCones = library::computeContactCones (problem_, *q_rand);
+      contactConesImp = library::computeContactCones (problem_, *q_rand);
       // Note: orientation not updated with 2D-CC direction since not computed
-      impactNodeRb->contactCones (&contactCones);
 
       // try to connect the random configuration to each connected component
       // of the roadmap.
@@ -112,20 +108,15 @@ namespace hpp {
 	  // iteration on each node of the current connected-component
 	  for (core::NodeVector_t::const_iterator n_it = cc->nodes ().begin (); 
 	       n_it != cc->nodes ().end (); ++n_it){
-	    core::RbprmNodePtr_t n_itRb = static_cast<core::RbprmNodePtr_t>(*n_it);
-	    if(!impactNodeRb) hppDout(error, "Impossible to cast node to rbprmNode");
 	    core::ConfigurationPtr_t qCC = (*n_it)->configuration ();
 	    hppDout (info, "qCC: " << displayConfig (*qCC));
 
-	    // NOT TIME-OPTIMAL (I can store the cones in the roadmap... so I computed them each time)
-	    contactCones = library::computeContactCones (problem_, *qCC);
-	    n_itRb->contactCones (&contactCones);
+	    // NOT TIME-OPTIMAL (I cannot store the cones in the roadmap... so I computed them each time)
+	    contactConesCC = library::computeContactCones (problem_, *qCC);
 
 	    // Create forward and backward paths
-	    //fwdPath = (*smParabola_) (*qCC, *q_rand);
-	    fwdPath = (*smParabola_) (n_itRb, impactNodeRb);
-	    //bwdPath = (*smParabola_) (*q_rand, *qCC);
-	    bwdPath = (*smParabola_) (impactNodeRb, n_itRb);
+	    fwdPath = (*smParabola_) (*qCC, *q_rand, &contactConesCC, &contactConesImp);
+	    bwdPath = (*smParabola_) (*q_rand, *qCC, &contactConesImp, &contactConesCC);
 	    // if a path is returned (i.e. not null), then it is valid
 
 	    if (fwdPath) {
@@ -173,24 +164,17 @@ namespace hpp {
         core::PathPtr_t path;
         core::PathPtr_t fwdPath, bwdPath;
         const core::ConfigurationPtr_t q_init = roadmap ()->initNode()->configuration ();
-        const core::RbprmNodePtr_t initNode = static_cast<core::RbprmNodePtr_t>(roadmap ()->initNode());
-	if (!initNode) hppDout (error, "problem to cast RbprmNode");
-	std::vector<fcl::Vec3f> cones;
-	cones = library::computeContactCones (problem_, *q_init);
-	initNode->contactCones (&cones);
+	std::vector<fcl::Vec3f> conesInit, conesGoal;
+	conesInit = library::computeContactCones (problem_, *q_init);
 
       for (core::Nodes_t::const_iterator itn = roadmap ()->goalNodes ().begin();itn != roadmap ()->goalNodes ().end (); ++itn) {
-	if (!*itn) hppDout (error, "problem to get goal node");
-        const core::RbprmNodePtr_t goalNode = static_cast<core::RbprmNodePtr_t>(*itn);
-	if (!goalNode) hppDout (error, "problem to cast RbprmNode");
 	const core::ConfigurationPtr_t q_goal = (*itn)->configuration ();
-	cones = library::computeContactCones (problem_, *q_goal);
-	goalNode->contactCones (&cones);
+	conesGoal = library::computeContactCones (problem_, *q_goal);
         assert (*q_init != *q_goal);
 
         // Create forward and backward paths
-	fwdPath = (*smParabola_) (initNode, goalNode);
-	bwdPath = (*smParabola_) (goalNode, initNode);
+	fwdPath = (*smParabola_) (*q_init, *q_goal, &conesInit, &conesGoal);
+	bwdPath = (*smParabola_) (*q_goal, *q_init, &conesGoal, &conesInit);
         // if a path is returned (i.e. not null), then it is valid
         if (fwdPath) {
           hppDout (info, "forward path is valid");

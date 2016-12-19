@@ -71,11 +71,13 @@ namespace hpp {
         return impl_compute (q1, q2);
       }
 
-      core::PathPtr_t operator() (const core::NodePtr_t n1,
-                                  const core::NodePtr_t n2)
+      core::PathPtr_t operator() (core::ConfigurationIn_t q1,
+				  core::ConfigurationIn_t q2,
+				  std::vector<fcl::Vec3f>* cones1,
+				  std::vector<fcl::Vec3f>* cones2) const
       {
         try {
-          return impl_compute (n1, n2);
+          return impl_compute (q1, q2, cones1, cones2);
         } catch (const core::projection_error& e) {
           hppDout (info, "Could not build path: " << e.what());
         }
@@ -86,9 +88,11 @@ namespace hpp {
       virtual core::PathPtr_t impl_compute (core::ConfigurationIn_t q1,
 					    core::ConfigurationIn_t q2) const;
 
-      /// create a path between two nodes
-      core::PathPtr_t impl_compute (core::NodePtr_t n1,
-				    core::NodePtr_t n2) const;
+      /// create a path between two configurations with contact-cones
+      core::PathPtr_t impl_compute (core::ConfigurationIn_t q1,
+				    core::ConfigurationIn_t q2,
+				    std::vector<fcl::Vec3f>* cones1,
+				    std::vector<fcl::Vec3f>* cones2) const;
 
       /// Compute a random parabola in direction of q1->q2
       core::PathPtr_t compute_random_3D_path (core::ConfigurationIn_t q1,
@@ -151,9 +155,11 @@ namespace hpp {
       core::PathPtr_t compute_3D_path (core::ConfigurationIn_t q1,
 				       core::ConfigurationIn_t q2) const;
 
-      /// 3D impl_compute with nodes (contact-cones -> convex-cone)
-      core::PathPtr_t compute_3D_path (core::NodePtr_t n1,
-				       core::NodePtr_t n2) const;
+      /// 3D impl_compute with configurations and contact-cones
+      core::PathPtr_t compute_3D_path (core::ConfigurationIn_t q1,
+				       core::ConfigurationIn_t q2,
+				       std::vector<fcl::Vec3f>* cones1,
+				       std::vector<fcl::Vec3f>* cones2) const;
 
       /// Compute second constraint: V0 <= V0max
       /// return false if constraint can never be respected.

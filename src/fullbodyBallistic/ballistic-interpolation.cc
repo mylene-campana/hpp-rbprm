@@ -366,7 +366,10 @@ namespace hpp {
           if(std::find(contactingLimbs.begin(),contactingLimbs.end(),lit->first) == contactingLimbs.end()){
             hppDout(notice," Not in contact, index config : "<<lit->second->limb_->rankInConfiguration()<<" -> "<<lit->second->effector_->rankInConfiguration());
             for(size_t i = lit->second->limb_->rankInConfiguration() ; i < lit->second->effector_->rankInConfiguration() ; i++){
-              qtmp[i] = flexionPose_[i];
+	      if(increase_u_offset)
+		qtmp[i] = takeoffContactPose_[i];
+	      else
+		qtmp[i] = landingContactPose_[i];
             }
             if(robot_->getLimbcollisionValidations().at(lit->first)->validate(qtmp,report)){
               lastState.configuration_ = qtmp;
@@ -381,7 +384,10 @@ namespace hpp {
       // (mylene)NO! this is wrong because trunk was planned before
       // trunk DOF should be the value on the parab
       /*for (size_t i = 7 ; i < minIndex ; i++){
-        qtmp[i] = flexionPose_[i];
+	if(increase_u_offset)
+	qtmp[i] = takeoffContactPose_[i];
+	else
+	qtmp[i] = landingContactPose_[i];
 	}*/
       if(robot_->getCollisionValidation()->validate(qtmp,report)){
         lastState.configuration_ = qtmp;
@@ -535,24 +541,16 @@ namespace hpp {
           }
         } 
       }
-      
-     
-      
       // replace the trunkDOF with contactPose value : ( 7 because we suppose we always work with freeflyer as root ....)
       if(!useAllLimb){
+	hppDout (info, "in compute contact-pose, modify also trunk DOF");
         for (size_t i = 7 ; i < minIndex ; i++){
           q[i] = contactPose[i];
         }
       }
       return q;
     }
-    
-    Configuration_t BallisticInterpolation::computeContactPose(const State& state){
-      if(contactPose_.size() == 0)
-        return state.configuration_;
-      else
-        return rbprm::computeContactPose(state,contactPose_,robot_);
-    }
+ 
 
     Configuration_t BallisticInterpolation::blendPoses 
     (const Configuration_t q1, const Configuration_t q2, const value_type r)
@@ -598,15 +596,13 @@ namespace hpp {
     core::PathVectorPtr_t BallisticInterpolation::InterpolateFullPath
     (const core::value_type u_offset) {
       if(!path_) throw std::runtime_error ("Cannot interpolate; not path given to interpolator ");
-      Configuration_t qStart = computeContactPose(start_);
-      Configuration_t qEnd = computeContactPose(end_);
+      Configuration_t qStart = computeFlexionContactPose(start_);
+      Configuration_t qEnd = computeFlexionContactPose(end_);
       core::DevicePtr_t robot = robot_->device_;
-      T_StateFrame stateFrames;      
+      T_StateFrame stateFrames;
       Configuration_t q2(robot->configSize ()),
 	q1contact (robot->configSize ()), q2contact (robot->configSize ());
       BallisticPathPtr_t bp;
-      const model::ObjectVector_t &collisionObjects =
-	problem_->collisionObstacles();
       hppDout (info, "u_offset= " << u_offset);
       const std::size_t subPathNumber = path_->numberPaths ();
       hppDout (info, "number of sub-paths: " << subPathNumber);
@@ -640,12 +636,10 @@ namespace hpp {
 	  q1contact = q2contact;
 	  state1 = state2;
 	}
-	if (contactPose_.size () != 0)
-	  q2 = fillConfiguration (subpath->end (), contactPose_);
-	else if (flexionPose_.size () != 0)
+	if (flexionPose_.size () != 0)
 	  q2 = fillConfiguration (subpath->end (), flexionPose_);
 	else
-	q2 = fillConfiguration (subpath->end (), robot->configSize ());
+	  q2 = fillConfiguration (subpath->end (), robot->configSize ());
 	hppDout (info, "q2: " << displayConfig(q2));
 	V0 = pp_next->V0_; // V0_i+1
 	Vimp = pp->Vimp_; // Vimp_i
@@ -657,7 +651,7 @@ namespace hpp {
 	robot_->Vfdir_ = Vimp;
 	state2 = ComputeContacts(robot_, q2, affMap_, affFilters_, dir);
 	hppDout (info, "state2 config= " << displayConfig(state2.configuration_));
-	q2contact = computeContactPose(state2);
+	q2contact = computeFlexionContactPose (state2);
 	if (problem_->configValidations ()->validate (q2contact, validationReport))
 	  state2.configuration_ = q2contact; // sometimes, state2.configuration_ is "a little" in collision whereas q2contact is not
 	else {
@@ -859,8 +853,8 @@ namespace hpp {
     (const core::value_type u_offset) {
       if(!path_) throw std::runtime_error ("Cannot interpolate; not path given to interpolator ");
       hppDout (info, "direct B-interpolation");
-      Configuration_t qStart = computeContactPose(start_);
-      Configuration_t qEnd = computeContactPose(end_);
+      Configuration_t qStart = computeFlexionContactPose (start_);
+      Configuration_t qEnd = computeFlexionContactPose (end_);
       core::DevicePtr_t robot = robot_->device_;
       BallisticPathPtr_t bp;
       core::PathPtr_t pathLimb;
