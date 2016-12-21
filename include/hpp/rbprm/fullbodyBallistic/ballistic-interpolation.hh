@@ -77,7 +77,8 @@ namespace hpp {
       /// for an cushion takeoff/landing. If u_offset = 0, this effect is
       /// disable.
       core::PathVectorPtr_t InterpolateFullPath
-	(const core::value_type u_offset = 0);
+	(const core::value_type u_offset = 0,
+	 T_StateFrame* stateFramesRef = NULL);
 
       /// Between Start and End states, tranform the trunk path and the 
       /// start-goal states so that:
@@ -87,7 +88,8 @@ namespace hpp {
       /// for an cushion takeoff/landing. If u_offset = 0, this effect is
       /// disable.
       core::PathVectorPtr_t InterpolateDirectPath
-	(const core::value_type u_offset = 0);
+	(const core::value_type u_offset = 0,
+	 T_StateFrame* stateFramesRef = NULL);
 
       /// Tranform the trunk path and the start-goal states so that:
       /// the trunk is still following the parabola path
@@ -299,6 +301,7 @@ namespace hpp {
       size_t lastRootIndex_;
       affMap_t affMap_;
       std::map<std::string, std::vector<std::string> > affFilters_;
+      size_t trunkConfigSize_;
     }; // class BallisticInterpolation
     
   } // namespace rbprm

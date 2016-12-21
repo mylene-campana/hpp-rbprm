@@ -491,7 +491,12 @@ namespace geom
     triPlane.p2 = plane->vertices[plane->tri_indices[0][1]];
     triPlane.p3 = plane->vertices[plane->tri_indices[0][2]];
     Pn = TriangleNormal(triPlane);
+    hppDout (info, "normal of plane= " << Pn.transpose ());
     P0 = triPlane.p1; //FIXME : better point ?
+    Point P1 = triPlane.p2; Point P2 = triPlane.p3;
+    hppDout (info, "p1 of plane= " << P0.transpose ());
+    hppDout (info, "p2 of plane= " << P1.transpose ());
+    hppDout (info, "p3 of plane= " << P2.transpose ());
 
     for(size_t i = 0 ; i < polygone->num_tris ; i++){ // FIXME : can test 2 times the same line (in both triangles), avoid this ?
       //hppDout(info,"triangle : "<<i);

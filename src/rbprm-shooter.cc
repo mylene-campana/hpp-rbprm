@@ -191,7 +191,7 @@ namespace
     RbPrmShooterPtr_t RbPrmShooter::create (const model::RbPrmDevicePtr_t& robot, const ObjectVector_t& geometries, const affMap_t& affordances, const std::vector<std::string>& filter, const std::map<std::string, std::vector<std::string> >& affFilters, const std::size_t shootLimit, const std::size_t displacementLimit, const std::size_t nbFilterMatch)
     {
       unsigned int seed = (unsigned int)(time(NULL));
-      srand (seed);
+      //srand (seed);
       hppDout(notice,"&&&&&& SEED = "<<seed);
       RbPrmShooter* ptr = new RbPrmShooter (robot, geometries, affordances,
                                             filter, affFilters, shootLimit, displacementLimit, nbFilterMatch);
