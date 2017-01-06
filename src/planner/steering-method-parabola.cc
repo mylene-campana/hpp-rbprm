@@ -414,22 +414,28 @@ namespace hpp {
       /* Compute 2D Convex-Cones */
       vector_t dir2DCC1 = convexCone::compute_convex_cone_inter (*cones1, theta,
 								 mu_);
-      vector_t dir2DCC2 = convexCone::compute_convex_cone_inter (*cones2, theta,
-								 mu_);
       if (dir2DCC1.norm () == 0) {
 	hppDout (info, "plane_theta not intersecting first cone");
 	initialConstraint_ = false;
 	problem_->parabolaResults_ [1] ++;
 	return core::PathPtr_t ();
       }
+      value_type delta1 = dir2DCC1 [0];
+      hppDout (info, "delta1: " << delta1);
+      assert (!(delta1 != delta1)); // assert if NaN
+
+      vector_t dir2DCC2 = convexCone::compute_convex_cone_inter (*cones2, theta,
+								 mu_);
       if (dir2DCC2.norm () == 0) {
 	hppDout (info, "plane_theta not intersecting second cone");
 	initialConstraint_ = false;
 	problem_->parabolaResults_ [1] ++;
 	return core::PathPtr_t ();
       }
-      value_type delta1 = dir2DCC1 [0];
       value_type delta2 = dir2DCC2 [0];
+      hppDout (info, "delta2: " << delta2);
+      assert (!(delta2 != delta2)); // assert if NaN
+
       if (delta1 == M_PI) { // no non-sliding constraints
 	delta1 = 100.; // act as if no friction
       }
@@ -439,9 +445,7 @@ namespace hpp {
       // Only for demo without friction :
       // delta1 = 100.;
       // delta2 = 100.;
-      hppDout (info, "delta1: " << delta1);
-      hppDout (info, "delta2: " << delta2);
-	  
+
       /* Definition of gamma_theta angles */
       const value_type nx1 = dir2DCC1 [1]; const value_type ny1 = dir2DCC1 [2];
       const value_type nz1 = dir2DCC1 [3]; const value_type nx2 = dir2DCC2 [1];
@@ -588,8 +592,8 @@ namespace hpp {
       initialROMnames_.clear (); endROMnames_.clear ();
       fillROMnames (q1, &initialROMnames_);
       fillROMnames (q2, &endROMnames_);
-      hppDout (info, "initialROMnames_ size= " << initialROMnames_.size ());
-      hppDout (info, "endROMnames_ size= " << endROMnames_.size ());
+      //hppDout (info, "initialROMnames_ size= " << initialROMnames_.size ());
+      //hppDout (info, "endROMnames_ size= " << endROMnames_.size ());
     
       // parabola path with alpha_0 as the middle of alpha_0 bounds
       ParabolaPathPtr_t pp = ParabolaPath::create (device_.lock(), q1, q2,
@@ -600,8 +604,8 @@ namespace hpp {
       // checks
       hppDout (info, "pp->V0_= " << pp->V0_);
       hppDout (info, "pp->Vimp_= " << pp->Vimp_);
-      hppDout (info, "pp->initialROMnames_ size= " << pp->initialROMnames_.size ());
-      hppDout (info, "pp->endROMnames_ size= " << pp->endROMnames_.size ());
+      //hppDout (info, "pp->initialROMnames_ size= " << pp->initialROMnames_.size ());
+      //hppDout (info, "pp->endROMnames_ size= " << pp->endROMnames_.size ());
 
       bool hasCollisions = !rbPathValidation->validateTrunk (pp, false,
 							     validPart,

@@ -257,8 +257,7 @@ namespace hpp {
         return state;
       }
       
-      while (contact_OK && iteration < maxIter && ((((currentLenght<bp->length())/3.)&&increase_u_offset) || ((currentLenght > (bp->length()*2./3.))&&(!increase_u_offset)))){ 
-        hppDout (info, "currentLenght= " << currentLenght);        
+      while (contact_OK && iteration < maxIter && ((((currentLenght<bp->length())/3.)&&increase_u_offset) || ((currentLenght > (bp->length()*2./3.))&&(!increase_u_offset)))){      
         currentLenght += u;        
         iteration++;
         hppDout (info, "iteration= " << iteration);
@@ -274,10 +273,12 @@ namespace hpp {
         state = rbprm::ComputeContacts(lastState,robot_,q_trunk_offset,
 				       affMap_, affFilters_,
 				       dir,contactMaintained,multipleBreaks,true,0.);
+	hppDout (info, "config after maintainContacts= " << displayConfig(state.configuration_));
+	hppDout (info, "## contactMaintained = " << contactMaintained);
         if(contactMaintained){
           contact_OK = true;
           lastState = state;
-        }else{
+        }else {
           hppDout(notice,"contact released");
           contact_OK = false;
           for( rbprm::T_Limb::const_iterator lit = robot_->GetLimbs().begin();lit != robot_->GetLimbs().end(); ++lit){
@@ -330,6 +331,7 @@ namespace hpp {
 	      hppDout (info, "lenght= " << lenght);
 	      if (lenght > u_offset && isValid) {
 		hppDout (info, "takeoff contact state is pushed in stack");
+		hppDout (info, "config pushed= " << displayConfig(lastState.configuration_));
 		stateFrames.push_back(std::make_pair(lenght,lastState)); // add intermediate state
 	      } else
 		hppDout (info, "takeoff contact state NOT pushed in stack");
@@ -337,19 +339,19 @@ namespace hpp {
 	      hppDout (info, "lenght= " << lenght);
 	      if (lenght < bp->length() - u_offset && isValid) {
 		hppDout (info, "landing contact state is pushed in stack");
+		hppDout (info, "config pushed= " << displayConfig(lastState.configuration_));
 		reverseFrame.push_back(std::make_pair(lenght,lastState)); // add intermediate state
 	      } else
 		hppDout (info, "landing contact state NOT pushed in stack");
 	    }
             lastState = state;
 	    previousLength = lenght;
-          }
-        }
+          } // if contactOK
+        }// if contactMaintained
         hppDout (info, "q_contact_offset= " << displayConfig (q_contact_offset));
-        hppDout (info, "## contactMaintained = " << contactMaintained);
-        
       }//while
-      
+      hppDout (info, "-- contact broken or max number of iterations reached");
+
       // replace limbs that are accurate:
       // take limb-configs from contact if contact succeeded, 
       // from interp otherwise.
@@ -421,16 +423,26 @@ namespace hpp {
       if(increase_u_offset){ // ADDED My
        hppDout (info, "lenght= " << lenght);
        if (lenght > u_offset && isValid) {
-	 hppDout (info, "takeoff contact state is pushed in stack");
+	 hppDout (info, "last takeoff contact state is pushed in stack");
+	 hppDout (info, "length= " << lenght);
+	 hppDout (info, "config pushed= " << displayConfig(lastState.configuration_));
 	 stateFrames.push_back(std::make_pair(lenght,lastState)); // add intermediate state
        } else
-	 hppDout (info, "takeoff contact state NOT pushed in stack");
+	 hppDout (info, "last takeoff contact state NOT pushed in stack");
+      } else { // add reverse intermediate states
+	if (bp->length() - lenght > u_offset && isValid) {
+	 hppDout (info, "last landing contact state is pushed in stack");
+	 hppDout (info, "length= " << lenght);
+	 hppDout (info, "config pushed= " << displayConfig(lastState.configuration_));
+	 stateFrames.push_back(std::make_pair(lenght,lastState)); // add intermediate state
+	} else
+	  hppDout (info, "last landing contact state NOT pushed in stack");
       }
       
-      if(!increase_u_offset){ // add reverse intermediate states
+	/*if(!increase_u_offset){ // add reverse intermediate states
 	for(T_StateFrame::const_reverse_iterator cit = reverseFrame.rbegin() ; cit != reverseFrame.rend(); ++cit)
 	  stateFrames.push_back(*cit);
-      }
+	  }*/ // DOES NOT SEEM TO WORK CORRECTLY
       
       return lastState;
     }
@@ -617,7 +629,7 @@ namespace hpp {
       vector_t V0 (3), Vimp (3); fcl::Vec3f dir;
       core::PathPtr_t subpath = path_->pathAtRank (0);
       State state1, state2;
-      State contactState1,contactState2,stateTop,contactTransition1,contactTransition2;
+      State contactState1,contactState2,stateTop;
       core::value_type lenghtTop,lenghtTakeoff,lenghtLanding,lenghtLanding6DOF,lenghtTakeoff6DOF;
       core::ValidationReportPtr_t validationReport;
       trunkConfigSize_ = path_->pathAtRank (0)->initial ().size () - 4;
@@ -695,11 +707,9 @@ namespace hpp {
 	  stateFrames.push_back(std::make_pair(bp->length(),state2));
     
 	hppDout(notice, "position initial state frame  = "<<displayConfig(state1.configuration_));
-	hppDout(notice, "position initial Contact transition state frame  = "<<displayConfig(contactTransition1.configuration_));
 	hppDout(notice, "position initial Contact state frame  = "<<displayConfig(contactState1.configuration_));
 	hppDout(notice, "position top frame  = "<<displayConfig(stateTop.configuration_));
 	hppDout(notice, "position final contact frame  = "<<displayConfig(contactState2.configuration_));
-	hppDout(notice, "position final Contact transition state frame  = "<<displayConfig(contactTransition2.configuration_));
 	hppDout(notice, "position final state frame  = "<<displayConfig(state2.configuration_));
 	hppDout(notice, "TIME initial state frame  = "<<0);
 	hppDout(notice, "TIME initial Contact transition state frame  = "<<lenghtTakeoff6DOF);
@@ -750,11 +760,9 @@ namespace hpp {
 	    stateFrames.push_back(std::make_pair(bp->length(),state2));
       
 	  hppDout(notice, "position initial state frame  = "<<displayConfig(state1.configuration_));
-	  hppDout(notice, "position initial Contact transition state frame  = "<<displayConfig(contactTransition1.configuration_));
 	  hppDout(notice, "position initial Contact state frame  = "<<displayConfig(contactState1.configuration_));
 	  hppDout(notice, "position top frame  = "<<displayConfig(stateTop.configuration_));
 	  hppDout(notice, "position final contact frame  = "<<displayConfig(contactState2.configuration_));
-	  hppDout(notice, "position final Contact transition state frame  = "<<displayConfig(contactTransition2.configuration_));
 	  hppDout(notice, "position final state frame  = "<<displayConfig(state2.configuration_));
 	  hppDout(notice, "TIME initial state frame  = "<<0);
 	  hppDout(notice, "TIME initial Contact transition state frame  = "<<lenghtTakeoff6DOF);
@@ -790,7 +798,7 @@ namespace hpp {
 	(robot->configSize (), robot->numberDof ());
       robot_->noStability_ = true; // disable stability for waypoints
       vector_t V0 (3), Vimp (3); fcl::Vec3f dir;
-      State contactState1,contactState2,contactTransition1,contactTransition2,stateTop;
+      State contactState1,contactState2,stateTop;
       T_StateFrame stateFrames;
       value_type lenghtTop,lenghtTakeoff,lenghtLanding,lenghtLanding6DOF,lenghtTakeoff6DOF;
       const core::PathPtr_t path = path_->pathAtRank (0);
@@ -819,11 +827,9 @@ namespace hpp {
       stateFrames.push_back(std::make_pair(bp->length(),end_));
 
       hppDout(notice, "position initial state frame  = "<<displayConfig(start_.configuration_));
-      hppDout(notice, "position initial Contact transition state frame  = "<<displayConfig(contactTransition1.configuration_));
       hppDout(notice, "position initial Contact state frame  = "<<displayConfig(contactState1.configuration_));
       hppDout(notice, "position top frame  = "<<displayConfig(stateTop.configuration_));
       hppDout(notice, "position final contact frame  = "<<displayConfig(contactState2.configuration_));
-      hppDout(notice, "position final Contact transition state frame  = "<<displayConfig(contactTransition2.configuration_));
       hppDout(notice, "position final state frame  = "<<displayConfig(end_.configuration_));
       hppDout(notice, "TIME initial state frame  = "<<0);
       hppDout(notice, "TIME initial Contact transition state frame  = "<<lenghtTakeoff6DOF);
@@ -836,10 +842,6 @@ namespace hpp {
 
       for( rbprm::T_Limb::const_iterator lit = robot_->GetLimbs().begin();lit != robot_->GetLimbs().end(); ++lit){
         hppDout(notice,"LIST OF LIMBS END : "<< lit->first << "contact = "<<((end_.contacts_.find(lit->first) != end_.contacts_.end()) && end_.contacts_.at(lit->first)));
-      }
-
-      for( rbprm::T_Limb::const_iterator lit = robot_->GetLimbs().begin();lit != robot_->GetLimbs().end(); ++lit){
-        hppDout(notice,"LIST OF LIMBS END_extend : "<< lit->first << "contact = "<<contactTransition2.contacts_[lit->first]);
       }
 
       *stateFramesRef = stateFrames;

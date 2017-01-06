@@ -37,8 +37,6 @@ namespace convexCone
       const value_type psi = acos (-scalProd);
       hppDout (info, "psi = " << psi);
       hppDout (info, "2*phi = " << 2*phi);
-      //hppDout (info, "fabs(cos(2*phi)) = " << fabs(cos(2*phi)));
-      //if (scalProd < 0 && fabs(cos(2*phi)) < fabs (scalProd)) {
       if (psi > -2*phi && psi < 2*phi) {
 	hppDout (info, "2 cones and force closure case DETECTED");
 	return true;
@@ -46,6 +44,17 @@ namespace convexCone
     }
     if (N > 2) {
       hppDout (info, "3+ cones, force closure computation NOT IMPLEMENTED");
+      // at least, test cones 2-by-2
+      for (std::size_t i = 0; i < N; i++) {
+	for (std::size_t j = i + 1; j < N; j++) {
+	  const value_type scalProd = cones [i][0]*cones [j][0] + cones [i][1]*cones [j][1] + cones [i][2]*cones [j][2];
+	  const value_type psi = acos (-scalProd);
+	  if (psi > -2*phi && psi < 2*phi) {
+	    hppDout (info, "force closure case DETECTED");
+	    return true;
+	  }
+	}
+      }
     }
     return false;
   }
@@ -77,12 +86,12 @@ namespace convexCone
     hppDout (info, "tx = " << tx << ", ty = " << ty);
     if (theta != M_PI/2 && theta != -M_PI/2) {
       const value_type Ttheta = tan(theta);
-      if (ty - tx*Ttheta == 0) {
+      if (ty - tx*Ttheta == 0 || fabs(ty - tx*Ttheta) < 1e-3) {
 	hppDout (info, "plane_theta is parallel to t_dir");
 	return true;
       }
     } else { // theta = pi/2 or theta = -pi/2
-      if (tx == 0) {
+      if (tx == 0 || fabs(tx) < 1e-3) {
 	hppDout (info, "plane_theta is parallel to t_dir");
 	return true;
       }
@@ -118,6 +127,7 @@ namespace convexCone
 			 const value_type theta, const value_type mu) {
     
     // constants
+    const value_type epsilon = 1e-3; // for non-zero conditions
     const value_type nx = n[0]; const value_type ny = n[1];
     const value_type nz = n[2]; const value_type n2x = n2[0];
     const value_type n2y = n2[1]; const value_type n2z = n2[2];
@@ -141,7 +151,7 @@ namespace convexCone
     hppDout (info, "Cyz = " << Cyz << ", Czx = " << Czx << ", Cxy = " << Cxy);
     value_type A, B, C;
     if (nz != 0) {
-      if (Cyz != 0) {
+      if (Cyz != 0 && fabs(Cyz) > epsilon) {
 	// case I
 	hppDout (info, "case I");
 	A = 1 + Czx*Czx/(Cyz*Cyz) + pow((Czx*ny + nx*Cyz)/(nz*Cyz), 2);
@@ -158,7 +168,7 @@ namespace convexCone
 	zPp = (1 - xPp*nx - yPp*ny)/nz;
 	zPm = (1 - xPm*nx - yPm*ny)/nz;
       } else { // (Cyz == 0)
-	if (Czx != 0) {
+	if (Czx != 0 && fabs(Czx) > epsilon) {
 	  // case II
 	  hppDout (info, "case II");
 	  xPp = (nz*K - n2z)/Czx; xPm = xPp;
@@ -178,8 +188,8 @@ namespace convexCone
 	}
       }
     } else { // nz == 0
-      if (ny != 0) {
-	if (n2z != 0) {
+      if (ny != 0 && fabs(ny) > epsilon) {
+	if (n2z != 0 && fabs(n2z) > epsilon) {
 	  // case III
 	  hppDout (info, "case III");
 	  A = 1 + pow (nx/ny,2) + pow (Cxy/(ny*n2z),2);
@@ -196,28 +206,28 @@ namespace convexCone
 	  yPm = (1-nx*xPm)/ny;
 	  zPm = (Cxy*xPm + ny*K - n2y)/(ny*n2z);
 	} else { // n2z == 0
-	  if (Cxy != 0) {
+	  if (Cxy != 0 && fabs(Cxy) > epsilon) {
 	    // case IV
 	    hppDout (info, "case IV");
 	    xPp = (n2y - ny*K)/Cxy;
 	    yPp = (1-nx*xPp)/ny;
-	    zPp = sqrt(mu*mu - xPp*xPp - yPp*yPp);
+	    zPp = sqrt(mu12 - xPp*xPp - yPp*yPp);
 	    xPm = xPp;
 	    yPm = yPp;
-	    zPm = -sqrt(mu*mu - xPm*xPm - yPm*yPm);
+	    zPm = -sqrt(mu12 - xPm*xPm - yPm*yPm);
 	  } else { // Cxy == 0
 	    // case V
 	    hppDout (info, "case V");
 	    xPp = nx;
 	    yPp = (1-nx*xPp)/ny;
-	    zPp = sqrt(mu*mu-nx*nx-pow(nx,4)/(ny*ny));
+	    zPp = sqrt(mu12-nx*nx-pow(nx,4)/(ny*ny));
 	    xPm = xPp;
 	    yPm = yPp;
-	    zPm = -sqrt(mu*mu-nx*nx-pow(nx,4)/(ny*ny));
+	    zPm = -sqrt(mu12-nx*nx-pow(nx,4)/(ny*ny));
 	  }
 	}
       } else { // ny == 0
-	if (n2z != 0) {
+	if (n2z != 0 && fabs(n2z) > epsilon) {
 	  // case VI
 	  hppDout (info, "case VI");
 	  xPp = 1;
@@ -227,7 +237,7 @@ namespace convexCone
 	  yPm = -mu*sqrt(n2z*n2z/(n2z*n2z+n2y*n2y));
 	  zPm = -n2y*n2z/yPm;
 	} else { // n2z == 0
-	  if (n2y != 0) {
+	  if (n2y != 0 && fabs(n2y) > epsilon) {
 	    // case VII
 	    hppDout (info, "case VII");
 	    xPp = 0; yPp = 0; zPp = mu;
@@ -335,6 +345,7 @@ namespace convexCone
 				const fcl::Vec3f n, const value_type theta,
 				const value_type mu) {
     hppDout (info, "cone-circle plane intersection existence -------");
+    const value_type epsilon = 1e-3; // for non-zero conditions
     const value_type nx = n[0]; const value_type ny = n[1];
     const value_type nz = n[2];
     const value_type mu12 = 1 + mu*mu;
@@ -385,8 +396,8 @@ namespace convexCone
 	}
       } // nz != 0
       else { // nz == 0
-	if (ny != 0) {
-	  if (nxytTheta != 0) {
+	if (ny != 0 && fabs(ny) > epsilon) {
+	  if (nxytTheta != 0 && fabs(nxytTheta) > epsilon) {
 	    // Case V_MC
 	    hppDout (info, "case V_MC");
 	    x = 1/nxytTheta;
@@ -421,7 +432,7 @@ namespace convexCone
 	}
       }
     } else { // theta = +- pi/2
-      if (nz != 0) {
+      if (nz != 0 && fabs(nz) > epsilon) {
 	A = 1 + pow(ny/nz,2);
 	B = -2*ny/(nz*nz);
 	C = 1/(nz*nz) - mu12;
@@ -460,7 +471,7 @@ namespace convexCone
 	}
       } // if nz != 0
       else { // nz == 0
-	if (ny != 0) {
+	if (ny != 0 && fabs(ny) > epsilon) {
 	  // Case VII_MC
 	  hppDout (info, "case VII_MC");
 	  (*Mplus) [0] = 0;
@@ -535,6 +546,8 @@ namespace convexCone
   vector_t compute_convex_cone_inter (const Cones cones,
 				      const value_type theta,
 				      const value_type mu) {
+    hppDout (info, "theta= " << theta);
+    hppDout (info, "mu= " << mu);
     value_type angle = 0;
     vector_t result (4);
     const std::size_t Ncones = cones.size ();
@@ -607,6 +620,7 @@ namespace convexCone
     result [1] = CC_dir [0]; // direction of 2D-convex-cone
     result [2] = CC_dir [1];
     result [3] = CC_dir [2];
+    hppDout (info, "result= " << result.transpose ());
     return result;
   }
 
