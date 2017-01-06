@@ -768,15 +768,10 @@ namespace hpp {
 	  *stateFramesRef = stateFrames;
 	  hppDout (info, "number of states= " << stateFrames.size ());
 
-	  //pathLimb = rbprm::interpolation::interpolateStates (robot_,problem_,bp,stateFrames.begin(),stateFrames.end()-1,2); // interpolateStates in limb-rrt-helper
-	  //hppDout (info, "after interpolateStates final subpath");
-	  //newPath->appendPath(pathLimb);
+	  pathLimb = rbprm::interpolation::interpolateStates (robot_,problem_,bp,stateFrames.begin(),stateFrames.end()-1,2); // interpolateStates in limb-rrt-helper
+	  hppDout (info, "after interpolateStates final subpath");
+	  newPath->appendPath(pathLimb);
       
-	  //core::PathPtr_t comPath = interpolation::comRRT(robot_, problem_, bp, stateFrames.begin()->second, (stateFrames.end()-1)->second, 0);
-	  //hppDout (info, "after comRRT direct path");
-	  //newPath->appendPath(comPath);
-
-
 	}//if final subpath
       }// for subpaths
       return newPath;
@@ -850,13 +845,9 @@ namespace hpp {
       *stateFramesRef = stateFrames;
       hppDout (info, "number of states= " << stateFrames.size ());
 
-      //pathLimb = interpolation::interpolateStates(robot_,problem_,bp,stateFrames.begin(),stateFrames.end()-1,2); // limb-rrt-helper
-      //hppDout (info, "after interpolateStates direct path");
-      //newPath->appendPath(pathLimb);
-      
-      //core::PathPtr_t comPath = interpolation::comRRT(robot_, problem_, bp, stateFrames.begin()->second, (stateFrames.end()-1)->second, 0);
-      //hppDout (info, "after comRRT direct path");
-      //newPath->appendPath(comPath);
+      pathLimb = interpolation::interpolateStates(robot_,problem_,bp,stateFrames.begin(),stateFrames.end()-1,2); // limb-rrt-helper
+      hppDout (info, "after interpolateStates direct path");
+      newPath->appendPath(pathLimb);
 
       return newPath;
     }
