@@ -40,7 +40,7 @@ namespace hpp {
   namespace rbprm {
 
     using model::displayConfig;
-    const double epsilon = 10e-3;
+    const double epsilon = 1e-3;
 
     bool isCentroidalConeValid (const core::vector_t& n,
 				const core::vector_t& V0Dir,
@@ -458,7 +458,7 @@ namespace hpp {
               const fcl::Vec3f z = limb->effector_->currentTransformation().getRotation() * limb->normal_;
               const fcl::Matrix3f alignRotation = tools::GetRotationMatrix(z,normal);
               //rotation = alignRotation * limb->effector_->initialPosition ().getRotation();
-rotation = alignRotation * limb->effector_->currentTransformation().getRotation();
+	      rotation = alignRotation * limb->effector_->currentTransformation().getRotation();
               // Add constraints to resolve Ik
               core::ConfigProjectorPtr_t proj = core::ConfigProjector::create(body->device_,"proj", 1e-2, 30); // DEBUG, initially: 1e-4, 20
               // get current normal orientation
@@ -467,40 +467,22 @@ rotation = alignRotation * limb->effector_->currentTransformation().getRotation(
               posOffset = posOffset + normal * epsilon;
               fcl::Transform3f localFrame, globalFrame;
               globalFrame.setTranslation(posOffset);
-//std::cout << "target " << globalFrame << std::endl;
+	      //std::cout << "target " << globalFrame << std::endl;
+	      proj->add(core::NumericalConstraint::create (constraints::Position::create("pos_stable_contact",body->device_, limb->effector_, localFrame, globalFrame, setTranslationConstraints(normal))));//
 
-              proj->add(core::NumericalConstraint::create (constraints::Position::create("pos_stable_contact",body->device_,
-                                                                                         limb->effector_,
-                                                                                         localFrame,
-                                                                                         globalFrame,
-                                                                                         setTranslationConstraints(normal))));//
-
-
-
-              if(limb->contactType_ == hpp::rbprm::_6_DOF)
+	      if(limb->contactType_ == hpp::rbprm::_6_DOF)
               {
-                  proj->add(core::NumericalConstraint::create (constraints::Orientation::create("rot_stable_contact",body->device_,
-                                                                                                limb->effector_,
-                                                                                                fcl::Transform3f(rotation),
-                                                                                                //localFrame.getRotation(),
-                                                                                                setRotationConstraints(z))));
-              }
-	      /*#ifdef PROFILE
-    RbPrmProfiler& watch = getRbPrmProfiler();
-    watch.start("ik");
-    #endif*/
+		hppDout (info, "6 DOF contact type");
+                  proj->add(core::NumericalConstraint::create (constraints::Orientation::create("rot_stable_contact",body->device_, limb->effector_, fcl::Transform3f(rotation),
+                //localFrame.getRotation(),
+                setRotationConstraints(z))));
+              } else hppDout (info, "NOT 6 DOF contact type");
     
               if(proj->apply(configuration))
               {
 		hppDout (info, "in projection test");
-		/*#ifdef PROFILE
-    watch.stop("ik");
-#endif
-#ifdef PROFILE
-    RbPrmProfiler& watch = getRbPrmProfiler();
-    watch.start("collision");
-    #endif*/
                 hpp::core::ValidationReportPtr_t valRep (new hpp::core::CollisionValidationReport);
+		hppDout (info, "tested config for contact= " << displayConfig(configuration));
                 if(validation->validate(configuration, valRep)) // true
                 {
 		  hppDout (info, "config is valid");

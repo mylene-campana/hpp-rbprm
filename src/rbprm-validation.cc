@@ -152,9 +152,12 @@ namespace hpp {
         {
 	  if((filter.empty() || std::find(filter.begin(), filter.end(), cit->first) != filter.end()) && cit->second->validate(config, rbprmReportCast))
             {
+	      //hppDout (info, "ROM in collision= " << cit->first);
 	      ++filterMatch;
             }
         }
+      //hppDout (info, "filterMatch= " << filterMatch);
+      //hppDout (info, "nbFilterMatch_= " << nbFilterMatch_);
       if(filterMatch >= nbFilterMatch_)
 	rbprmReport->romsValid=true;
       else

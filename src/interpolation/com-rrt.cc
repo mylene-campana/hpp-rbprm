@@ -14,6 +14,7 @@
 // received a copy of the GNU Lesser General Public License along with
 // hpp-rbprm. If not, see <http://www.gnu.org/licenses/>.
 
+#include <hpp/util/debug.hh>
 #include <hpp/rbprm/interpolation/com-rrt.hh>
 #include <hpp/rbprm/interpolation/limb-rrt.hh>
 #include <hpp/rbprm/interpolation/time-constraint-utils.hh>
@@ -43,6 +44,7 @@ using namespace core;
                            const  std::size_t numOptimizations,
                            const bool keepExtraDof)
     {
+      hppDout (info, "start comRRT -----------");
         //check whether there is a contact variations
         std::vector<std::string> variations = nextState.allVariations(startState, extractEffectorsName(fullbody->GetLimbs()));
         core::PathPtr_t guidePath;
@@ -52,6 +54,7 @@ using namespace core;
         stateFrames.push_back(std::make_pair(comPath->timeRange().second, nextState));
         if(variations.empty())
         {
+	  hppDout (info, "no variations between states");
             std::vector<std::string> fixed = nextState.fixedContacts(startState);
             model::DevicePtr_t device = fullbody->device_->clone();
             /*if(keepExtraDof)
@@ -80,19 +83,21 @@ using namespace core;
             //return guidePath;
         }
         else
-        {
+	  {
+	    hppDout (info, "variations between states");
             guidePath = limbRRT(fullbody,referenceProblem,states.begin(),states.begin()+1,numOptimizations);
-        }
+	  }
         ComRRTShooterFactory shooterFactory(guidePath);
         SetComRRTConstraints constraintFactory;
 #ifdef PROFILE
-    RbPrmProfiler& watch = getRbPrmProfiler();
-    watch.start("com_traj");
+	RbPrmProfiler& watch = getRbPrmProfiler();
+	watch.start("com_traj");
 #endif
+	hppDout (info, "start interpolateStatesFromPath");
         core::PathPtr_t resPath = interpolateStatesFromPath<ComRRTHelper, ComRRTShooterFactory, SetComRRTConstraints>
-              (fullbody, referenceProblem, shooterFactory, constraintFactory, comPath, stateFrames.begin(), stateFrames.begin()+1, numOptimizations, keepExtraDof);
+	  (fullbody, referenceProblem, shooterFactory, constraintFactory, comPath, stateFrames.begin(), stateFrames.begin()+1, numOptimizations, keepExtraDof);
 #ifdef PROFILE
-    watch.stop("com_traj");
+	watch.stop("com_traj");
 #endif
         return resPath;
     }
@@ -101,6 +106,7 @@ using namespace core;
                            const PathPtr_t guidePath, const CIT_StateFrame &startState, const CIT_StateFrame &endState,
                            const  std::size_t numOptimizations)
     {
+      hppDout (info, "Start comRRTFromPath -----");
         ComRRTShooterFactory shooterFactory(guidePath);
         SetComRRTConstraints constraintFactory;
         return interpolateStatesFromPath<ComRRTHelper, ComRRTShooterFactory, SetComRRTConstraints>

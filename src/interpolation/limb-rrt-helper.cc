@@ -260,6 +260,40 @@ using namespace model;
 	    hppDout (info, "after BiRRT planner solve");
             helper.rootProblem_.resetGoalConfigs();
         }
+
+	// if no variation, still solve the problem to keep the contact along the path
+	if (variations.size () == 0) {
+	  hppDout (info, "variation null, limbRRT for each limb anyway!");
+	  for(T_Limb::const_iterator lit = limbs.begin(); lit != limbs.end(); ++lit)
+	  {
+	    hppDout (info, "limb= " << lit->first);
+	    SetPathValidation(helper);
+            //DisableUnNecessaryCollisions(helper.rootProblem_, limbs.at(*cit));
+            SetConfigShooter(helper,lit->second,rootPath);
+            ConfigurationPtr_t start = limbRRTConfigFromDevice(helper, from,0.);
+            ConfigurationPtr_t end   = limbRRTConfigFromDevice(helper, to ,rootPath->length());
+	    hppDout (info, "BiRRT planner start: " << displayConfig (from.configuration_));
+	    hppDout (info, "BiRRT planner end: " << displayConfig (to.configuration_));
+	    const model::DevicePtr_t robot = helper.fullbody_->device_;
+	    if (!helper.rootProblem_.configValidations ()->validate (*start, validationReport))
+	      hppDout (info, "start config NOT valid");
+	    if (!helper.rootProblem_.configValidations ()->validate (*end, validationReport))
+	      hppDout (info, "end config NOT valid");
+            helper.rootProblem_.initConfig(start);
+	    hppDout (info, "create BiRRT planner");
+            BiRRTPlannerPtr_t planner = BiRRTPlanner::create(helper.rootProblem_);
+            ProblemTargetPtr_t target = problemTarget::GoalConfigurations::create (planner);
+            helper.rootProblem_.target (target);
+            helper.rootProblem_.addGoalConfig(end);
+            AddContactConstraints(helper, from, to);
+
+	    hppDout (info, "before BiRRT planner solve");
+	    res = planner->solve();
+	    hppDout (info, "after BiRRT planner solve");
+            helper.rootProblem_.resetGoalConfigs();
+	  }
+	}
+
 	hppDout (info, "number of subpaths in res= " << res->numberPaths ());
         return res;
     }

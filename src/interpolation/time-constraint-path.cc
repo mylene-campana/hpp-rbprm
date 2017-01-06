@@ -16,6 +16,7 @@
 // hpp-core  If not, see
 // <http://www.gnu.org/licenses/>.
 
+#include <hpp/util/debug.hh>
 #include <hpp/rbprm/interpolation/time-constraint-path.hh>
 #include <hpp/rbprm/interpolation/time-constraint-utils.hh>
 #include <hpp/model/device.hh>
@@ -28,6 +29,7 @@ using namespace hpp::core;
 namespace hpp {
   namespace rbprm {
   namespace interpolation{
+    using model::displayConfig;
     TimeConstraintPath::TimeConstraintPath (const DevicePtr_t& device,
                               ConfigurationIn_t init,
                               ConfigurationIn_t end,
@@ -143,6 +145,8 @@ namespace hpp {
     {
       Configuration_t initc = initial();
       Configuration_t endc = end();
+      hppDout (info, "initial= " << displayConfig(initc));
+      hppDout (info, "end= " << displayConfig(endc));
       updateConstraints(initc);
       if (constraints()) {
         if (!constraints()->isSatisfied (initial())) {            
