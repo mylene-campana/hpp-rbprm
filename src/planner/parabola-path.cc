@@ -47,6 +47,7 @@ namespace hpp {
       coefficients (coefs);
       initialROMnames_.reserve (10);
       endROMnames_.reserve (10);
+      computeDuration ();
     }
 
     ParabolaPath::ParabolaPath (const core::DevicePtr_t& device,
@@ -66,7 +67,8 @@ namespace hpp {
       assert (device);
       coefficients (coefs);
       hppDout (info, "V0_= " << V0_.transpose () << " Vimp_= " << Vimp_.transpose ());
-      hppDout (info, "initialROMnames size= " << initialROMnames_.size ());
+      //hppDout (info, "initialROMnames size= " << initialROMnames_.size ());
+      computeDuration ();
     }
 
     ParabolaPath::ParabolaPath (const ParabolaPath& path) :
@@ -74,7 +76,7 @@ namespace hpp {
       end_ (path.end_), coefficients_ (path.coefficients_),
       length_ (path.length_), V0_ (path.V0_), Vimp_ (path.Vimp_),
       initialROMnames_ (path.initialROMnames_),
-      endROMnames_ (path.endROMnames_)
+      endROMnames_ (path.endROMnames_), duration_ (path.duration_)
     {
       hppDout (info, "V0_= " << V0_.transpose () << " Vimp_= " << Vimp_.transpose ());
       hppDout (info, "initialROMnames size= " << initialROMnames_.size ());
@@ -154,8 +156,13 @@ namespace hpp {
       bool success;
       core::Configuration_t q1 ((*this) (subInterval.first, success)); // straight
       core::Configuration_t q2 ((*this) (subInterval.second, success)); // straight
+      hppDout (info, "q1= " << displayConfig(q1));
+      hppDout (info, "q2= " << displayConfig(q2));
+      hppDout (info, "subInterval.first= " << subInterval.first);
+      hppDout (info, "subInterval.second= " << subInterval.second);
+      hppDout (info, "computeLength(q1,q2)= " << computeLength(q1,q2));
       ParabolaPathPtr_t result = rbprm::ParabolaPath::create(device_,q1,q2,computeLength(q1,q2),coefficients_, V0_, Vimp_, initialROMnames_, endROMnames_);
-      hppDout (info, "initialROMnames size= " << (*result).initialROMnames_.size ());
+      //hppDout (info, "initialROMnames size= " << (*result).initialROMnames_.size ());
       return result;
     }
 

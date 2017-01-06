@@ -199,6 +199,9 @@ namespace hpp {
       /// Evaluate velocity vector at path abcissa t
       core::vector_t evaluateVelocity (const core::value_type t) const;
 
+      /// Get path duration (in seconds)
+      virtual core::value_type duration () const { return duration_;}
+
       core::value_type alpha_; // chosen alpha in interval
       core::value_type alphaMin_; // min bound of alpha interval
       core::value_type alphaMax_; // max bound of alpha interval
@@ -260,14 +263,23 @@ namespace hpp {
       /// config(1) = coefs(0)*x(param)^2 + coefs(1)*x(param) + coefs(2)
       virtual bool impl_compute (core::ConfigurationOut_t result,
                                  core::value_type param) const;
+
+      void computeDuration () const {
+	const core::value_type theta = coefficients_ (3);
+	const core::value_type Xtheta = cos(theta)*end_(0) + sin(theta)*end_(1) -(cos(theta)*initial_(0) + sin(theta)*initial_(1));
+	const core::value_type Z = end_(2) - initial_(2);
+	const core::value_type alpha = coefficients_ (4);
+	duration_ = Xtheta*sqrt(2*(Xtheta*tan(alpha)-Z)/(9.81*Xtheta*Xtheta));
+      }
       
     private:
       core::DevicePtr_t device_;
       core::Configuration_t initial_;
       core::Configuration_t end_;
       ParabolaPathWkPtr_t weak_;
-      mutable core::vector_t coefficients_; // parabola coefficients
+      mutable core::vector_t coefficients_; // parabola coefficients: A, B, C, theta, alpha0, x_theta_0_dot, x_theta_0
       mutable core::value_type length_;
+      mutable core::value_type duration_;
 
     }; // class ParabolaPath
   } //   namespace rbprm

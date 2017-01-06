@@ -205,6 +205,9 @@ namespace hpp {
       /// Evaluate velocity vector at path abcissa t
       core::vector_t evaluateVelocity (const core::value_type t) const;
 
+      /// Get path duration (in seconds)
+      virtual core::value_type duration () const { return duration_;}
+
     protected:
       /// Print path in a stream
       virtual std::ostream& print (std::ostream &os) const
@@ -248,15 +251,24 @@ namespace hpp {
       virtual bool impl_compute (core::ConfigurationOut_t result,
                                  core::value_type param) const;
 
+      void computeDuration () const {
+	const core::value_type theta = coefficients_ (3);
+	const core::value_type Xtheta = cos(theta)*end_(0) + sin(theta)*end_(1) -(cos(theta)*initial_(0) + sin(theta)*initial_(1));
+	const core::value_type Z = end_(2) - initial_(2);
+	const core::value_type alpha = coefficients_ (4);
+	duration_ = Xtheta*sqrt(2*(Xtheta*tan(alpha)-Z)/(9.81*Xtheta*Xtheta));
+      }
+
     private:
       core::DevicePtr_t device_;
       core::Configuration_t initial_;
       core::Configuration_t end_;
       BallisticPathWkPtr_t weak_;
-      mutable core::vector_t coefficients_; // 4 parabola coefficients
+      mutable core::vector_t coefficients_; // parabola coefficients: A, B, C, theta, alpha0, x_theta_0_dot, x_theta_0
       mutable core::value_type length_;
       core::PathPtr_t limbPath_;
       size_t lastRootIndex_;
+      mutable core::value_type duration_;
     }; // class BallisticPath
   } //   namespace rbprm
 } // namespace hpp

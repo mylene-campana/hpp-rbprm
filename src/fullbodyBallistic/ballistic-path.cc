@@ -44,12 +44,13 @@ namespace hpp {
     {
       assert (device);
       coefficients (coefs);
+      computeDuration ();
     }
 
     BallisticPath::BallisticPath (const BallisticPath& path) :
       parent_t (path), device_ (path.device_), initial_ (path.initial_),
       end_ (path.end_), coefficients_ (path.coefficients_),
-      length_ (path.length_)
+      length_ (path.length_), duration_ (path.duration_)
     {
     }
 
