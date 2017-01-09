@@ -220,10 +220,10 @@ namespace convexCone
 	    hppDout (info, "case V");
 	    xPp = nx;
 	    yPp = (1-nx*xPp)/ny;
-	    zPp = sqrt(mu12-nx*nx-pow(nx,4)/(ny*ny));
+	    zPp = sqrt(mu12 - xPp*xPp - yPp*yPp);
 	    xPm = xPp;
 	    yPm = yPp;
-	    zPm = -sqrt(mu12-nx*nx-pow(nx,4)/(ny*ny));
+	    zPm = -sqrt(mu12 - xPm*xPm - yPm*yPm);
 	  }
 	}
       } else { // ny == 0
@@ -356,7 +356,7 @@ namespace convexCone
     if (tanThetaDef) {
       const value_type tanTheta = tan(theta);
       const value_type nxytTheta = nx + tanTheta*ny;
-      if (nz != 0) {
+      if (nz != 0 && fabs(nz) > epsilon) {
 	A = 1 + tanTheta*tanTheta + pow((nxytTheta/nz),2);
 	B = -2*nxytTheta/(nz*nz);
 	C = 1/(nz*nz) - mu12;
@@ -508,7 +508,7 @@ namespace convexCone
     fcl::Vec3f Mplus = M_vec [0];// border max angle
     fcl::Vec3f Mminus = M_vec [0]; // border min angle
     value_type minPsi = std::numeric_limits <value_type>::infinity();
-    value_type maxPsi = 0;
+    value_type maxPsi = -std::numeric_limits <value_type>::infinity();
     for (std::size_t i = 0; i < N_points; i++) {
       fcl::Vec3f M_i = M_vec [i];
       hppDout (info, "M_i" << M_i); // for VIEWER-PLOT
@@ -526,11 +526,13 @@ namespace convexCone
     }
     hppDout (info, "END of intersection points ---"); // for VIEWER-PLOT
     const value_type crossScal = Mplus[0]*Mminus[0] + Mplus[1]*Mminus[1] + Mplus[2]*Mminus[2];
-    const value_type scal_p = Mplus[0]*Mplus[0] + Mplus[1]*Mplus[1] + Mplus[2]*Mplus[2];
-    const value_type scal_n = Mminus[0]*Mminus[0] + Mminus[1]*Mminus[1] + Mminus[2]*Mminus[2];
+    const value_type scal_p = sqrt(Mplus[0]*Mplus[0] + Mplus[1]*Mplus[1] + Mplus[2]*Mplus[2]);
+    const value_type scal_n = sqrt(Mminus[0]*Mminus[0] + Mminus[1]*Mminus[1] + Mminus[2]*Mminus[2]);
+    hppDout (info, "Mplus = " << Mplus); hppDout (info, "Mminus = " << Mminus);
     hppDout (info, "crossScal = " << crossScal);
     hppDout (info, "scal_n = " << scal_n );
     hppDout (info, "scal_p = " << scal_p );
+    assert (fabs(crossScal/(scal_p*scal_n)) <= 1);
     phi_cc = 0.5*acos (crossScal/(scal_p*scal_n));
     *Mplus_border = Mplus;
     *Mminus_border = Mminus;
@@ -582,12 +584,14 @@ namespace convexCone
 	  fcl::Vec3f Mplus; fcl::Vec3f Mminus;
 	  if (cone_plane_inter (n, theta, mu)) {
 	    cone_circle_plane_inter (&Mplus, &Mminus, n, theta, mu);
+	    assert (Mplus.norm() != 0);
 	    M_vec.push_back (Mplus);
 	    if (Mplus != Mminus)
 	      M_vec.push_back (Mminus);
 	  }
 	  if (cone_plane_inter (n2, theta, mu)) {
 	    cone_circle_plane_inter (&Mplus, &Mminus, n2, theta, mu);
+	    assert (Mplus.norm() != 0);
 	    M_vec.push_back (Mplus);
 	    if (Mplus != Mminus)
 	      M_vec.push_back (Mminus);
@@ -597,7 +601,9 @@ namespace convexCone
 	    // If t is not parallel to plan_theta, allow to compute P->M points
 	    compute_M_points (&Mplus, &Mminus, n, n2, theta, mu);
 	    M_vec.push_back (Mplus);
+	    assert (Mplus.norm() != 0);
 	    M_vec.push_back (Mminus);
+	    assert (Mminus.norm() != 0);
 	  }
 	}
       }

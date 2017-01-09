@@ -40,7 +40,7 @@ namespace hpp {
   namespace rbprm {
 
     using model::displayConfig;
-    const double epsilon = 1e-3;
+    const double epsilon = 5e-3;
 
     bool isCentroidalConeValid (const core::vector_t& n,
 				const core::vector_t& V0Dir,
@@ -297,6 +297,7 @@ namespace hpp {
                                    std::map<std::string,core::CollisionValidationPtr_t>& limbValidations,
                                    model::ConfigurationIn_t configuration, bool& contactMaintained, bool& multipleBreaks, const double robustnessTreshold, bool ignore6DOF = false)
     {
+      hppDout (info, "in maintainPreviousContact");
         contactMaintained = true;
         std::vector<std::string> brokenContacts;
         // iterate over every existing contact and try to maintain them
@@ -320,10 +321,8 @@ namespace hpp {
             proj->add(core::NumericalConstraint::create (constraints::Position::create("",body->device_, limb->effector_,fcl::Vec3f(0,0,0), ppos)));
             if(limb->contactType_ == hpp::rbprm::_6_DOF && !ignore6DOF)
             {
-                proj->add(core::NumericalConstraint::create (constraints::Orientation::create("rot_maintain_contact",body->device_,
-                                                                                  limb->effector_,
-                                                                                  rotation,
-                                                                                  setMaintainRotationConstraints(z))));
+	      hppDout (info, "6DOF");
+	      proj->add(core::NumericalConstraint::create (constraints::Orientation::create("rot_maintain_contact",body->device_, limb->effector_, rotation, setMaintainRotationConstraints(z))));
             }
             if(proj->apply(config))
             {
@@ -473,6 +472,7 @@ namespace hpp {
 	      if(limb->contactType_ == hpp::rbprm::_6_DOF)
               {
 		hppDout (info, "6 DOF contact type");
+		hppDout (info, "z= " << z);
                   proj->add(core::NumericalConstraint::create (constraints::Orientation::create("rot_stable_contact",body->device_, limb->effector_, fcl::Transform3f(rotation),
                 //localFrame.getRotation(),
                 setRotationConstraints(z))));
@@ -771,9 +771,12 @@ else
     State result = MaintainPreviousContacts(previous,body, body->limbcollisionValidations_, configuration, contactMaintained, multipleBreaks, robustnessTreshold);
     // If more than one are broken, go back to previous state
     // and reposition
-    hppDout(notice,"MaintainPreviousCOntact, contact maintained = "<<contactMaintained);
+    hppDout(notice,"after MaintainPreviousContact, is contact maintained= "<< contactMaintained);
+    hppDout(notice,"after MaintainPreviousContact, multipleBreaks= "<< multipleBreaks);
+    hppDout(notice,"after MaintainPreviousContact, !allowFailure= "<< !allowFailure);
     if(multipleBreaks && !allowFailure)
       {
+	hppDout(notice,"maintaineContact failed, try to compute new contact"); // NOT USEFULL IN BALLISTIC INTERP
         fcl::Vec3f normal, position;
         result = previous;
         result.stable = false;
@@ -808,6 +811,7 @@ else
     core::Configuration_t config = result.configuration_;
     bool contactCreated(false);
     // iterate over each const free limb to try to generate contacts
+    hppDout (info, "iterate over each const free limb to try to generate contacts");
     for(T_Limb::const_iterator lit = limbs.begin(); lit != limbs.end(); ++lit)
       {
         fcl::Vec3f normal, position;
@@ -825,12 +829,13 @@ else
 						  robustnessTreshold) != NO_CONTACT || contactCreated;
 	  }
       }
-    hppDout(notice,"COntacts created = "<<contactCreated);
+    hppDout(notice,"Contacts created = "<<contactCreated);
     contactMaintained = !contactCreated && contactMaintained;
     // reload previous configuration
     // no stable contact was found / limb maintained
     if(!result.stable && !body->noStability_)
       {
+	hppDout(notice,"problem with stability");
         // if no contact changes happened, try to modify one contact
         // existing previously to find a stable value
         if(contactMaintained)
@@ -886,7 +891,7 @@ else
 	    result = initializeExtraConfigs (body, result);
             return result;
 	  }
-      }
+      } // if stability problem
     body->device_->currentConfiguration(save);    
     body->device_->controlComputation (flag);
     result.nbContacts = result.contactNormals_.size();
