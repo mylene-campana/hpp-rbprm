@@ -175,6 +175,7 @@ std::vector<std::string> State::fixedContacts(const State& previous) const
         const std::string& name = cit->first;
         if(std::find(variations.begin(), variations.end(), name) == variations.end())
         {
+	  hppDout(info, "fixed: " << name);
             res.push_back(name);
         }
     }
@@ -190,11 +191,40 @@ std::vector<std::string> State::allVariations(const State& previous, const std::
     {
         if(std::find(fixedContacts.begin(), fixedContacts.end(), *cit) == fixedContacts.end())
         {
+	  hppDout(info, "limb has moved between the two states: " << (*cit));
             res.push_back(*cit);
         }
     }
     return res;
 }
+
+  std::vector<std::string> State::allFixedContacts(const State& previous,const std::vector<std::string>& allEffectors) const
+  {
+    hppDout(notice,"contact all fixed : ");
+    std::vector<std::string> res;
+    bool inContact;
+    for(std::vector<std::string>::const_iterator cit = allEffectors.begin() ; cit != allEffectors.end() ; ++cit) {
+      hppDout(notice,"limb= " << *cit);
+      inContact = false;
+      if(contacts_.find(*cit) != contacts_.end()) {
+	hppDout(notice,"limb is in contact in current state");
+	inContact = contacts_.at(*cit);
+      }
+
+      if(inContact && (previous.contacts_.find(*cit) != previous.contacts_.end())) {
+	hppDout(notice,"limb is in contact in previous state"); // BUT THE CONTACT MAY BE DIFFERENT
+	inContact = previous.contacts_.at(*cit);
+      }
+      else
+	inContact = false;
+
+      if(inContact){
+	res.push_back(*cit);
+	hppDout(notice,"Contact Allfixed : "<<*cit);
+      }
+    }
+    return res;
+  }
 
 void State::print() const
 {

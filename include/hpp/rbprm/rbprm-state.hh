@@ -106,28 +106,7 @@ typedef T_StateFrame::const_iterator CIT_StateFrame;
         void printInternal(std::stringstream& ss) const;
 
 
-	std::vector<std::string> allFixedContacts(const State& previous,const std::vector<std::string>& allEffectors) const
-        {
-	  hppDout(notice,"contact all fixed : ");
-	  std::vector<std::string> res;
-	  bool inContact;
-	  for(std::vector<std::string>::const_iterator cit = allEffectors.begin() ; cit != allEffectors.end() ; ++cit){
-	    inContact = false;
-	    if(contacts_.find(*cit) != contacts_.end())
-	      inContact = contacts_.at(*cit);
-
-	    if(inContact && (previous.contacts_.find(*cit) != previous.contacts_.end()))
-	      inContact = previous.contacts_.at(*cit);
-	    else
-	      inContact = false;
-
-	    if(inContact){
-	      res.push_back(*cit);
-	      hppDout(notice,"Contact Allfixed : "<<*cit);
-	    }
-	  }
-	  return res;
-        }
+	std::vector<std::string> allFixedContacts(const State& previous,const std::vector<std::string>& allEffectors) const;
 
 
 

@@ -314,7 +314,8 @@ namespace hpp {
             const RbPrmLimbPtr_t limb = body->GetLimbs().at(name);
             // try to maintain contact
             const fcl::Vec3f& ppos  =previous.contactPositions_.at(name);
-            core::ConfigProjectorPtr_t proj = core::ConfigProjector::create(body->device_,"proj", 1e-3, 30);
+	    hppDout (info, "pos= " << ppos);
+            core::ConfigProjectorPtr_t proj = core::ConfigProjector::create(body->device_,"proj", 1e-4, 20);
             hpp::tools::LockJointRec(limb->limb_->name(), body->device_->rootJoint(), proj);
             const fcl::Vec3f z = limb->effector_->currentTransformation().getRotation() * limb->normal_;
             const fcl::Matrix3f& rotation = previous.contactRotation_.at(name);
@@ -322,6 +323,7 @@ namespace hpp {
             if(limb->contactType_ == hpp::rbprm::_6_DOF && !ignore6DOF)
             {
 	      hppDout (info, "6DOF");
+	      hppDout (info, "=rotation " << rotation);
 	      proj->add(core::NumericalConstraint::create (constraints::Orientation::create("rot_maintain_contact",body->device_, limb->effector_, rotation, setMaintainRotationConstraints(z))));
             }
             if(proj->apply(config))
@@ -415,12 +417,12 @@ namespace hpp {
       // request samples which collide with each of the collision objects
       
 		
-			sampling::heuristic eval = evaluate; if(!eval) eval =  limb->evaluate_;
+      sampling::heuristic eval = evaluate; if(!eval) eval =  limb->evaluate_;
       std::size_t i (0);
-		  if (affordances.empty ()) {
-		  	throw std::runtime_error ("No aff objects found!!!");
-		  }
-		  std::vector<sampling::T_OctreeReport> reports(affordances.size());
+      if (affordances.empty ()) {
+	throw std::runtime_error ("No aff objects found!!!");
+      }
+      std::vector<sampling::T_OctreeReport> reports(affordances.size());
       for(model::ObjectVector_t::const_iterator oit = affordances.begin();
           oit != affordances.end(); ++oit, ++i)
       {
@@ -455,11 +457,14 @@ namespace hpp {
               position = bestReport.contact_.pos;
               // the normal is given by the normal of the contacted object
               const fcl::Vec3f z = limb->effector_->currentTransformation().getRotation() * limb->normal_;
+	      hppDout (info, "limb->normal_= " << limb->normal_);
+	      hppDout (info, "z= " << z);
               const fcl::Matrix3f alignRotation = tools::GetRotationMatrix(z,normal);
+	      hppDout (info, "normal= " << normal);
               //rotation = alignRotation * limb->effector_->initialPosition ().getRotation();
 	      rotation = alignRotation * limb->effector_->currentTransformation().getRotation();
               // Add constraints to resolve Ik
-              core::ConfigProjectorPtr_t proj = core::ConfigProjector::create(body->device_,"proj", 1e-2, 30); // DEBUG, initially: 1e-4, 20
+              core::ConfigProjectorPtr_t proj = core::ConfigProjector::create(body->device_,"proj", 1e-4, 20); // DEBUG, initially: 1e-4, 20
               // get current normal orientation
               hpp::tools::LockJointRec(limb->limb_->name(), body->device_->rootJoint(), proj);
               fcl::Vec3f posOffset = position - rotation * limb->offset_;
@@ -472,10 +477,9 @@ namespace hpp {
 	      if(limb->contactType_ == hpp::rbprm::_6_DOF)
               {
 		hppDout (info, "6 DOF contact type");
-		hppDout (info, "z= " << z);
-                  proj->add(core::NumericalConstraint::create (constraints::Orientation::create("rot_stable_contact",body->device_, limb->effector_, fcl::Transform3f(rotation),
-                //localFrame.getRotation(),
-                setRotationConstraints(z))));
+		proj->add(core::NumericalConstraint::create (constraints::Orientation::create("rot_stable_contact",body->device_, limb->effector_, fcl::Transform3f(rotation), 
+											      //setMaintainRotationConstraints(z))));
+                setRotationConstraints(z)))); // allow z-axis rotation
               } else hppDout (info, "NOT 6 DOF contact type");
     
               if(proj->apply(configuration))
@@ -806,6 +810,8 @@ else
 	result = initializeExtraConfigs (body, result);
         return result;
       }
+    else
+      hppDout(notice,"maintaineContact failed, BUT NOT try to compute new contact");
     // no more than one contact was broken
     // we can go on normally
     core::Configuration_t config = result.configuration_;

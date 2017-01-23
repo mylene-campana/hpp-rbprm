@@ -64,7 +64,7 @@ namespace hpp {
       contactSize_ (core::vector_t(2))
     {
       hppDout(notice,"Constructor ballistic-planner with Roadmap");
-      hppDout(info,"contactSize_= " << contactSize_);
+      //hppDout(info,"contactSize_= " << contactSize_);
     }
 
     void BallisticPlanner::oneStep ()

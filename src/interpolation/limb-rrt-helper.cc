@@ -78,6 +78,8 @@ using namespace model;
         }*/
         rootProblem_.collisionObstacles(referenceProblem->collisionObstacles());
         hppDout(notice,"REFERENCE PROBLEM OBSTACLE :"<<rootProblem_.collisionObstacles().size()<<" ; "<<referenceProblem->collisionObstacles().size());
+	const core::value_type error_treshold = 0.001;
+	proj_ = core::ConfigProjector::create(rootProblem_.robot(),"proj", error_treshold, 1000);
         BallisticPathPtr_t bp = boost::dynamic_pointer_cast<BallisticPath>(rootPath);
         hppDout(notice,"test last root index helper = "<<bp->lastRootIndex());
         if(bp){
@@ -173,7 +175,8 @@ using namespace model;
         const rbprm::T_Limb& limbs = helper.fullbody_->GetLimbs();
 	hppDout (info, "fix from contacts");
 	hppDout (info, "from= " << displayConfig(from.configuration_));
-        std::vector<std::string> fixed = to.allFixedContacts(from,extractEffectorsName(limbs));
+        //std::vector<std::string> fixed = to.allFixedContacts(from,extractEffectorsName(limbs)); // problem: seems to return all limb in contact
+	std::vector<std::string> fixed = to.fixedContacts(from);
         core::Problem& problem = helper.rootProblem_;
         model::DevicePtr_t device = problem.robot();
         core::ConstraintSetPtr_t cSet = core::ConstraintSet::create(device,"");
@@ -182,29 +185,36 @@ using namespace model;
             cit != fixed.end(); ++cit)
         {
             //std::cout << "constraint " << *cit << std::endl;
+	  hppDout (info, "fixed contact: " << *cit);
             RbPrmLimbPtr_t limb = helper.fullbody_->GetLimbs().at(*cit);
             const fcl::Vec3f& ppos  = from.contactPositions_.at(*cit);
-
             JointPtr_t effectorJoint = device->getJointByName(limb->effector_->name());
 	    hppDout (info, "create contact position constraint");
-            proj->add(core::NumericalConstraint::create (
-                                    constraints::deprecated::Position::create("",device,
-                                                                  effectorJoint,fcl::Vec3f(0,0,0), ppos)));
+	    hppDout (info, "pos= " << ppos);
+            proj->add(core::NumericalConstraint::create (constraints::deprecated::Position::create("", device, effectorJoint,fcl::Vec3f(0,0,0), ppos)));
             if(limb->contactType_ == hpp::rbprm::_6_DOF && !to.ignore6DOF)
             {
 	      hppDout (info, "create contact rotation constraint");
-                const fcl::Matrix3f& rotation = from.contactRotation_.at(*cit);
+	      const fcl::Matrix3f& rotation = from.contactRotation_.at(*cit);
+	      hppDout (info, "rotation= " << rotation);
+	      proj->add(core::NumericalConstraint::create (constraints::deprecated::Orientation::create("", device, effectorJoint, rotation, cosntraintsR)));
 
-                proj->add(core::NumericalConstraint::create (constraints::deprecated::Orientation::create("", device,
-                                                                                  effectorJoint,
-                                                                                  rotation,
-                                                                                  cosntraintsR)));
-
-            }
+	      }
         }
-
         cSet->addConstraint(proj);
         problem.constraints(cSet);
+	hppDout (info, "test end config with configProjector build with initial config");
+	hppDout (info, "end config= " << displayConfig(to.configuration_));
+	Configuration_t endLong (to.configuration_.size () + 1);
+	for (std::size_t i = 0; i < to.configuration_.size (); i++)
+	  endLong [i] = to.configuration_ [i];
+	endLong [to.configuration_.size ()] = 0;
+	hppDout (info, "endLong config= " << displayConfig(endLong));
+	if (!proj->isSatisfied (endLong)) {
+	//if (!problem.constraints()->isSatisfied (endLong)) {
+	  hppDout (error, "End configuration of limbRRT does not satisfy the contact-constraints of the initial config");
+	  throw projection_error ("End configuration of limbRRT does not satisfy the contact-constraints of the initial config");
+	}
 
     }
 
@@ -218,6 +228,13 @@ using namespace model;
 
     }
 
+      void InitConstraints (LimbRRTHelper& helper)
+      {
+        core::ConstraintSetPtr_t cSet = core::ConstraintSet::create(helper.rootProblem_.robot(),"");
+        cSet->addConstraint(helper.proj_);
+        helper.rootProblem_.constraints(cSet);
+      }
+
     PathVectorPtr_t interpolateStates(LimbRRTHelper& helper, const State& from, const State& to)
     {
         PathVectorPtr_t res;
@@ -227,6 +244,8 @@ using namespace model;
         std::vector<std::string> variations = to.allVariations(from,extractEffectorsName(limbs));
 	hppDout (info, "variation number: " << variations.size ());
         core::ValidationReportPtr_t validationReport;
+
+	AddContactConstraints(helper, from, to);
 	
         //std::vector<std::string> variations = extractEffectorsName(limbs);
         for(std::vector<std::string>::const_iterator cit = variations.begin();
@@ -253,7 +272,8 @@ using namespace model;
             ProblemTargetPtr_t target = problemTarget::GoalConfigurations::create (planner);
             helper.rootProblem_.target (target);
             helper.rootProblem_.addGoalConfig(end);
-            AddContactConstraints(helper, from, to);
+            //AddContactConstraints(helper, from, to); // END constr never OK ??
+	    //InitConstraints(helper);
 
 	    hppDout (info, "before BiRRT planner solve");
 	    res = planner->solve();
@@ -285,7 +305,8 @@ using namespace model;
             ProblemTargetPtr_t target = problemTarget::GoalConfigurations::create (planner);
             helper.rootProblem_.target (target);
             helper.rootProblem_.addGoalConfig(end);
-            AddContactConstraints(helper, from, to);
+            //AddContactConstraints(helper, from, to);
+	    //InitConstraints(helper);
 
 	    hppDout (info, "before BiRRT planner solve");
 	    res = planner->solve();

@@ -271,13 +271,7 @@ namespace hpp {
        * @param state 
        * @return the configuration
        */
-      core::Configuration_t computeFlexionContactPose (const State& state) {
-	if(flexionPose_.size() == 0)
-	  return state.configuration_;
-	else
-	  return rbprm::computeContactPose(state,flexionPose_,robot_);
-      }
-
+      core::Configuration_t computeFlexionContactPose (const State& state);
       
       /// Blend the two configurations with a as ratio:
       /// result = r*q1 + (1-r)*q2

@@ -232,6 +232,7 @@ namespace hpp {
       core::ValidationReportPtr_t validationReport;
       const std::size_t ecsSize = 
 	robot_->device_->extraConfigSpace ().dimension ();
+      const bool allowFailureMaintainContacts = true;
 
       for( rbprm::T_Limb::const_iterator lit = robot_->GetLimbs().begin();lit != robot_->GetLimbs().end(); ++lit){
         if(lastState.contacts_[lit->first]){ // limb is in contact
@@ -257,7 +258,7 @@ namespace hpp {
         return state;
       }
       
-      while (contact_OK && iteration < maxIter && ((((currentLenght<bp->length())/3.)&&increase_u_offset) || ((currentLenght > (bp->length()*2./3.))&&(!increase_u_offset)))){      
+      while (contact_OK && iteration < maxIter && ((((currentLenght<bp->length())/3.)&&increase_u_offset) || ((currentLenght > (bp->length()*2./3.))&&(!increase_u_offset)))) {
         currentLenght += u;        
         iteration++;
         hppDout (info, "iteration= " << iteration);
@@ -270,9 +271,8 @@ namespace hpp {
 	  dir = - dir;
 	}
 	hppDout (info, "dir computeOffsetContactConfig= " << dir);
-        state = rbprm::ComputeContacts(lastState,robot_,q_trunk_offset,
-				       affMap_, affFilters_,
-				       dir,contactMaintained,multipleBreaks,true,0.);
+        //state = rbprm::ComputeContacts(lastState,robot_,q_trunk_offset, affMap_, affFilters_, dir,contactMaintained,multipleBreaks,true,0.);
+	state = rbprm::ComputeContacts(previousState,robot_,q_trunk_offset, affMap_, affFilters_, dir,contactMaintained,multipleBreaks,allowFailureMaintainContacts,0.); // ALWAYS USE FIRST STATE AS REF
 	hppDout (info, "config after maintainContacts= " << displayConfig(state.configuration_));
 	hppDout (info, "## contactMaintained = " << contactMaintained);
         if(contactMaintained){
@@ -351,7 +351,7 @@ namespace hpp {
         hppDout (info, "q_contact_offset= " << displayConfig (q_contact_offset));
       }//while
       hppDout (info, "-- contact broken or max number of iterations reached");
-
+      
       // replace limbs that are accurate:
       // take limb-configs from contact if contact succeeded, 
       // from interp otherwise.
@@ -369,9 +369,9 @@ namespace hpp {
           if(std::find(contactingLimbs.begin(),contactingLimbs.end(),lit->first) == contactingLimbs.end()){
             hppDout(notice," Not in contact, index config : "<<lit->second->limb_->rankInConfiguration()<<" -> "<<lit->second->effector_->rankInConfiguration());
             for(size_t i = lit->second->limb_->rankInConfiguration() ; i < lit->second->effector_->rankInConfiguration() ; i++){
-	      if(increase_u_offset)
+	      if(increase_u_offset && takeoffContactPose_.size () != 0)
 		qtmp[i] = takeoffContactPose_[i];
-	      else
+	      else if (!increase_u_offset && landingContactPose_.size () != 0)
 		qtmp[i] = landingContactPose_[i];
             }
             if(robot_->getLimbcollisionValidations().at(lit->first)->validate(qtmp,report)){
@@ -613,8 +613,10 @@ namespace hpp {
     core::PathVectorPtr_t BallisticInterpolation::InterpolateFullPath
     (const core::value_type u_offset, T_StateFrame* stateFramesRef) {
       if(!path_) throw std::runtime_error ("Cannot interpolate; not path given to interpolator ");
-      Configuration_t qStart = computeFlexionContactPose(start_);
-      Configuration_t qEnd = computeFlexionContactPose(end_);
+      //Configuration_t qStart = computeFlexionContactPose(start_);
+      //Configuration_t qEnd = computeFlexionContactPose(end_);
+      Configuration_t qStart = start_.configuration_;
+      Configuration_t qEnd = end_.configuration_;
       core::DevicePtr_t robot = robot_->device_;
       T_StateFrame stateFrames;
       Configuration_t q2(robot->configSize ()),
@@ -654,7 +656,11 @@ namespace hpp {
 	  q1contact = q2contact;
 	  state1 = state2;
 	}
-	if (flexionPose_.size () != 0)
+
+	  const std::string robotName = robot_->device_->name ();
+	if (robotName.compare ("spiderman") == 0 && takeoffContactPose_.size () != 0)
+	  q2 = fillConfiguration (subpath->end (), takeoffContactPose_);
+	else if (flexionPose_.size () != 0)
 	  q2 = fillConfiguration (subpath->end (), flexionPose_);
 	else
 	  q2 = fillConfiguration (subpath->end (), robot->configSize ());
@@ -669,11 +675,15 @@ namespace hpp {
 	state2 = ComputeContacts(robot_, q2, affMap_, affFilters_, dir);
 	hppDout (info, "state2 config= " << displayConfig(state2.configuration_));
 	q2contact = computeFlexionContactPose (state2);
+	hppDout (info, "q2contact = " << displayConfig(q2contact));
 	if (problem_->configValidations ()->validate (q2contact, validationReport))
 	  state2.configuration_ = q2contact; // sometimes, state2.configuration_ is "a little" in collision whereas q2contact is not
 	else {
-	  hppDout (error, "q2contact is abnormally in collision");
-	  throw std::runtime_error ("q2contact is abnormally in collision");
+	  hppDout (info, "q2contact is abnormally in collision, retry state2");
+	  if (!problem_->configValidations ()->validate (state2.configuration_, validationReport))
+	    throw std::runtime_error ("q2contact and state2 are abnormally in collision");
+	  else
+	    q2contact = state2.configuration_;
 	}
 	// TODO: get new contact-cones, compute convex-cone, compare validity
 	/*const std::size_t contactNumber = state2.contacts_.size ();
@@ -789,8 +799,10 @@ namespace hpp {
     (const core::value_type u_offset, T_StateFrame* stateFramesRef) {
       if(!path_) throw std::runtime_error ("Cannot interpolate; not path given to interpolator ");
       hppDout (info, "direct B-interpolation");
-      Configuration_t qStart = computeFlexionContactPose (start_);
-      Configuration_t qEnd = computeFlexionContactPose (end_);
+      //Configuration_t qStart = computeFlexionContactPose (start_);
+      //Configuration_t qEnd = computeFlexionContactPose (end_);
+      Configuration_t qStart = start_.configuration_;
+      Configuration_t qEnd = end_.configuration_;
       core::DevicePtr_t robot = robot_->device_;
       BallisticPathPtr_t bp;
       core::PathPtr_t pathLimb;
@@ -896,9 +908,32 @@ namespace hpp {
         core::size_type rankInConfiguration (joint->rankInConfiguration ());
         projector->add(core::LockedJoint::create(joint,c.segment(rankInConfiguration, joint->configSize())));
         for(std::size_t i=0; i< joint->numberChildJoints(); ++i)
-        {
-            LockJointRec(limb,joint->childJoint(i), projector);
-        }
+	  {
+	    LockJointRec(limb,joint->childJoint(i), projector);
+	  }
     }
-  } // model
+
+    core::Configuration_t BallisticInterpolation::computeFlexionContactPose (const State& state) {
+      const std::string robotName = robot_->device_->name ();
+      if (robotName.compare ("spiderman") == 0) {
+	const std::size_t nbContacts = state.nbContacts;
+	hppDout (info, "nbContacts= " << nbContacts);
+	/* DEBUG since cannot create contacts with hands !!
+	  if (nbContacts <= 2 && flexionPose_.size() != 0) {
+	  hppDout (info, "use flexion refConfig");
+	  return rbprm::computeContactPose(state, flexionPose_, robot_);
+	  }*/
+	if (nbContacts > 2 && takeoffContactPose_.size() != 0) {
+	  hppDout (info, "use takeoffContact refConfig");
+	  return rbprm::computeContactPose(state, takeoffContactPose_, robot_);
+	}
+	return state.configuration_;
+      }// if jumperman robot
+      if (flexionPose_.size() != 0)
+	return rbprm::computeContactPose(state,flexionPose_,robot_);
+      else
+	return state.configuration_;
+    }
+
+  } // rbprm
 } //hpp

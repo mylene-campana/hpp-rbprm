@@ -54,7 +54,10 @@ namespace hpp {
          core::Problem rootProblem_;
          core::PathPlannerPtr_t planner_;
          core::PathPtr_t rootPath_;
+	 core::ConfigProjectorPtr_t proj_;
     };
+
+
 
     /// Runs the LimbRRT to create a kinematic, continuous,
     /// collision free path between the two State (ie, only one effector
