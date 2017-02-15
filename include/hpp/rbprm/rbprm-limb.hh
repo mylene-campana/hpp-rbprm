@@ -115,6 +115,7 @@ namespace hpp {
         sampling::heuristic evaluate_;
         const sampling::SampleDB sampleContainer_;
         const bool disableEndEffectorCollision_;
+	std::size_t nbTries6DOF_;
 
     protected:
 

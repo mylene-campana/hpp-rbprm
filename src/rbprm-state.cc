@@ -31,6 +31,7 @@ State::State(const State& other)
     contactNormals_ = (other.contactNormals_);
     contactPositions_ = (other.contactPositions_);
     contactRotation_ = (other.contactRotation_);
+    ignoreRotation_ = (other.ignoreRotation_);
 }
 
 
@@ -42,6 +43,7 @@ State& State::operator= (const State& other)
       contactNormals_ = other.contactNormals_;
       contactPositions_ = other.contactPositions_;
       contactRotation_ = other.contactRotation_;
+      ignoreRotation_ = other.ignoreRotation_;
       contactOrder_ = other.contactOrder_;
       nbContacts = other.nbContacts;
       com_ = other.com_;
@@ -89,31 +91,34 @@ std::string State::RemoveFirstContact()
   contactPositions_.erase(contactId);
   contactRotation_.erase(contactId);
   contactNormals_.erase(contactId);
+  ignoreRotation_.erase(contactId);
   stable = false;
   --nbContacts;
   return contactId;
 }
 
-void State::contactCreations(const State& previous, std::vector<std::string>& outList) const
-{
-  for(std::map<std::string, fcl::Vec3f>::const_iterator cit = contactPositions_.begin();
-      cit != contactPositions_.end(); ++cit)
+  void State::contactCreations(const State& previous, std::vector<std::string>& outList) const
   {
-      const std::string& name = cit->first;
-      bool newContact(true);
-      if(previous.contactPositions_.find(name) != previous.contactPositions_.end())
+    for(std::map<std::string, fcl::Vec3f>::const_iterator cit = contactPositions_.begin();
+	cit != contactPositions_.end(); ++cit)
       {
-          newContact = (previous.contactPositions_.at(name) - cit->second).norm() > 10e-3;
-      }
-      if(newContact && std::find(outList.begin(),outList.end(),name) == outList.end())
-      {
-          outList.push_back(name);
+	const std::string& name = cit->first;
+	bool newContact(true);
+	if(previous.contactPositions_.find(name) != previous.contactPositions_.end())
+	  {
+	    newContact = (previous.contactPositions_.at(name) - cit->second).norm() > 10e-3;
+	  }
+	if(newContact && std::find(outList.begin(),outList.end(),name) == outList.end())
+	  {
+	    hppDout (info, "contact created between two states= " << name);
+	    outList.push_back(name);
+	  }
       }
   }
-}
 
 void State::contactBreaks(const State& previous, std::vector<std::string>& outList) const
 {
+  hppDout (info, "check contact breaks");
   previous.contactCreations(*this, outList);
 }
 

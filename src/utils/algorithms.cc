@@ -487,44 +487,51 @@ namespace geom
     // compute plane equation (normal, point inside the plan)
     Point P0;
     TrianglePoints triPlane;
-    triPlane.p1 = plane->vertices[plane->tri_indices[0][0]]; // FIXME : always use the first triangle, is it an issue ?
-    triPlane.p2 = plane->vertices[plane->tri_indices[0][1]];
-    triPlane.p3 = plane->vertices[plane->tri_indices[0][2]];
+    std::size_t triIndex = 0; // FIXME : always use the first triangle, is it an issue ?
+    triPlane.p1 = plane->vertices[plane->tri_indices[triIndex][0]]; 
+    triPlane.p2 = plane->vertices[plane->tri_indices[triIndex][1]];
+    triPlane.p3 = plane->vertices[plane->tri_indices[triIndex][2]];
     Pn = TriangleNormal(triPlane);
     hppDout (info, "normal of plane= " << Pn.transpose ());
     P0 = triPlane.p1; //FIXME : better point ?
-    Point P1 = triPlane.p2; Point P2 = triPlane.p3;
+    Point P1 = triPlane.p2; Point P2 = triPlane.p3; // not used
     hppDout (info, "p1 of plane= " << P0.transpose ());
     hppDout (info, "p2 of plane= " << P1.transpose ());
     hppDout (info, "p3 of plane= " << P2.transpose ());
 
     for(size_t i = 0 ; i < polygone->num_tris ; i++){ // FIXME : can test 2 times the same line (in both triangles), avoid this ?
-      //hppDout(info,"triangle : "<<i);
       for(size_t j = 0 ; j < 3 ; j++){
-       // hppDout(info,"couple : "<<j);
-        intersection = intersectSegmentPlane(polygone->vertices[polygone->tri_indices[i][j]],
-                                             polygone->vertices[polygone->tri_indices[i][((j == 2) ? 0 : (j+1))]], Pn,P0);
+	Point Pij = polygone->vertices[polygone->tri_indices[i][j]];
+	Point Pijj = polygone->vertices[polygone->tri_indices[i][((j == 2) ? 0 : (j+1))]];
+	hppDout(info,"triangle: " << i << "couple: "<< j);
+	hppDout(info, "Pij" << Pij.transpose ());
+	hppDout(info, "Pijj" << Pijj.transpose ());
+        intersection = intersectSegmentPlane(Pij, Pijj, Pn,P0);
         if(intersection.size() > 0)
           res.insert(res.end(),intersection.begin(),intersection.end());
+	else
+	  hppDout(info,"intersection with segment of triangle empty");
       }
     }
-
-
-
+    if(res.size() == 0) {
+      hppDout(info,"intersection with ROM empty (BECAUSE AFFORDANCE IS WRONG)");
+    }
+    else {
     // ordonate the point in the vector (clockwise) first point and last point are the same
     sortedRes = convexHull(res.begin(),res.end());
     //hppDout(notice,"clipped point : ");
-    std::ostringstream ss;
+    /*std::ostringstream ss;
     ss<<"[";
     for(size_t i = 0; i < sortedRes.size() ; ++i){
       ss<<"["<<sortedRes[i][0]<<","<<sortedRes[i][1]<<","<<sortedRes[i][2]<<"]";
       if(i< (sortedRes.size() -1))
         ss<<",";
     }
-    ss<<"]";
+    ss<<"]";*/
     //std::cout<<"intersection : "<<std::endl;
     //std::cout<<ss.str()<<std::endl;
     //hppDout(notice,"area = "<<area(sortedRes.begin(),sortedRes.end()));
+    }
     return sortedRes;
   }
 

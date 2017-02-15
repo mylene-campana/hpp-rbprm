@@ -41,19 +41,6 @@ namespace hpp {
     using core::vector_t;
     using core::Configuration_t;
 
-    BallisticInterpolationPtr_t
-    BallisticInterpolation::create (const core::ProblemPtr_t &problem,
-				    const RbPrmFullBodyPtr_t robot,
-				    const State &start,
-				    const State &end,
-				    const core::PathVectorConstPtr_t path) {
-      BallisticInterpolation* rbprmDevice =
-	new BallisticInterpolation(problem, robot, start, end, path);
-      BallisticInterpolationPtr_t res (rbprmDevice);
-      res->init (res);
-      return res;
-    }
-
     BallisticInterpolation::BallisticInterpolation
     (const core::ProblemPtr_t& problem, const RbPrmFullBodyPtr_t robot,
      const hpp::rbprm::State &start, const State& end,
@@ -66,15 +53,10 @@ namespace hpp {
       for( rbprm::T_Limb::const_iterator lit = robot_->GetLimbs().begin();lit != robot_->GetLimbs().end(); ++lit){
         hppDout(notice,"LIST OF LIMBS : "<< lit->first);
         if(lit->second->limb_->rankInConfiguration() < lastRootIndex_){
-          lastRootIndex_ =lit->second->limb_->rankInConfiguration();
+          lastRootIndex_ = lit->second->limb_->rankInConfiguration();
         }
       }
       hppDout(notice,"Last root index = "<<lastRootIndex_);
-    }
-
-    BallisticInterpolation::~BallisticInterpolation()
-    {
-      // NOTHING
     }
 
     // ========================================================================
@@ -210,47 +192,48 @@ namespace hpp {
     State BallisticInterpolation::computeOffsetContactConfig
     (const BallisticPathPtr_t bp, const State& previousState,
      T_StateFrame &stateFrames, const value_type u_offset,
-     const bool increase_u_offset, value_type& lenght,
-     value_type& lenghtTransition, const std::size_t maxIter) {
+     const bool increase_u_offset, value_type& length,
+     const std::size_t maxIter) {
       Configuration_t q_trunk_offset, q_contact_offset(previousState.configuration_), q_interp, result;
       q_trunk_offset = previousState.configuration_; 
       hppDout(notice,"q_trunk_offset = "<<displayConfig(q_trunk_offset));
       core::DevicePtr_t robot = robot_->device_;
       bool success, contact_OK = true, multipleBreaks, contactMaintained;
       std::vector<std::string> contactingLimbs;
-      Configuration_t lastfixedLimb(robot->configSize());
-      for(size_t i = 0 ; i < lastfixedLimb.size() ; i ++){lastfixedLimb[i] = 0;}
+      Configuration_t lastfixedLimb (robot->configSize());
+      for(int i = 0 ; i < lastfixedLimb.size() ; i ++){lastfixedLimb[i] = 0;}
       Configuration_t fixedLimb(lastfixedLimb);
       
       std::size_t iteration = 0;
       fcl::Vec3f dir;
-      State state,lastState;
+      State state,lastState, lastValidState;
       lastState = previousState;
-      value_type currentLenght, previousLength;
+      value_type currentLength, previousLength;
       value_type u;
       T_StateFrame reverseFrame;
       core::ValidationReportPtr_t validationReport;
-      const std::size_t ecsSize = 
-	robot_->device_->extraConfigSpace ().dimension ();
       const bool allowFailureMaintainContacts = true;
+      const std::size_t nbTries6DOF = 5; // allow to try 5 times the 6DOF constraint before trying 3DOF instead
 
+      hppDout (info, "previousState config for computeOffsetContact= " << displayConfig(previousState.configuration_));
       for( rbprm::T_Limb::const_iterator lit = robot_->GetLimbs().begin();lit != robot_->GetLimbs().end(); ++lit){
         if(lastState.contacts_[lit->first]){ // limb is in contact
 	  contactingLimbs.push_back(lit->first);
 	  hppDout(notice,"contacting limbs : "<<lit->first);
-        } 
+        } else
+	  hppDout(info,"NOT contacting limbs: " << lit->first);
       }
       
       if(increase_u_offset){ // forward progression
         u = u_offset;
-        currentLenght = 0;
+        currentLength = 0;
       }else{ // backward progression
         u = - u_offset;
-        currentLenght = bp->length();
+        currentLength = bp->length();
       }
-      previousLength = currentLenght;
+      previousLength = currentLength;
      
-      q_interp = (*bp) (currentLenght, success);
+      q_interp = (*bp) (currentLength, success);
       
       if (u_offset == 0) {
         hppDout (info, "no cushion effect asked, return interpolated config");
@@ -258,197 +241,116 @@ namespace hpp {
         return state;
       }
       
-      while (contact_OK && iteration < maxIter && ((((currentLenght<bp->length())/3.)&&increase_u_offset) || ((currentLenght > (bp->length()*2./3.))&&(!increase_u_offset)))) {
-        currentLenght += u;        
+      while (contact_OK && iteration < maxIter && ((((currentLength<bp->length())/3.)&&increase_u_offset) || ((currentLength > (bp->length()*2./3.))&&(!increase_u_offset)))) {
+	currentLength += u; // u can be negative
         iteration++;
         hppDout (info, "iteration= " << iteration);
-        hppDout (info, "currentLenght = " << currentLenght);
-        q_trunk_offset = (*bp) (currentLenght, success);
+        hppDout (info, "currentLength = " << currentLength);
+        q_trunk_offset = (*bp) (currentLength, success);
 	hppDout (info, "q_trunk_offset= " << displayConfig(q_trunk_offset));
-        dir = bp->evaluateVelocity (currentLenght);
+        dir = bp->evaluateVelocity (currentLength);
 	if (increase_u_offset) {
 	  // for takeoff, inverse dir  AS DONE IN CORBA (V0) !!
 	  dir = - dir;
 	}
 	hppDout (info, "dir computeOffsetContactConfig= " << dir);
-        //state = rbprm::ComputeContacts(lastState,robot_,q_trunk_offset, affMap_, affFilters_, dir,contactMaintained,multipleBreaks,true,0.);
-	state = rbprm::ComputeContacts(previousState,robot_,q_trunk_offset, affMap_, affFilters_, dir,contactMaintained,multipleBreaks,allowFailureMaintainContacts,0.); // ALWAYS USE FIRST STATE AS REF
+        state = rbprm::ComputeContacts(lastState,robot_,q_trunk_offset, affMap_, affFilters_, dir,contactMaintained,multipleBreaks,allowFailureMaintainContacts,0., nbTries6DOF);
+	//state = rbprm::ComputeContacts(previousState,robot_,q_trunk_offset, affMap_, affFilters_, dir,contactMaintained,multipleBreaks,allowFailureMaintainContacts,0.); // ALWAYS USE FIRST STATE AS REF
 	hppDout (info, "config after maintainContacts= " << displayConfig(state.configuration_));
 	hppDout (info, "## contactMaintained = " << contactMaintained);
+
+	for( rbprm::T_Limb::const_iterator lit = robot_->GetLimbs().begin();lit != robot_->GetLimbs().end(); ++lit){
+	  if(state.contacts_[lit->first]){ // limb is in contact
+	    hppDout(notice,"contacting limbs: "<<lit->first);
+	  } else
+	    hppDout(info,"NOT contacting limbs: " << lit->first);
+	}
+
         if(contactMaintained){
           contact_OK = true;
-          lastState = state;
         }else {
-          hppDout(notice,"contact released");
-          contact_OK = false;
+          hppDout(notice,"contact released, set contact_OK to false");
+          contact_OK = false; //NO! other contacts may be maintained
           for( rbprm::T_Limb::const_iterator lit = robot_->GetLimbs().begin();lit != robot_->GetLimbs().end(); ++lit){
 	    value_type diffNorm = 1;
             if(state.contacts_[lit->first]){ // get limbs still in contact
-	      // PROBLEM !!! their contact may be different of lastState
 	      const fcl::Vec3f& scp = state.contactPositions_[lit->first];
 	      const fcl::Vec3f& lscp = lastState.contactPositions_[lit->first];
 	      diffNorm = sqrt(pow(scp[0] - lscp[0],2) + pow(scp[1] - lscp[1],2) + pow(scp[2] - lscp[2],2));
 	      hppDout (info, "state.contactPositions_[lit->first]= " << scp);
 	      hppDout (info, "lastState.contactPositions_[lit->first]= " << lscp);
-	      hppDout (info, "diffNorm= " << diffNorm);
+	      hppDout (info, "limb: " << lit->first << " diffNorm= " << diffNorm);
 	      if (diffNorm <= 1e-3) {
 		// limb contact is OK -> at least one contact OK for this state
+		hppDout (info, "set contact_OK to true");
 		contact_OK = true;
 	      } else
 		hppDout (info, "contact could not be maintained (another was created)");
 	    }
 	    else if (!state.contacts_[lit->first] || diffNorm > 1e-3) { // limb not in contact or contact is NOT OK
-              if(lastState.contacts_[lit->first]){ // limb just loose the contact
-                for(size_t i=robot_->GetLimbs().at(lit->first)->limb_->rankInConfiguration() ; i < robot_->GetLimbs().at(lit->first)->effector_->rankInConfiguration() ; i++){
+              if(lastState.contacts_[lit->first]) { // limb just loose the contact
+                for(int i=robot_->GetLimbs().at(lit->first)->limb_->rankInConfiguration() ; i < robot_->GetLimbs().at(lit->first)->effector_->rankInConfiguration() ; i++){
                   fixedLimb[i] = lastState.configuration_[i];
                   hppDout(notice,"fixed limb "<<i<<" = "<<fixedLimb[i]);
                 }
               }
             }
-          }
-          if(contact_OK) { // there is another limb in contact
-            hppDout(notice,"another limb in contact, add intermediate state : "<<displayConfig(lastState.configuration_)); 
-            if(increase_u_offset)
-              lenght = currentLenght-u;
-            else
-              lenght = bp->length()-currentLenght-u;
-            
-            lastState.configuration_ = replaceFixedLimb(lastState.configuration_,lastfixedLimb);
-            lastfixedLimb = fixedLimb;
-	    if (ecsSize > 0) {
-	      const std::size_t ecIndex = lastState.configuration_.size () - ecsSize;
-	      for (std::size_t k = 0; k < ecsSize; k++) {
-		lastState.configuration_ [ecIndex + k] = q_trunk_offset [ecIndex + k];
-	      }
-	    }
+          }// for limbs
+	}// if contactNotMaintained
+	if(contact_OK) { // there is at least one limb with contact maintained
+	  hppDout(notice,"another limb in contact, add intermediate state : "<<displayConfig(state.configuration_)); 
+	  lastfixedLimb = fixedLimb;
 
-	    bool isValid = problem_->configValidations ()->validate (lastState.configuration_, validationReport);
-	    hppDout (info, "isValid lastState= " << isValid);
-	    bool lastStateHasImproved = fabs(lenght - previousLength) > u_offset; // to prevent adding the (same) state two consecutive times, NOT USED YET
-	    hppDout (info, "lastStateHasImproved= " << lastStateHasImproved);
+	  //replace limbs that are accurate, trunkDOF with contactPose value, EC
+	  state = replaceAccurateTrunkAndLimbs (state, q_trunk_offset, increase_u_offset, contactingLimbs, lastfixedLimb); // NO USE OF LASTSTATE ??
+
+	  bool isValid = problem_->configValidations ()->validate (state.configuration_, validationReport);
+	  hppDout (info, "isValid state= " << isValid);
+	  hppDout (info, "currentLength= " << currentLength);
+	  hppDout (info, "previousLength= " << previousLength);
+	  hppDout (info, "fabs(currentLength - previousLength)= " << fabs(currentLength - previousLength));
+	  bool stateHasImproved = fabs(currentLength - previousLength) >= u_offset - 1e-6; // to prevent adding the (same) state two consecutive times
+	  hppDout (info, "stateHasImproved= " << stateHasImproved);
             
-            if(increase_u_offset) {
-	      hppDout (info, "lenght= " << lenght);
-	      if (lenght > u_offset && isValid) {
-		hppDout (info, "takeoff contact state is pushed in stack");
-		hppDout (info, "config pushed= " << displayConfig(lastState.configuration_));
-		stateFrames.push_back(std::make_pair(lenght,lastState)); // add intermediate state
-	      } else
-		hppDout (info, "takeoff contact state NOT pushed in stack");
+	  if(stateHasImproved && isValid) {
+	    if (increase_u_offset) {
+	      hppDout (info, "takeoff contact state is pushed in stack");
+	      hppDout (info, "config pushed= " << displayConfig(state.configuration_));
+	      stateFrames.push_back(std::make_pair(currentLength,state)); // add intermediate state
 	    } else {
-	      hppDout (info, "lenght= " << lenght);
-	      if (lenght < bp->length() - u_offset && isValid) {
-		hppDout (info, "landing contact state is pushed in stack");
-		hppDout (info, "config pushed= " << displayConfig(lastState.configuration_));
-		reverseFrame.push_back(std::make_pair(lenght,lastState)); // add intermediate state
-	      } else
-		hppDout (info, "landing contact state NOT pushed in stack");
+	      hppDout (info, "landing contact state is pushed in stack");
+	      hppDout (info, "config pushed= " << displayConfig(state.configuration_));
+	      reverseFrame.push_back(std::make_pair(currentLength,state)); // add intermediate state
 	    }
-            lastState = state;
-	    previousLength = lenght;
-          } // if contactOK
-        }// if contactMaintained
+	    lastState = state;
+	    previousLength = currentLength; // only updated if contact was OK
+	  } else {
+	    hppDout (info,"invalid or non-improving state NOT pushed in stack");
+	    hppDout (info, "contact_OK set to false to break while");
+	    contact_OK = false;
+	  }
+	} // if contactOK
         hppDout (info, "q_contact_offset= " << displayConfig (q_contact_offset));
       }//while
       hppDout (info, "-- contact broken or max number of iterations reached");
-      
-      // replace limbs that are accurate:
-      // take limb-configs from contact if contact succeeded, 
-      // from interp otherwise.
-      
-      // replace the limbs not used for contact with their configuration in flexionPose_
-      size_t minIndex = robot_->device_->configSize();
-      core::ValidationReportPtr_t report;
-      core::Configuration_t qtmp(lastState.configuration_);
-      for( rbprm::T_Limb::const_iterator lit = robot_->GetLimbs().begin();lit != robot_->GetLimbs().end(); ++lit){
-        hppDout(notice,"LIST OF LIMBS : "<< lit->first << " contact = "<<lastState.contacts_[lit->first]);
-        if(lit->second->limb_->rankInConfiguration() < minIndex){
-          minIndex =lit->second->limb_->rankInConfiguration();
-        }
-        if( !lastState.contacts_[lit->first]){ // limb was not in contact in first state
-          if(std::find(contactingLimbs.begin(),contactingLimbs.end(),lit->first) == contactingLimbs.end()){
-            hppDout(notice," Not in contact, index config : "<<lit->second->limb_->rankInConfiguration()<<" -> "<<lit->second->effector_->rankInConfiguration());
-            for(size_t i = lit->second->limb_->rankInConfiguration() ; i < lit->second->effector_->rankInConfiguration() ; i++){
-	      if(increase_u_offset && takeoffContactPose_.size () != 0)
-		qtmp[i] = takeoffContactPose_[i];
-	      else if (!increase_u_offset && landingContactPose_.size () != 0)
-		qtmp[i] = landingContactPose_[i];
-            }
-            if(robot_->getLimbcollisionValidations().at(lit->first)->validate(qtmp,report)){
-              lastState.configuration_ = qtmp;
-            }else{
-              qtmp = lastState.configuration_;
-            }
-          }
-        } 
-      }
-      
-      // replace the trunkDOF with contactPose value : (we suppose we always work with freeflyer as root ....)
-      // (mylene)NO! this is wrong because trunk was planned before
-      // trunk DOF should be the value on the parab
-      hppDout (info, "using takeoffContactPose and landing for trunk DOF");
-      hppDout (info, "minIndex= " << minIndex);
-      hppDout (info, "trunkConfigSize_= " << trunkConfigSize_);
-      for (size_t i = 7 ; i < trunkConfigSize_ ; i++){
-	if(increase_u_offset && takeoffContactPose_.size () != 0)
-	  qtmp[i] = takeoffContactPose_[i];
-	else if (!increase_u_offset && landingContactPose_.size () != 0)
-	  qtmp[i] = landingContactPose_[i];
-      }
-      if(robot_->getCollisionValidation()->validate(qtmp,report)){
-        lastState.configuration_ = qtmp;
-      }else{
-        qtmp = lastState.configuration_;
-      }
-      if(increase_u_offset)
-        lenght = currentLenght-u;
-      else
-        lenght = bp->length()-currentLenght-u;
-      
-      lastState.configuration_ = replaceFixedLimb(lastState.configuration_,lastfixedLimb);
-      if (ecsSize > 0) {
-	const std::size_t size1 = lastState.configuration_.size () - ecsSize;
-	const std::size_t size2 = lastState.configuration_.size () - ecsSize;
-	hppDout (info, "size1= " << size1 << "  size2= " << size2); // not sure if they are the same ...
-	for (std::size_t k = 0; k < ecsSize; k++) {
-	  lastState.configuration_ [size1 + k] = q_trunk_offset [size2 + k];
-	}
+      hppDout (info, "-- or last computed state was invalid (not added)");
+
+      // push reverseStateFrames into stateFrames in correct order
+      for (int i = reverseFrame.size () - 1; i >= 0; i--) { // no std::size_t
+	hppDout (info, "push reverse state length= " << reverseFrame[i].first);
+	hppDout (info, "state= " << displayConfig(reverseFrame[i].second.configuration_));
+	stateFrames.push_back(reverseFrame [i]);
       }
 
-      bool isValid = problem_->configValidations ()->validate (lastState.configuration_, validationReport);
-      hppDout (info, "isValid lastState= " << isValid);
-      bool lastStateHasImproved = fabs(lenght - previousLength) > u_offset; // to prevent adding the (same) state two consecutive times, NOT USED YET
-      hppDout (info, "lastStateHasImproved= " << lastStateHasImproved);
-     
-      if(increase_u_offset){ // ADDED My
-       hppDout (info, "lenght= " << lenght);
-       if (lenght > u_offset && isValid) {
-	 hppDout (info, "last takeoff contact state is pushed in stack");
-	 hppDout (info, "length= " << lenght);
-	 hppDout (info, "config pushed= " << displayConfig(lastState.configuration_));
-	 stateFrames.push_back(std::make_pair(lenght,lastState)); // add intermediate state
-       } else
-	 hppDout (info, "last takeoff contact state NOT pushed in stack");
-      } else { // add reverse intermediate states
-	if (bp->length() - lenght > u_offset && isValid) {
-	 hppDout (info, "last landing contact state is pushed in stack");
-	 hppDout (info, "length= " << lenght);
-	 hppDout (info, "config pushed= " << displayConfig(lastState.configuration_));
-	 stateFrames.push_back(std::make_pair(lenght,lastState)); // add intermediate state
-	} else
-	  hppDout (info, "last landing contact state NOT pushed in stack");
-      }
-      
-	/*if(!increase_u_offset){ // add reverse intermediate states
-	for(T_StateFrame::const_reverse_iterator cit = reverseFrame.rbegin() ; cit != reverseFrame.rend(); ++cit)
-	  stateFrames.push_back(*cit);
-	  }*/ // DOES NOT SEEM TO WORK CORRECTLY
-      
+      hppDout (info, "lastState= " << displayConfig(lastState.configuration_));
+      hppDout (info, "previousLength= " << previousLength);
+      length = previousLength; // last valid length
       return lastState;
     }
 
     State BallisticInterpolation::computeTopExtendingPose 
-    (const core::PathPtr_t path, const BallisticPathPtr_t bp, value_type& lenght) {
+    (const core::PathPtr_t path, const BallisticPathPtr_t bp,
+     value_type& length) {
       bool success;
       ParabolaPathPtr_t pp = boost::dynamic_pointer_cast<ParabolaPath>(path);
       State state;
@@ -486,7 +388,7 @@ namespace hpp {
       const Configuration_t q_interp_top = (*bp) (u_max*pathLength, success);
       hppDout (info, "q_interp_top= " << displayConfig(q_interp_top));
       core::Configuration_t q;
-      lenght = u_max*pathLength;
+      length = u_max*pathLength;
       if (parabTallEnough)
 	r = 0.8;
       else
@@ -511,7 +413,6 @@ namespace hpp {
 	hppDout (info, "q_top is NOT valid");
 	core::Configuration_t qtmp = q_top;
 	std::size_t count = 0;
-	const T_Limb& robotLimbs = robot_->GetLimbs();
 	rbprm::RbPrmLimbPtr_t limb;
 	r = 0.2;
 	do{ 
@@ -552,7 +453,7 @@ namespace hpp {
         if( (state.contacts_.find(lit->first) == state.contacts_.end())){ // limb is not in contact
           useAllLimb = false;
           hppDout(notice," Not in contact, index config : "<<lit->second->limb_->rankInConfiguration()<<" -> "<<lit->second->effector_->rankInConfiguration());
-          for(size_t i = lit->second->limb_->rankInConfiguration() ; i < lit->second->effector_->rankInConfiguration() ; i++){
+          for(int i = lit->second->limb_->rankInConfiguration() ; i < lit->second->effector_->rankInConfiguration() ; i++){
             q[i] = contactPose[i];
           }
         } 
@@ -608,10 +509,101 @@ namespace hpp {
 	  return emptyLimb;
     }
 
+    State BallisticInterpolation::replaceAccurateTrunkAndLimbs
+    (const State& refState, const core::Configuration_t refTrunk,
+     const bool increase_u_offset,
+     const std::vector<std::string> contactingLimbs,
+     const core::Configuration_t lastfixedLimb) {
+      State state = refState;
+      const std::size_t ecsSize = 
+	robot_->device_->extraConfigSpace ().dimension ();
+      const std::size_t ecIndex = refState.configuration_.size () - ecsSize;
+
+      state.configuration_ = replaceFixedLimb(state.configuration_,
+					      lastfixedLimb);
+
+      // take limb-configs from contact if contact succeeded, 
+      // from interp otherwise.
+      // replace the limbs not used for contact with their configuration in flexionPose_
+      size_t minIndex = robot_->device_->configSize();
+      core::ValidationReportPtr_t report;
+      core::Configuration_t qtmp (state.configuration_);
+      for( rbprm::T_Limb::const_iterator lit = robot_->GetLimbs().begin();lit != robot_->GetLimbs().end(); ++lit){
+        hppDout(notice,"LIST OF LIMBS : "<< lit->first << " contact = "<<state.contacts_[lit->first]);
+        if(lit->second->limb_->rankInConfiguration() < minIndex){
+          minIndex =lit->second->limb_->rankInConfiguration();
+        }
+        if(!state.contacts_[lit->first]){ // limb was in contact in refState
+          if(std::find(contactingLimbs.begin(),contactingLimbs.end(),lit->first) == contactingLimbs.end()) {
+            hppDout(notice," Not in contact, index config : "<<lit->second->limb_->rankInConfiguration()<<" -> "<<lit->second->effector_->rankInConfiguration());
+            for(int i = lit->second->limb_->rankInConfiguration() ; i < lit->second->effector_->rankInConfiguration() ; i++){
+	      if(increase_u_offset && takeoffContactPose_.size () != 0)
+		qtmp[i] = takeoffContactPose_[i];
+	      else if (!increase_u_offset && landingContactPose_.size () != 0)
+		qtmp[i] = landingContactPose_[i];
+            }
+            if(robot_->getLimbcollisionValidations().at(lit->first)->validate(qtmp,report)) {
+	      hppDout (info, "state with contactPose LIMB DOF is valid, DOF kept");
+              state.configuration_ = qtmp;
+	    }
+          }
+        }
+      }//for
+
+      // replace the trunkDOF with contactPose value : (we suppose we always work with freeflyer as root ....)
+      // (mylene)NO! this is wrong because trunk was planned before
+      // trunk DOF should be the value on the parab
+      hppDout (info, "using takeoffContactPose and landing for trunk DOF");
+      hppDout (info, "minIndex= " << minIndex);
+      hppDout (info, "trunkConfigSize_= " << trunkConfigSize_); // no EC
+      for (size_t i = 7 ; i < trunkConfigSize_ ; i++) {
+	if(increase_u_offset && takeoffContactPose_.size () != 0)
+	  qtmp[i] = takeoffContactPose_[i];
+	else if (!increase_u_offset && landingContactPose_.size () != 0)
+	  qtmp[i] = landingContactPose_[i];
+      }
+      if(robot_->getCollisionValidation()->validate(qtmp,report)){
+	hppDout (info, "state with contactPose TRUNK DOF is valid, DOF kept");
+        state.configuration_ = qtmp;
+      }
+
+      // set EC of state from trunk config
+      if (ecsSize > 0) {
+	for (std::size_t k = 0; k < ecsSize; k++) {
+	  state.configuration_ [ecIndex + k] = refTrunk [trunkConfigSize_ + k];
+	}
+      }
+      return state;
+    }
+
+    State BallisticInterpolation::createStateFromCone
+    (const State previousState, library::ContactCones cone) {
+      State state = previousState;
+      state.nbContacts = cone.coneNumber_;
+      for (std::size_t i = 0; i < cone.coneNumber_; i++) {
+	for( rbprm::T_Limb::const_iterator lit = robot_->GetLimbs().begin();lit != robot_->GetLimbs().end(); ++lit){
+	  const hpp::rbprm::RbPrmLimbPtr_t& limb = lit->second;
+	  hppDout (info, "limb: " << lit->first << ", cone ROMname: " << cone.ROMnames_ [i]);
+	  if (cone.ROMnames_ [i].compare (lit->first) == 0) {
+	    // create contact
+	    state.contacts_ [lit->first] = true;
+	    state.contactNormals_ [lit->first] = cone.directions_ [i];
+	    state.contactPositions_ [lit->first] = cone.positions_ [i];
+	    // ?? current state of robot important ?
+	    robot_->device_->currentConfiguration (previousState.configuration_);
+	    const fcl::Vec3f z = limb->effector_->currentTransformation().getRotation() * limb->normal_;
+	    const fcl::Matrix3f alignRotation = tools::GetRotationMatrix(z,cone.directions_ [i]);
+	    state.contactRotation_ [lit->first] = alignRotation * limb->effector_->currentTransformation().getRotation();
+	  }//if
+	}//for limbs
+      }//for cones
+      return state;
+    }
+
     // ========================================================================
 
-    core::PathVectorPtr_t BallisticInterpolation::InterpolateFullPath
-    (const core::value_type u_offset, T_StateFrame* stateFramesRef) {
+     T_PathVectorBP BallisticInterpolation::InterpolateFullPath
+     (const core::value_type u_offset, T_StateFrame* stateFramesRef) {
       if(!path_) throw std::runtime_error ("Cannot interpolate; not path given to interpolator ");
       //Configuration_t qStart = computeFlexionContactPose(start_);
       //Configuration_t qEnd = computeFlexionContactPose(end_);
@@ -625,15 +617,15 @@ namespace hpp {
       hppDout (info, "u_offset= " << u_offset);
       const std::size_t subPathNumber = path_->numberPaths ();
       hppDout (info, "number of sub-paths: " << subPathNumber);
-      core::PathVectorPtr_t newPath = core::PathVector::create 
-	(robot->configSize (), robot->numberDof ());
+      std::vector<core::PathVectorPtr_t> newPathVector;
       robot_->noStability_ = true; // disable stability for waypoints
       vector_t V0 (3), Vimp (3); fcl::Vec3f dir;
       core::PathPtr_t subpath = path_->pathAtRank (0);
       State state1, state2;
       State contactState1,contactState2,stateTop;
-      core::value_type lenghtTop,lenghtTakeoff,lenghtLanding,lenghtLanding6DOF,lenghtTakeoff6DOF;
+      core::value_type lengthTop,lengthTakeoff,lengthLanding;//,lengthLanding6DOF,lengthTakeoff6DOF;
       core::ValidationReportPtr_t validationReport;
+      T_PathVectorBP resultPairVector;
       trunkConfigSize_ = path_->pathAtRank (0)->initial ().size () - 4;
 
       for (std::size_t i = 0; i < subPathNumber - 1; i++) {
@@ -645,7 +637,7 @@ namespace hpp {
 	ParabolaPathPtr_t pp_next = 
 	  boost::dynamic_pointer_cast<ParabolaPath>(subpath_next);
 	const value_type pathLength = subpath->length ();
-	core::PathPtr_t pathLimb;
+	core::PathVectorPtr_t pathLimb;
 	
 	if (i == 0) { // keep qStart config which already has contacts
 	  hppDout (info, "keep start config");
@@ -665,6 +657,8 @@ namespace hpp {
 	else
 	  q2 = fillConfiguration (subpath->end (), robot->configSize ());
 	hppDout (info, "q2: " << displayConfig(q2));
+	Configuration_t q2next = subpath_next-> end (); // for theta
+	hppDout (info, "q2next: " << displayConfig(q2next));
 	V0 = pp_next->V0_; // V0_i+1
 	Vimp = pp->Vimp_; // Vimp_i
 	dir = computeDir (V0, Vimp);
@@ -672,8 +666,29 @@ namespace hpp {
 	hppDout (info, "(Vimp-V0)= " << -computeDir (V0, Vimp));
 	robot_->V0dir_ = V0;
 	robot_->Vfdir_ = Vimp;
+	robot_->thetaBefore_ = atan2 (q2[1] - q1contact[1], q2[0] - q1contact[0]);
+	robot_->thetaAfter_ = atan2 (q2next[1] - q2[1], q2next[0] - q2[0]);
+	hppDout (info, "robot_->thetaBefore_= " << robot_->thetaBefore_);
+	hppDout (info, "robot_->thetaAfter_= " << robot_->thetaAfter_);
+
 	state2 = ComputeContacts(robot_, q2, affMap_, affFilters_, dir);
 	hppDout (info, "state2 config= " << displayConfig(state2.configuration_));
+
+	// try to create planning contacts
+	// NOT accurate because of trunk-re-orientation after planning
+	/*bool contactMaintained, multipleBreaks;
+	library::ContactCones cones = pp->contactConesImp_;
+	State state2repos = createStateFromCone (state2, cones);
+	Configuration_t state2repos_trunkConf = state2repos.configuration_;
+	state2repos_trunkConf.resize (trunkConfigSize_);
+	const Configuration_t state2repos_trunkConfLong = fillConfiguration(state2repos_trunkConf, robot->configSize ());
+	hppDout (info, "state2repos_trunkConfLong= " << displayConfig(state2repos_trunkConfLong));
+	State stateTest = rbprm::ComputeContacts(state2repos,robot_, state2repos_trunkConfLong, affMap_, affFilters_, dir,contactMaintained,multipleBreaks,false,0., 5);
+	hppDout (info, "stateTest = "<<displayConfig(stateTest.configuration_));
+	for (std::size_t i = 0; i < cones.coneNumber_; i++)
+	  hppDout (info, "planningContactVerif limb= "  << cones.ROMnames_ [i] << " position= " << cones.positions_ [i] << " direction= " << cones.directions_ [i]);
+	*/
+
 	q2contact = computeFlexionContactPose (state2);
 	hppDout (info, "q2contact = " << displayConfig(q2contact));
 	if (problem_->configValidations ()->validate (q2contact, validationReport))
@@ -685,19 +700,16 @@ namespace hpp {
 	  else
 	    q2contact = state2.configuration_;
 	}
-	// TODO: get new contact-cones, compute convex-cone, compare validity
-	/*const std::size_t contactNumber = state2.contacts_.size ();
-	  for(std::map<std::string, bool>::const_iterator cit = state2.contacts_.begin() ; cit != state2.contacts_.end() ; ++cit){
-	  if(cit->second){ // in contact
-	  const fcl::Vec3f& normal = state2.contactNormals_.at(cit->first);
-	  }*/
+	// reset params in case of computeContact request somewhere else
+	robot_->thetaBefore_ = NULL;
+	robot_->thetaAfter_ = NULL;
    
 	hppDout (info, "q2contact= " << displayConfig(q2contact));
 	hppDout (info, "q1contact= " << displayConfig(q1contact));
 
-	bp = Interpolate (q1contact, q2contact, pathLength, subpath->coefficients ());
+	bp = BallisticPath::create (robot_->device_, q1contact, q2contact, pathLength, subpath->coefficients ());
 	bp->lastRootIndex(lastRootIndex_);
-	stateTop = computeTopExtendingPose (subpath, bp,lenghtTop);
+	stateTop = computeTopExtendingPose (subpath, bp,lengthTop);
 
 	if (stateTop.configuration_.rows())
 	  hppDout (info, "topState validity: " << problem_->configValidations ()->validate (stateTop.configuration_, validationReport));
@@ -709,10 +721,10 @@ namespace hpp {
 	stateFrames.clear();
 	if (state1validity)
 	  stateFrames.push_back(std::make_pair(0,state1));
-	contactState1 = computeOffsetContactConfig (bp, state1,stateFrames, u_offset, true,lenghtTakeoff,lenghtTakeoff6DOF);
+	contactState1 = computeOffsetContactConfig (bp, state1,stateFrames, u_offset, true,lengthTakeoff);
 	if (stateTop.configuration_.rows())
-	  stateFrames.push_back(std::make_pair(lenghtTop,stateTop));
-	contactState2 = computeOffsetContactConfig (bp, state2,stateFrames, u_offset, false,lenghtLanding,lenghtLanding6DOF);
+	  stateFrames.push_back(std::make_pair(lengthTop,stateTop));
+	contactState2 = computeOffsetContactConfig (bp, state2,stateFrames, u_offset, false,lengthLanding);
 	if (state2validity)
 	  stateFrames.push_back(std::make_pair(bp->length(),state2));
     
@@ -722,21 +734,20 @@ namespace hpp {
 	hppDout(notice, "position final contact frame  = "<<displayConfig(contactState2.configuration_));
 	hppDout(notice, "position final state frame  = "<<displayConfig(state2.configuration_));
 	hppDout(notice, "TIME initial state frame  = "<<0);
-	hppDout(notice, "TIME initial Contact transition state frame  = "<<lenghtTakeoff6DOF);
-	hppDout(notice, "TIME initial Contact state frame  = "<<lenghtTakeoff);
-	hppDout(notice, "TIME top frame  = "<<lenghtTop);
-	hppDout(notice, "TIME final contact frame  = "<<bp->length() - lenghtLanding);
-	hppDout(notice, "TIME final contact transition frame  = "<<bp->length() - lenghtLanding6DOF);
+	//hppDout(notice, "TIME initial Contact transition state frame  = "<<lengthTakeoff6DOF);
+	hppDout(notice, "TIME initial Contact state frame  = "<<lengthTakeoff);
+	hppDout(notice, "TIME top frame  = "<<lengthTop);
+	hppDout(notice, "TIME final contact frame  = "<<lengthLanding);
+	//hppDout(notice, "TIME final contact transition frame  = "<<bp->length() - lengthLanding6DOF);
 	hppDout(notice, "TIME final state frame  = "<<bp->length());
 	hppDout(notice,"test last root index interpolate = "<<bp->lastRootIndex());
     
 	hppDout (info, "before interpolateStates in fullpath");
 	hppDout (info, "number of states= " << stateFrames.size ());
-	pathLimb = rbprm::interpolation::interpolateStates
+	pathLimb = rbprm::interpolation::interpolateStatesinPathVector
 	  (robot_,problem_,bp,stateFrames.begin(),stateFrames.end()-1,2);
-	newPath->appendPath(pathLimb);
 	hppDout (info, "after interpolateStates in fullpath");
-  
+	resultPairVector.push_back(std::make_pair(pathLimb,bp));
 	subpath = subpath_next;
 	pp = boost::dynamic_pointer_cast<ParabolaPath>(subpath);
 	
@@ -747,10 +758,9 @@ namespace hpp {
 	  state2 = end_;
 
 	  // Compute top-keyframe and adapt ballistic-path with it
-	  bp = Interpolate (q1contact, q2contact, subpath->length (),
-			    subpath->coefficients ());
+	  bp = BallisticPath::create (robot_->device_, q1contact, q2contact, subpath->length (), subpath->coefficients ());
 	  bp->lastRootIndex(lastRootIndex_);
-	  stateTop = computeTopExtendingPose (subpath, bp,lenghtTop);
+	  stateTop = computeTopExtendingPose (subpath, bp,lengthTop);
 
 	  if (stateTop.configuration_.rows())
 	    hppDout (info, "topState validity: " << problem_->configValidations ()->validate (stateTop.configuration_, validationReport));
@@ -762,10 +772,10 @@ namespace hpp {
 	  stateFrames.clear();
 	  if (state1validity)
 	    stateFrames.push_back(std::make_pair(0,state1));
-	  contactState1 = computeOffsetContactConfig (bp, state1,stateFrames, u_offset, true,lenghtTakeoff,lenghtTakeoff6DOF);
+	  contactState1 = computeOffsetContactConfig (bp, state1,stateFrames, u_offset, true,lengthTakeoff);
 	  if (stateTop.configuration_.rows())
-	    stateFrames.push_back(std::make_pair(lenghtTop,stateTop));
-	  contactState2 = computeOffsetContactConfig (bp, state2,stateFrames, u_offset, false,lenghtLanding,lenghtLanding6DOF);
+	    stateFrames.push_back(std::make_pair(lengthTop,stateTop));
+	  contactState2 = computeOffsetContactConfig (bp, state2,stateFrames, u_offset, false,lengthLanding);
 	  if (state2validity)
 	    stateFrames.push_back(std::make_pair(bp->length(),state2));
       
@@ -775,55 +785,63 @@ namespace hpp {
 	  hppDout(notice, "position final contact frame  = "<<displayConfig(contactState2.configuration_));
 	  hppDout(notice, "position final state frame  = "<<displayConfig(state2.configuration_));
 	  hppDout(notice, "TIME initial state frame  = "<<0);
-	  hppDout(notice, "TIME initial Contact transition state frame  = "<<lenghtTakeoff6DOF);
-	  hppDout(notice, "TIME initial Contact state frame  = "<<lenghtTakeoff);
-	  hppDout(notice, "TIME top frame  = "<<lenghtTop);
-	  hppDout(notice, "TIME final contact frame  = "<<bp->length() - lenghtLanding);
-	  hppDout(notice, "TIME final contact transition frame  = "<<bp->length() - lenghtLanding6DOF);
+	  //hppDout(notice, "TIME initial Contact transition state frame  = "<<lengthTakeoff6DOF);
+	  hppDout(notice, "TIME initial Contact state frame  = "<<lengthTakeoff);
+	  hppDout(notice, "TIME top frame  = "<<lengthTop);
+	  hppDout(notice, "TIME final contact frame  = "<<lengthLanding);
+	  //hppDout(notice, "TIME final contact transition frame  = "<<bp->length() - lengthLanding6DOF);
 	  hppDout(notice, "TIME final state frame  = "<<bp->length());
 	  hppDout(notice,"test last root index interpolate = "<<bp->lastRootIndex());
     
 	  *stateFramesRef = stateFrames;
 	  hppDout (info, "number of states= " << stateFrames.size ());
 
-	  pathLimb = rbprm::interpolation::interpolateStates (robot_,problem_,bp,stateFrames.begin(),stateFrames.end()-1,2); // interpolateStates in limb-rrt-helper
+	  pathLimb = rbprm::interpolation::interpolateStatesinPathVector (robot_,problem_,bp,stateFrames.begin(),stateFrames.end()-1,2); // interpolateStates in limb-rrt-helper
 	  hppDout (info, "after interpolateStates final subpath");
-	  newPath->appendPath(pathLimb);
+	  resultPairVector.push_back(std::make_pair(pathLimb,bp));
       
 	}//if final subpath
       }// for subpaths
-      return newPath;
+      return resultPairVector;
     }
 
-    core::PathVectorPtr_t BallisticInterpolation::InterpolateDirectPath
+    T_PathVectorBP
+    BallisticInterpolation::InterpolateDirectPath
     (const core::value_type u_offset, T_StateFrame* stateFramesRef) {
       if(!path_) throw std::runtime_error ("Cannot interpolate; not path given to interpolator ");
       hppDout (info, "direct B-interpolation");
       //Configuration_t qStart = computeFlexionContactPose (start_);
       //Configuration_t qEnd = computeFlexionContactPose (end_);
+      
+      hppDout (info, "check contacting limbs");
+      State startCopy = start_;
+      for( rbprm::T_Limb::const_iterator lit = robot_->GetLimbs().begin();lit != robot_->GetLimbs().end(); ++lit){
+        if(start_.contacts_[lit->first]){ // limb is in contact
+	  hppDout(notice,"contacting limbs: "<<lit->first);
+        } else
+	  hppDout(info,"NOT contacting limbs: " << lit->first);
+      }
+
       Configuration_t qStart = start_.configuration_;
       Configuration_t qEnd = end_.configuration_;
       core::DevicePtr_t robot = robot_->device_;
       BallisticPathPtr_t bp;
-      core::PathPtr_t pathLimb;
-      core::PathVectorPtr_t newPath = core::PathVector::create 
-	(robot->configSize (), robot->numberDof ());
+      T_PathVectorBP resultPairVector;
       robot_->noStability_ = true; // disable stability for waypoints
-      vector_t V0 (3), Vimp (3); fcl::Vec3f dir;
       State contactState1,contactState2,stateTop;
       T_StateFrame stateFrames;
-      value_type lenghtTop,lenghtTakeoff,lenghtLanding,lenghtLanding6DOF,lenghtTakeoff6DOF;
+      value_type lengthTop,lengthTakeoff,lengthLanding,lengthLanding6DOF,lengthTakeoff6DOF;
       const core::PathPtr_t path = path_->pathAtRank (0);
       const value_type pathLength = path->length ();
       const vector_t pathCoefs = path->coefficients ();
       core::ValidationReportPtr_t validationReport;
       trunkConfigSize_ = path->initial ().size () - 4;
 
-      bp = Interpolate (qStart, qEnd, pathLength, pathCoefs);
-      stateTop = computeTopExtendingPose (path, bp,lenghtTop);
+      bp = BallisticPath::create (robot_->device_, qStart, qEnd, pathLength, pathCoefs);
+      stateTop = computeTopExtendingPose (path, bp,lengthTop);
       bp->lastRootIndex(lastRootIndex_);
-      hppDout(notice, "full lenght = "<<bp->length());
-      hppDout(notice,"lenght top = "<<lenghtTop);
+      hppDout(notice, "full length = "<<bp->length());
+      hppDout(notice,"length top = "<<lengthTop);
 
       if (stateTop.configuration_.rows())
 	hppDout (info, "topState validity: " << problem_->configValidations ()->validate (stateTop.configuration_, validationReport));
@@ -832,11 +850,16 @@ namespace hpp {
 
       stateFrames.clear();
       stateFrames.push_back(std::make_pair(0,start_));
-      contactState1 = computeOffsetContactConfig (bp, start_,stateFrames, u_offset, true,lenghtTakeoff,lenghtTakeoff6DOF);
+      hppDout (info, "number of states (1)= " << stateFrames.size ());
+      contactState1 = computeOffsetContactConfig (bp, start_,stateFrames, u_offset, true,lengthTakeoff);
+      hppDout (info, "number of states (1+offsetTakeoff)= " << stateFrames.size ());
       if (stateTop.configuration_.rows())
-	stateFrames.push_back(std::make_pair(lenghtTop,stateTop));
-      contactState2 = computeOffsetContactConfig (bp, end_,stateFrames, u_offset, false,lenghtLanding,lenghtLanding6DOF);
+	stateFrames.push_back(std::make_pair(lengthTop,stateTop));
+      hppDout (info, "number of states (2+offsetTakeoff)= " << stateFrames.size ());
+      //contactState2 = computeOffsetContactConfig (bp, end_,stateFrames, u_offset, false,lengthLanding); // !!! DEBUG ONLY
+      hppDout (info, "number of states (2+offsets)= " << stateFrames.size ());
       stateFrames.push_back(std::make_pair(bp->length(),end_));
+      hppDout (info, "number of states (3+offsets)= " << stateFrames.size ());
 
       hppDout(notice, "position initial state frame  = "<<displayConfig(start_.configuration_));
       hppDout(notice, "position initial Contact state frame  = "<<displayConfig(contactState1.configuration_));
@@ -844,11 +867,11 @@ namespace hpp {
       hppDout(notice, "position final contact frame  = "<<displayConfig(contactState2.configuration_));
       hppDout(notice, "position final state frame  = "<<displayConfig(end_.configuration_));
       hppDout(notice, "TIME initial state frame  = "<<0);
-      hppDout(notice, "TIME initial Contact transition state frame  = "<<lenghtTakeoff6DOF);
-      hppDout(notice, "TIME initial Contact state frame  = "<<lenghtTakeoff);
-      hppDout(notice, "TIME top frame  = "<<lenghtTop);
-      hppDout(notice, "TIME final contact frame  = "<<bp->length() - lenghtLanding);
-      hppDout(notice, "TIME final contact transition frame  = "<<bp->length() - lenghtLanding6DOF);
+      //hppDout(notice, "TIME initial Contact transition state frame  = "<<lengthTakeoff6DOF);
+      hppDout(notice, "TIME initial Contact state frame  = "<<lengthTakeoff);
+      hppDout(notice, "TIME top frame  = "<<lengthTop);
+      hppDout(notice, "TIME final contact frame  = "<<lengthLanding);
+      //hppDout(notice, "TIME final contact transition frame  = "<<bp->length() - lengthLanding6DOF);
       hppDout(notice, "TIME final state frame  = "<<bp->length());
       hppDout(notice,"test last root index interpolate = "<<bp->lastRootIndex());
 
@@ -859,20 +882,10 @@ namespace hpp {
       *stateFramesRef = stateFrames;
       hppDout (info, "number of states= " << stateFrames.size ());
 
-      pathLimb = interpolation::interpolateStates(robot_,problem_,bp,stateFrames.begin(),stateFrames.end()-1,2); // limb-rrt-helper
+      core::PathVectorPtr_t pathLimb = interpolation::interpolateStatesinPathVector (robot_,problem_,bp,stateFrames.begin(),stateFrames.end()-1,2); // limb-rrt-helper
       hppDout (info, "after interpolateStates direct path");
-      newPath->appendPath(pathLimb);
-
-      return newPath;
-    }
-
-    BallisticPathPtr_t BallisticInterpolation::Interpolate 
-    (const Configuration_t q1, const Configuration_t q2,
-     const core::value_type length, const core::vector_t coefficients) {
-      BallisticPathPtr_t bp = BallisticPath::create (robot_->device_, q1, q2,
-						     length,
-						     coefficients);
-      return bp;
+      resultPairVector.push_back(std::make_pair(pathLimb,bp));
+      return resultPairVector;
     }
 
     // ========================================================================

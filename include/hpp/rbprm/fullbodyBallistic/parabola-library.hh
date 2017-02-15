@@ -38,6 +38,7 @@ namespace hpp {
     using core::value_type;
     using core::vector_t;
 
+
     /// Arrange robot orientation according to the surface normal direction
     /// So that the robot is "on" the surface, rotated
     inline core::Configuration_t setOrientation
@@ -250,33 +251,43 @@ namespace hpp {
     /// (Old MIG version: return "average" direction from contact-cones)
 
     namespace library {
+      
+      typedef struct ContactCones ContactCones;
+      struct ContactCones {
+	std::size_t coneNumber_;
+	std::vector<std::string> ROMnames_;
+	std::vector<fcl::Vec3f> directions_;
+	std::vector<fcl::Vec3f> positions_;
+      };
+
       inline fcl::Vec3f vectorToVec3f (const polytope::vector3_t vector) {
 	fcl::Vec3f result;
 	for (std::size_t i = 0; i < 3; i++) result [i] = vector [i];
 	return result;
       }
 
-      inline std::vector<fcl::Vec3f> computeContactCones 
+      inline ContactCones computeContactCones 
       (const core::ProblemPtr_t& problem, const core::Configuration_t q) {
-	fcl::Vec3f normalAv (0,0,0);
-	std::vector<fcl::Vec3f> Cones; // list of contact-cones for CC
+	ContactCones contactCones;
+	std::vector<fcl::Vec3f> Cones, positions;
+	std::vector<std::string> ROMnames;
 	core::ValidationReportPtr_t report;
 	const core::DevicePtr_t& robot (problem->robot ());
 	model::RbPrmDevicePtr_t rbDevice =
 	  boost::dynamic_pointer_cast<model::RbPrmDevice> (robot);
 	if (!rbDevice) {
 	  hppDout(error,"~~ Device cast in RB problem");
-	  return Cones;
+	  return contactCones;
 	}
 
 	const bool isValid = problem->configValidations()->validate(q,report);
 	if(!isValid) {
 	  hppDout(warning,"~~ config is not valid");
-	  return Cones;
+	  return contactCones;
 	}
 	if (!report) {
 	  hppDout(error,"~~ Report problem");
-	  return Cones;
+	  return contactCones;
 	}
 	core::RbprmValidationReportPtr_t rbReport =
 	  boost::dynamic_pointer_cast<core::RbprmValidationReport> (report);
@@ -284,15 +295,18 @@ namespace hpp {
 	if(!rbReport)
 	  {
 	    hppDout(error,"~~ Validation Report cannot be cast");
-	    return Cones;
+	    return contactCones;
 	  }
       
 	// get the 2 object in contact for each ROM :
 	hppDout(info,"~~ Number of roms in collision : "<<rbReport->ROMReports.size());
-	const std::size_t nbNormalAv = rbReport->ROMReports.size();
 	for(std::map<std::string,core::CollisionValidationReportPtr_t>::const_iterator it = rbReport->ROMReports.begin() ; it != rbReport->ROMReports.end() ; ++it)
 	  {
 	    hppDout(info,"~~ for rom : "<<it->first);
+	    std::string ROMnameWithoutSphere = it->first;
+	    ROMnameWithoutSphere.resize ((it->first).size () - 6);
+	    hppDout(info,"ROMnameWithoutSphere= "<< ROMnameWithoutSphere);
+	    ROMnames.push_back (ROMnameWithoutSphere);
 	    core::CollisionObjectPtr_t obj1 = it->second->object1;
 	    core::CollisionObjectPtr_t obj2 = it->second->object2;
 	    hppDout(notice,"~~ collision between : "<<obj1->name() << " and "<<obj2->name());
@@ -322,18 +336,22 @@ namespace hpp {
 	      geom::Point center = geom::center(hull.begin(),hull.end());
 	      hppDout(notice,"Center = "<<center.transpose());
 	      hppDout(notice,"Normal : "<<pn.transpose());
+	      positions.push_back (vectorToVec3f (center));
 	      polytope::vector3_t normal = pn;
 	      normal.normalize ();
 	      fcl::Vec3f normal_vec3f = vectorToVec3f (normal);
 	      Cones.push_back (normal_vec3f);
-	      for (std::size_t i = 0; i < 3; i++) { // old MIG version
-		normalAv [i] += pn [i]/nbNormalAv;
-	      }
 	    }
 	  } // for each ROMS
-	normalAv.normalize ();
-	//hppDout (info, "normed normalAv (not used)= " << normalAv);
-	return Cones;
+	hppDout(notice,"positions.size()= "<< positions.size());
+
+	contactCones.coneNumber_ = Cones.size ();
+	// init memory of vectors ?
+	contactCones.directions_ = Cones;
+	contactCones.positions_ = positions;
+	contactCones.ROMnames_ = ROMnames;
+
+	return contactCones;
       }
     } // namespace library
   } //   namespace rbprm

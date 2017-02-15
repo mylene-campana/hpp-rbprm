@@ -22,7 +22,8 @@
 # include <hpp/core/fwd.hh>
 # include <hpp/core/config.hh>
 # include <hpp/core/path.hh>
-#include <hpp/rbprm/fullbodyBallistic/ballistic-path.hh>
+# include <hpp/rbprm/fullbodyBallistic/ballistic-path.hh>
+#include <hpp/rbprm/fullbodyBallistic/ballistic-interpolation.hh>
 
 namespace hpp {
   namespace rbprm {
@@ -58,18 +59,19 @@ namespace hpp {
                                              core::ConfigurationIn_t init,
                                              core::ConfigurationIn_t end,
                                              core::value_type length,
-                                             value_type alpha,
                                              value_type theta,
-                                             value_type v0)
+                                             value_type xTheta0dot)
       {
-        TimedBallisticPath* ptr = new TimedBallisticPath (device, init, end, length,
-                                                           alpha, theta, v0);
+        TimedBallisticPath* ptr = new TimedBallisticPath (device, init, end,
+							  length, theta,
+							  xTheta0dot);
         TimedBallisticPathPtr_t shPtr (ptr);
         ptr->init (shPtr);
         return shPtr;
       }
       
-      static TimedBallisticPathPtr_t create (const rbprm::BallisticPathPtr_t ballisticPath)
+      static TimedBallisticPathPtr_t create
+      (const rbprm::BallisticPathPtr_t ballisticPath)
       {
         TimedBallisticPath* ptr = new TimedBallisticPath (ballisticPath);
         TimedBallisticPathPtr_t shPtr (ptr);
@@ -77,9 +79,9 @@ namespace hpp {
         return shPtr;
       }
       
-      static TimedBallisticPathPtr_t create (const BallisticPathPtr_t bp1,const BallisticPathPtr_t bp1Max,const BallisticPathPtr_t bp2Max,const BallisticPathPtr_t bp2)
+      static TimedBallisticPathPtr_t create (PathVectorBP pathPair)
       {
-        TimedBallisticPath* ptr = new TimedBallisticPath (bp1,bp1Max,bp2Max,bp2);
+        TimedBallisticPath* ptr = new TimedBallisticPath (pathPair);
         TimedBallisticPathPtr_t shPtr (ptr);
         ptr->init (shPtr);
         return shPtr;
@@ -87,7 +89,8 @@ namespace hpp {
       
       /// Create copy and return shared pointer
       /// \param path path to copy
-      static TimedBallisticPathPtr_t createCopy (const TimedBallisticPathPtr_t& path)
+      static TimedBallisticPathPtr_t createCopy
+      (const TimedBallisticPathPtr_t& path)
       {
         TimedBallisticPath* ptr = new TimedBallisticPath (*path);
         TimedBallisticPathPtr_t shPtr (ptr);
@@ -100,7 +103,8 @@ namespace hpp {
       /// \param constraints the path is subject to
       /// <!> constraints part NOT IMPLEMENTED YET
       static TimedBallisticPathPtr_t createCopy
-      (const TimedBallisticPathPtr_t& path, const core::ConstraintSetPtr_t& /*constraints*/)
+      (const TimedBallisticPathPtr_t& path,
+       const core::ConstraintSetPtr_t& /*constraints*/)
       {
         //TimedBallisticPath* ptr = new TimedBallisticPath (*path, constraints);
         TimedBallisticPath* ptr = new TimedBallisticPath (*path);
@@ -111,7 +115,8 @@ namespace hpp {
       
       /// Return a shared pointer to this
       ///
-      /// As TimedBallisticPath are immutable, and refered to by shared pointers,
+      /// As TimedBallisticPath are immutable,
+      /// and refered to by shared pointers,
       /// they do not need to be copied.
       virtual core::PathPtr_t copy () const
       {
@@ -122,8 +127,8 @@ namespace hpp {
       ///
       /// \param constraints constraints to apply to the copy
       /// \precond *this should not have constraints.
-      virtual core::PathPtr_t copy (const core::ConstraintSetPtr_t& constraints) const
-      {
+      virtual core::PathPtr_t copy (const core::ConstraintSetPtr_t& constraints)
+	const {
         return createCopy (weak_.lock (), constraints);
       }
       
@@ -131,12 +136,12 @@ namespace hpp {
       /// \param subInterval interval of definition of the extract path
       /// If upper bound of subInterval is smaller than lower bound,
       /// result is reversed.
-      virtual core::PathPtr_t extract (const core::interval_t& subInterval) const throw (core::projection_error);
+      virtual core::PathPtr_t extract (const core::interval_t& subInterval)
+	const throw (core::projection_error);
       
       /// Reversion of a path
       /// \return a new path that is this one reversed.
       virtual core::PathPtr_t reverse () const;
-      
       
       /// Modify initial configuration
       /// \param initial new initial configuration
@@ -159,7 +164,10 @@ namespace hpp {
       }
       
       /// Return the internal robot.
-      core::DevicePtr_t device () const;
+      core::DevicePtr_t device () const
+      {
+	return device_;
+      }
       
       /// Get the initial configuration
       core::Configuration_t initial () const
@@ -177,10 +185,6 @@ namespace hpp {
       virtual core::value_type length () const {
         return length_;
       }
-      
-
-      
-
       
       core::value_type computeLength (const core::ConfigurationIn_t q1,
                                       const core::ConfigurationIn_t q2) const;
@@ -202,14 +206,13 @@ namespace hpp {
       TimedBallisticPath (const core::DevicePtr_t& robot,
                           core::ConfigurationIn_t init,
                           core::ConfigurationIn_t end, core::value_type length,
-                          value_type alpha,
                           value_type theta,
-                          value_type v0);
+                          value_type xTheta0dot);
       
       
       TimedBallisticPath (const BallisticPathPtr_t ballisticPath);
       
-      TimedBallisticPath (const BallisticPathPtr_t bp1,const BallisticPathPtr_t bp1Max,const BallisticPathPtr_t bp2Max,const BallisticPathPtr_t bp2);
+      TimedBallisticPath (PathVectorBP pathPair);
       
       
       /// Copy constructor
@@ -242,18 +245,13 @@ namespace hpp {
       core::Configuration_t initial_;
       core::Configuration_t end_;
       TimedBallisticPathWkPtr_t weak_;
-      mutable core::value_type length_;      
-      value_type alpha_;
+      mutable core::value_type length_; // duration
       value_type theta_;
-      value_type v0_;
+      value_type xTheta0dot_;
       value_type g_;
-      value_type xTheta0_;
-      // we use the 4 subpath for joint interpolation
-      BallisticPathPtr_t bp1_;
-      BallisticPathPtr_t bp1Max_;
-      BallisticPathPtr_t bp2Max_;
-      BallisticPathPtr_t bp2_;
-      value_type t1_,t1Max_,t2Max_,t2_;
+      core::PathVectorPtr_t pathVector_;
+      BallisticPathPtr_t ballisticPath_;
+      std::vector<value_type> times_;
       
     }; // class TimedBallisticPath
   } //   namespace rbprm

@@ -22,6 +22,7 @@
 # include <hpp/util/debug.hh>
 # include <hpp/core/steering-method.hh>
 # include <hpp/core/weighed-distance.hh>
+# include <hpp/rbprm/fullbodyBallistic/parabola-library.hh>
 
 namespace hpp {
   namespace rbprm {
@@ -73,8 +74,8 @@ namespace hpp {
 
       core::PathPtr_t operator() (core::ConfigurationIn_t q1,
 				  core::ConfigurationIn_t q2,
-				  std::vector<fcl::Vec3f>* cones1,
-				  std::vector<fcl::Vec3f>* cones2) const
+				  library::ContactCones* cones1,
+				  library::ContactCones* cones2) const
       {
         try {
           return impl_compute (q1, q2, cones1, cones2);
@@ -91,8 +92,8 @@ namespace hpp {
       /// create a path between two configurations with contact-cones
       core::PathPtr_t impl_compute (core::ConfigurationIn_t q1,
 				    core::ConfigurationIn_t q2,
-				    std::vector<fcl::Vec3f>* cones1,
-				    std::vector<fcl::Vec3f>* cones2) const;
+				    library::ContactCones* cones1,
+				    library::ContactCones* cones2) const;
 
       /// Compute a random parabola in direction of q1->q2
       core::PathPtr_t compute_random_3D_path (core::ConfigurationIn_t q1,
@@ -158,8 +159,8 @@ namespace hpp {
       /// 3D impl_compute with configurations and contact-cones
       core::PathPtr_t compute_3D_path (core::ConfigurationIn_t q1,
 				       core::ConfigurationIn_t q2,
-				       std::vector<fcl::Vec3f>* cones1,
-				       std::vector<fcl::Vec3f>* cones2) const;
+				       library::ContactCones* cones1,
+				       library::ContactCones* cones2) const;
 
       /// Compute second constraint: V0 <= V0max
       /// return false if constraint can never be respected.

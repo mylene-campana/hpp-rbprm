@@ -30,6 +30,8 @@
 
 namespace hpp {
   namespace rbprm {
+    typedef std::pair<core::PathVectorPtr_t, BallisticPathPtr_t> PathVectorBP;
+    typedef std::vector<PathVectorBP> T_PathVectorBP;
 
     core::Configuration_t computeContactPose(const State &state, core::Configuration_t contactPose,rbprm::RbPrmFullBodyPtr_t robot);
 
@@ -55,9 +57,15 @@ namespace hpp {
       static BallisticInterpolationPtr_t create
 	(const core::ProblemPtr_t& problem, const RbPrmFullBodyPtr_t robot,
 	 const State& start, const State& end,
-	 const core::PathVectorConstPtr_t path = core::PathVectorConstPtr_t());
+	 const core::PathVectorConstPtr_t path = core::PathVectorConstPtr_t()) {
+	BallisticInterpolation* rbprmDevice =
+	  new BallisticInterpolation (problem, robot, start, end, path);
+	BallisticInterpolationPtr_t res (rbprmDevice);
+	res->init (res);
+	return res;
+      }
 
-      ~BallisticInterpolation();
+      ~BallisticInterpolation(){}
 
       /// Transforms the path computed by RB-PRM into
       /// a discrete sequence of configurations.
@@ -76,9 +84,8 @@ namespace hpp {
       /// \param u_offset: normalized curvilinear abcissa of contact maintain 
       /// for an cushion takeoff/landing. If u_offset = 0, this effect is
       /// disable.
-      core::PathVectorPtr_t InterpolateFullPath
-	(const core::value_type u_offset = 0,
-	 T_StateFrame* stateFramesRef = NULL);
+      T_PathVectorBP InterpolateFullPath (const core::value_type u_offset = 0,
+					  T_StateFrame* stateFramesRef = NULL);
 
       /// Between Start and End states, tranform the trunk path and the 
       /// start-goal states so that:
@@ -87,18 +94,9 @@ namespace hpp {
       /// \param u_offset: normalized curvilinear abcissa of contact maintain
       /// for an cushion takeoff/landing. If u_offset = 0, this effect is
       /// disable.
-      core::PathVectorPtr_t InterpolateDirectPath
+      T_PathVectorBP InterpolateDirectPath
 	(const core::value_type u_offset = 0,
 	 T_StateFrame* stateFramesRef = NULL);
-
-      /// Tranform the trunk path and the start-goal states so that:
-      /// the trunk is still following the parabola path
-      /// the limbs are linearly interpolated
-      /// TODO: collision avoidance ??
-      BallisticPathPtr_t Interpolate (const model::Configuration_t q1,
-				      const model::Configuration_t q2,
-				      const core::value_type length,
-				      const core::vector_t coefficients);
 
       void extendingPose (const core::Configuration_t extendingPose) {
 	extendingPose_ = extendingPose;
@@ -147,10 +145,6 @@ namespace hpp {
       void affordanceMap (const affMap_t affMap) { // often called "affordances"
 	affMap_ = affMap;
       }
-
-      const core::PathVectorConstPtr_t path_;
-      const State start_;
-      const State end_;
 
     protected:
       BallisticInterpolation (const core::ProblemPtr_t &problem,
@@ -226,15 +220,15 @@ namespace hpp {
       State computeOffsetContactConfig
 	(const BallisticPathPtr_t bp, const State &previousState,
 	 T_StateFrame& stateFrames, const core::value_type u_offset,
-	 const bool increase_u_offset, core::value_type &lenght,
-	 core::value_type &lenghtTransition, const std::size_t maxIter = 100);
+	 const bool increase_u_offset, core::value_type &length,
+	 const std::size_t maxIter = 100);
 
       /// Return the configuration at the top of the parabola (path),
       /// using extendingPose_ for limbs part if defined,
       /// otherwise, just unsing interpolation (bp)
       State computeTopExtendingPose(const core::PathPtr_t path,
 				    const BallisticPathPtr_t bp,
-				    core::value_type &lenght);
+				    core::value_type &length);
 
       
       /**
@@ -282,8 +276,24 @@ namespace hpp {
       /// Find which limb is detected in collision and return it
       rbprm::RbPrmLimbPtr_t findLimbInCollision
 	(const core::ValidationReportPtr_t validationReport);
+
+      /// Replace the limbs not used for contact with their configuration in flexionPose_
+      /// Replace the trunkDOF with contactPose value : (we suppose we always work with freeflyer as root)
+      /// set EC of lastState from trunk config
+      State replaceAccurateTrunkAndLimbs
+	(const State& refState,  const core::Configuration_t refTrunk,
+	 const bool increase_u_offset,
+	 const std::vector<std::string> contactingLimbs,
+	 const core::Configuration_t lastfixedLimb);
+
+      /// Create a state which contacts corresponds to the given contact-cones
+      State createStateFromCone (const State previousState,
+				 library::ContactCones cone);
       
     private:
+      const core::PathVectorConstPtr_t path_;
+      State start_;
+      State end_;
       core::ProblemPtr_t problem_;
       RbPrmFullBodyPtr_t robot_; // device of fullbody
       BallisticInterpolationWkPtr_t weakPtr_;

@@ -73,19 +73,26 @@ namespace hpp {
       core::PathPtr_t fwdPath, bwdPath;
       DelayedEdge_t fwdDelayedEdge, bwdDelayedEdge;
       DelayedEdges_t delayedEdges; // store valid forward and backward
-      //const size_type indexECS = robot->configSize () - robot->extraConfigSpace ().dimension ();
 
       // shoot a RB-valid random configuration using rbprm-shooter
       core::ConfigurationPtr_t q_rand;
       core::Configuration_t q_tmp;
       core::ValidationReportPtr_t report;
       bool valid = false;
-      std::vector<fcl::Vec3f> contactConesCC, contactConesImp;
+      bool contactConesValid = false;
+      library::ContactCones contactConesCC, contactConesImp;
       
+      // Note: orientation not updated with 2D-CC direction since not computed
+      // Note: if contactCones are empty, problem with ROM-obstacle intersection
+
       hppDout(notice,"# oneStep BEGIN");
-      while (!valid) {
+      while (!valid || !contactConesValid) {
 	q_rand = configurationShooter_->shoot ();
 	valid = problem ().configValidations()->validate(*q_rand,report);
+	if (valid) {
+	  contactConesImp = library::computeContactCones (problem_, *q_rand);
+	  contactConesValid = (contactConesImp.coneNumber_ > 0) ? true : false;
+	}
       }
       hppDout (info, "q_rand: " << displayConfig (*q_rand));
 
@@ -93,8 +100,6 @@ namespace hpp {
       core::NodePtr_t impactNode = roadmap ()->addNode (q_rand);
       impactNode->indexInRM (roadmap ()->nodeIndex_);
       roadmap ()->nodeIndex_++;
-      contactConesImp = library::computeContactCones (problem_, *q_rand);
-      // Note: orientation not updated with 2D-CC direction since not computed
 
       // try to connect the random configuration to each connected component
       // of the roadmap.
@@ -120,7 +125,7 @@ namespace hpp {
 	    // if a path is returned (i.e. not null), then it is valid
 
 	    if (fwdPath) {
-	      hppDout (info, "forward path is valid");       
+	      hppDout (info, "forward path is valid");
 	      fwdDelayedEdge = DelayedEdge_t (*n_it, impactNode, fwdPath);
 	      delayedEdges.push_back (fwdDelayedEdge);
 	    }
@@ -164,12 +169,14 @@ namespace hpp {
         core::PathPtr_t path;
         core::PathPtr_t fwdPath, bwdPath;
         const core::ConfigurationPtr_t q_init = roadmap ()->initNode()->configuration ();
-	std::vector<fcl::Vec3f> conesInit, conesGoal;
+	library::ContactCones conesInit, conesGoal;
 	conesInit = library::computeContactCones (problem_, *q_init);
+	hppDout (info, "qInit nb contactCones= " << conesInit.coneNumber_); // verif
 
       for (core::Nodes_t::const_iterator itn = roadmap ()->goalNodes ().begin();itn != roadmap ()->goalNodes ().end (); ++itn) {
 	const core::ConfigurationPtr_t q_goal = (*itn)->configuration ();
 	conesGoal = library::computeContactCones (problem_, *q_goal);
+	hppDout (info, "qGoal nb contactCones= " << conesGoal.coneNumber_); // verif
         assert (*q_init != *q_goal);
 
         // Create forward and backward paths

@@ -31,7 +31,7 @@
 # include <hpp/rbprm/rbprm-path-validation.hh>
 # include <hpp/rbprm/rbprm-validation-report.hh>
 # include <hpp/rbprm/fullbodyBallistic/convex-cone-intersection.hh>
-# include <hpp/rbprm/planner/rbprm-node.hh>
+# include <hpp/rbprm/fullbodyBallistic/parabola-library.hh>
 
 namespace hpp {
   namespace rbprm {
@@ -70,7 +70,7 @@ namespace hpp {
 
     core::PathPtr_t SteeringMethodParabola::impl_compute
     (core::ConfigurationIn_t q1, core::ConfigurationIn_t q2,
-     std::vector<fcl::Vec3f>* cones1, std::vector<fcl::Vec3f>* cones2) const {
+     library::ContactCones* cones1, library::ContactCones* cones2) const {
       V0max_ = problem_->vmaxTakeoff_; // may have changed
       Vimpmax_ = problem_->vmaxLanding_;
       mu_ = problem_->mu_;
@@ -89,6 +89,7 @@ namespace hpp {
     SteeringMethodParabola::compute_3D_path (core::ConfigurationIn_t q1,
 					     core::ConfigurationIn_t q2) 
       const {
+      hppDout (info, "SM compute_3D_path without contact-cones");
       std::vector<std::string> filter;
       core::PathPtr_t validPart;
       const core::PathValidationPtr_t pathValidation
@@ -313,8 +314,6 @@ namespace hpp {
       initialROMnames_.clear (); endROMnames_.clear ();
       fillROMnames (q1, &initialROMnames_);
       fillROMnames (q2, &endROMnames_);
-      hppDout (info, "initialROMnames_ size= " << initialROMnames_.size ());
-      hppDout (info, "endROMnames_ size= " << endROMnames_.size ());
     
       // parabola path with alpha_0 as the middle of alpha_0 bounds
       ParabolaPathPtr_t pp = ParabolaPath::create (device_.lock(), q1, q2,
@@ -325,8 +324,6 @@ namespace hpp {
       // checks
       hppDout (info, "pp->V0_= " << pp->V0_);
       hppDout (info, "pp->Vimp_= " << pp->Vimp_);
-      hppDout (info, "pp->initialROMnames_ size= " << pp->initialROMnames_.size ());
-      hppDout (info, "pp->endROMnames_ size= " << pp->endROMnames_.size ());
 
       bool hasCollisions = !rbPathValidation->validateTrunk (pp, false,
 							     validPart,
@@ -363,11 +360,11 @@ namespace hpp {
     // ------------------------------------------------------------------
 
     core::PathPtr_t
-    SteeringMethodParabola::compute_3D_path (core::ConfigurationIn_t q1,
-					     core::ConfigurationIn_t q2,
-					     std::vector<fcl::Vec3f>* cones1,
-					     std::vector<fcl::Vec3f>* cones2) 
+    SteeringMethodParabola::compute_3D_path
+    (core::ConfigurationIn_t q1, core::ConfigurationIn_t q2,
+     library::ContactCones* cones1, library::ContactCones* cones2) 
       const {
+      hppDout (info, "SM compute_3D_path with contact-cones");
       std::vector<std::string> filter;
       core::PathPtr_t validPart;
       const core::PathValidationPtr_t pathValidation
@@ -412,8 +409,9 @@ namespace hpp {
       hppDout (info, "phi: " << phi);
 
       /* Compute 2D Convex-Cones */
-      vector_t dir2DCC1 = convexCone::compute_convex_cone_inter (*cones1, theta,
-								 mu_);
+      hppDout (info, "cones1, number of directions= " << cones1->directions_.size ()); // verif
+      vector_t dir2DCC1 = 
+	convexCone::compute_convex_cone_inter (cones1->directions_, theta,mu_);
       if (dir2DCC1.norm () == 0) {
 	hppDout (info, "plane_theta not intersecting first cone");
 	initialConstraint_ = false;
@@ -424,8 +422,8 @@ namespace hpp {
       hppDout (info, "delta1: " << delta1);
       assert (!(delta1 != delta1)); // assert if NaN
 
-      vector_t dir2DCC2 = convexCone::compute_convex_cone_inter (*cones2, theta,
-								 mu_);
+      vector_t dir2DCC2 =
+	convexCone::compute_convex_cone_inter (cones2->directions_, theta,mu_);
       if (dir2DCC2.norm () == 0) {
 	hppDout (info, "plane_theta not intersecting second cone");
 	initialConstraint_ = false;
@@ -569,11 +567,6 @@ namespace hpp {
           alpha = 0;
       hppDout (info, "alpha: " << alpha);*/
       
-      /* Compute Parabola coefficients */
-      vector_t coefs = computeCoefficients (alpha, theta, X_theta, Z, 
-					    x_theta_0, z_0);
-      hppDout (info, "coefs: " << coefs.transpose ());
-
       /* Verify that maximal heigh of smaller parab is not out of the bounds */
       const vector_t coefsInf = computeCoefficients (alpha_inf_bound, theta,
 						     X_theta, Z, x_theta_0,
@@ -585,6 +578,11 @@ namespace hpp {
 	problem_->parabolaResults_ [0] ++;
 	return core::PathPtr_t ();
       }
+
+      /* Compute Parabola coefficients */
+      vector_t coefs = computeCoefficients (alpha, theta, X_theta, Z, 
+					    x_theta_0, z_0);
+      hppDout (info, "coefs: " << coefs.transpose ());
       maxHeightRespected = parabMaxHeightRespected (coefs, x_theta_0,
 						    x_theta_imp);
 
@@ -592,20 +590,17 @@ namespace hpp {
       initialROMnames_.clear (); endROMnames_.clear ();
       fillROMnames (q1, &initialROMnames_);
       fillROMnames (q2, &endROMnames_);
-      //hppDout (info, "initialROMnames_ size= " << initialROMnames_.size ());
-      //hppDout (info, "endROMnames_ size= " << endROMnames_.size ());
     
       // parabola path with alpha_0 as the middle of alpha_0 bounds
       ParabolaPathPtr_t pp = ParabolaPath::create (device_.lock(), q1, q2,
 						   computeLength (q1, q2,coefs),
 						   coefs, V0_, Vimp_,
 						   initialROMnames_,
-						   endROMnames_);
+						   endROMnames_, *cones1,
+						   *cones2);
       // checks
-      hppDout (info, "pp->V0_= " << pp->V0_);
-      hppDout (info, "pp->Vimp_= " << pp->Vimp_);
-      //hppDout (info, "pp->initialROMnames_ size= " << pp->initialROMnames_.size ());
-      //hppDout (info, "pp->endROMnames_ size= " << pp->endROMnames_.size ());
+      hppDout (info, "pp->V0_= " << pp->V0_.transpose ());
+      hppDout (info, "pp->Vimp_= " << pp->Vimp_.transpose ());
 
       bool hasCollisions = !rbPathValidation->validateTrunk (pp, false,
 							     validPart,
@@ -627,7 +622,8 @@ namespace hpp {
 							x_theta_imp);
 	  pp = ParabolaPath::create (device_.lock (), q1, q2,
 				     computeLength (q1, q2, coefs), coefs, V0_,
-				     Vimp_, initialROMnames_, endROMnames_);
+				     Vimp_, initialROMnames_, endROMnames_,
+				     *cones1, *cones2);
 	  hasCollisions = !rbPathValidation->validateTrunk (pp, false,
 							    validPart,
 							    pathReport);

@@ -147,6 +147,11 @@ namespace hpp {
                                                              const CIT_StateFrame& endState,
                                                              const std::size_t numOptimizations = 10);
 
+      core::PathVectorPtr_t interpolateStatesinPathVector
+      (RbPrmFullBodyPtr_t fullbody, core::ProblemPtr_t referenceProblem,
+       const core::PathPtr_t rootPath, const CIT_StateFrame &startState,
+       const CIT_StateFrame &endState, const std::size_t numOptimizations);
+
     } // namespace interpolation
     } // namespace rbprm
   } // namespace hpp

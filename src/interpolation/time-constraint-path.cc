@@ -168,12 +168,14 @@ std::cout <<  device_->getJointByName("lh_foot_joint")->currentTransformation().
           throw projection_error ("Initial configuration of path does not satisfy "
               "the constraints");
         }
-        updateConstraints(endc);
-        if (constraints() && !constraints()->isSatisfied (end())) {
-//std::cout << "end conf " <<  initc << std::endl;
+      }
+      updateConstraints(endc);
+      if (constraints()) {
+        if (!constraints()->isSatisfied (end())) {
+	  //std::cout << "end conf " <<  initc << std::endl;
           hppDout (error, end().transpose ());
           throw projection_error ("End configuration of path does not satisfy "
-              "the constraints");
+				  "the constraints");
         }
       }
     }

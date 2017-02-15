@@ -22,6 +22,7 @@
 # include <hpp/core/fwd.hh>
 # include <hpp/core/config.hh>
 # include <hpp/core/path.hh>
+# include <hpp/rbprm/fullbodyBallistic/parabola-library.hh>
 
 namespace hpp {
   namespace rbprm {
@@ -72,18 +73,41 @@ namespace hpp {
       /// \param length Distance between the configurations.
       /// \param V0, Vimp initial and final velocity vectors
       /// \param initialROMnames, endROMnames initial and final ROM names
-      static ParabolaPathPtr_t create(const core::DevicePtr_t& device,
-				      core::ConfigurationIn_t init,
-				      core::ConfigurationIn_t end,
-				      core::value_type length,
-				      core::vector_t coefficients,
-				      core::vector_t V0, core::vector_t Vimp,
-				      std::vector <std::string> initialROMnames,
-				      std::vector <std::string> endROMnames)
+      static ParabolaPathPtr_t create
+      (const core::DevicePtr_t& device, core::ConfigurationIn_t init,
+       core::ConfigurationIn_t end, core::value_type length,
+       core::vector_t coefficients, core::vector_t V0, core::vector_t Vimp,
+       std::vector <std::string> initialROMnames,
+       std::vector <std::string> endROMnames)
       {
 	ParabolaPath* ptr = new ParabolaPath (device, init, end, length,
 					      coefficients, V0, Vimp,
 					      initialROMnames, endROMnames);
+	ParabolaPathPtr_t shPtr (ptr);
+	ptr->init (shPtr);
+	return shPtr;
+      }
+
+      /// Create instance and return shared pointer
+      /// \param device Robot corresponding to configurations
+      /// \param init, end Start and end configurations of the path
+      /// \param length Distance between the configurations.
+      /// \param V0, Vimp initial and final velocity vectors
+      /// \param initialROMnames, endROMnames initial and final ROM names
+      /// \param contactCones0, contactConesImp initial and final contact-cones
+      static ParabolaPathPtr_t create
+      (const core::DevicePtr_t& device, core::ConfigurationIn_t init,
+       core::ConfigurationIn_t end, core::value_type length,
+       core::vector_t coefficients, core::vector_t V0, core::vector_t Vimp,
+       std::vector <std::string> initialROMnames,
+       std::vector <std::string> endROMnames,
+       library::ContactCones contactCones0,
+       library::ContactCones contactConesImp)
+      {
+	ParabolaPath* ptr = new ParabolaPath (device, init, end, length,
+					      coefficients, V0, Vimp,
+					      initialROMnames, endROMnames,
+					      contactCones0, contactConesImp);
 	ParabolaPathPtr_t shPtr (ptr);
 	ptr->init (shPtr);
 	return shPtr;
@@ -163,41 +187,34 @@ namespace hpp {
       }
       
       /// Return the internal robot.
-      core::DevicePtr_t device () const;
+      core::DevicePtr_t device () const { return device_; }
 
       /// Get the initial configuration
-      core::Configuration_t initial () const
-      {
-        return initial_;
-      }
+      core::Configuration_t initial () const { return initial_; }
 
       /// Get the final configuration
-      core::Configuration_t end () const
-      {
-        return end_;
-      }
+      core::Configuration_t end () const{ return end_; }
 
       /// Get previously computed length
-      virtual core::value_type length () const {
-	return length_;
-      }
+      virtual core::value_type length () const { return length_; }
 
       /// Set the three parabola coefficients
       void coefficients (core::vector_t coefs) const {
-	for (std::size_t i = 0; i < coefs.size (); i++)
+	for (int i = 0; i < coefs.size (); i++)
 	  coefficients_(i) = coefs (i);
       }
 
       /// Get path coefficients
-      core::vector_t coefficients () const {
-	return coefficients_;
-      }
+      core::vector_t coefficients () const { return coefficients_; }
       
       core::value_type computeLength (const core::ConfigurationIn_t q1,
 				const core::ConfigurationIn_t q2) const;
 
       /// Evaluate velocity vector at path abcissa t
       core::vector_t evaluateVelocity (const core::value_type t) const;
+
+      /// Evaluate velocity vector at configuration q of path
+      core::vector_t evaluateVelocity (const core::Configuration_t q) const;
 
       /// Get path duration (in seconds)
       virtual core::value_type duration () const { return duration_;}
@@ -211,6 +228,8 @@ namespace hpp {
       core::vector_t Vimp_; // final velocity
       std::vector <std::string> initialROMnames_; // active ROM list at begining
       std::vector <std::string> endROMnames_; // active ROM list at end
+      library::ContactCones contactCones0_;
+      library::ContactCones contactConesImp_;
            
     protected:
       /// Print path in a stream
@@ -233,11 +252,23 @@ namespace hpp {
       ParabolaPath (const core::DevicePtr_t& device,
 		    core::ConfigurationIn_t init,
 		    core::ConfigurationIn_t end,
+		    value_type length,
+		    vector_t coefs,
+		    vector_t V0, vector_t Vimp,
+		    std::vector <std::string> initialROMnames,
+		    std::vector <std::string> endROMnames);
+
+      /// Constructor with velocities, ROMnames and contact-cones
+      ParabolaPath (const core::DevicePtr_t& device,
+		    core::ConfigurationIn_t init,
+		    core::ConfigurationIn_t end,
 		    core::value_type length,
 		    core::vector_t coefs,
 		    core::vector_t V0_, core::vector_t Vimp,
 		    std::vector <std::string> initialROMnames,
-		    std::vector <std::string> endROMnames);
+		    std::vector <std::string> endROMnames,
+		    library::ContactCones contactCones0,
+		    library::ContactCones contactConesImp);
 
       /// Copy constructor
       ParabolaPath (const ParabolaPath& path);

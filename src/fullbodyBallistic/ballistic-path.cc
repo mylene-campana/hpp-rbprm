@@ -159,7 +159,7 @@ namespace hpp {
 
 
     core::PathPtr_t BallisticPath::reverse () const{
-      hppDout(notice, "reverse path parabola !!!!!!!!!!!!!!!!!!!!!!!!");
+      hppDout(notice, "reverse ballistic path");
       bool success;
       core::Configuration_t q1 ((*this) (length_, success));
       core::Configuration_t q2 ((*this) (0, success));

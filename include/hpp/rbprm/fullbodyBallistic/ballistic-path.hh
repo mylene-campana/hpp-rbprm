@@ -180,7 +180,7 @@ namespace hpp {
 
       /// Set the three parabola coefficients
       void coefficients (core::vector_t coefs) const {
-	for (size_t i = 0; i < coefs.size () ; i++)
+	for (int i = 0; i < coefs.size () ; i++)
 	  coefficients_ (i) = coefs (i);
       }
 
@@ -207,6 +207,12 @@ namespace hpp {
 
       /// Get path duration (in seconds)
       virtual core::value_type duration () const { return duration_;}
+
+      size_t extremityStatus_;
+      // 0 = init and end are parabola transitions,
+      // 1 = init only is parabola transition,
+      // 2 = goal only is parabola transition
+      // 3 = no one is parabola transition (BP belongs to a "bigger" parabola)
 
     protected:
       /// Print path in a stream
