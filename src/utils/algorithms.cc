@@ -84,7 +84,28 @@ namespace geom
     
     return Point(cx,cy,cz);
   }
-  
+
+  /// see https://en.wikipedia.org/wiki/Centroid#Centroid_of_polygon
+  Point centroid(CIT_Point pointsBegin, CIT_Point pointsEnd, double &area){
+    area = 0;
+    double cx=0;
+    double cy=0;
+    double cz=0;
+
+    for(CIT_Point pit = pointsBegin ; pit != pointsEnd -1 ; ++pit){
+      area += ((*pit)[0]*(*(pit+1))[1]) - (((*(pit+1))[0])*((*pit)[1]));
+      cx += ((*pit)[0] + (*(pit+1))[0])*((*pit)[0]*(*(pit+1))[1] - (*(pit+1))[0]*(*pit)[1]);
+      cy += ((*pit)[1] + (*(pit+1))[1])*((*pit)[0]*(*(pit+1))[1] - (*(pit+1))[0]*(*pit)[1]);
+    }
+    area = area/2.;
+    cx = cx / (6.*area);
+    cy = cy / (6.*area);
+
+    // compute cz in the plan :
+    //TODO
+    return Point(cx,cy,cz);
+
+  }
   
   Point centerPlanar (T_Point points,const fcl::Vec3f& n, double t ){
     
@@ -175,8 +196,8 @@ namespace geom
     {
         T ch = convexHull<T, Dim, Numeric, Point, In>(pointsBegin, pointsEnd);
         return contains<Dim, Numeric, Point, In>(ch.begin(), ch.end(), aPoint);
-    }
-*/
+	}
+  */
   
   Point lineSect(CPointRef p1, CPointRef p2, CPointRef p3, CPointRef p4)
   {
@@ -207,9 +228,53 @@ namespace geom
     res[1] = y;
     return res;
   }
+
+  Point lineSect3D(CPointRef p1, CPointRef p2, CPointRef p3, CPointRef p4)
+  {
+    Point res;
+    double x1 = p1[0], x2 = p2[0], x3 = p3[0], x4 = p4[0];
+    double y1 = p1[1], y2 = p2[1], y3 = p3[1], y4 = p4[1];
+    double z1= p1[2];
+    Point u = p2-p1; // vector director of the first line
+
+    double d = (x1 - x2) * (y3 - y4) - (y1 - y2) * (x3 - x4);
+    // If d is zero, there is no intersection
+    //not supposed to happen
+    //if (d == 0) throw;
+
+    // Get the x and y
+    double pre = (x1*y2 - y1*x2), post = (x3*y4 - y3*x4);
+    double x = (pre * (x3 - x4) - (x1 - x2) * post) / d;
+    double y = (pre * (y3 - y4) - (y1 - y2) * post) / d;
+
+    // Check if the x and y coordinates are within both lines
+    // not supposed to happen
+    //if (x < min(x1, x2) || x > max(x1, x2) ||
+    //x < min(x3, x4) || x > max(x3, x4)) return NULL;
+    //if (y < min(y1, y2) || y > max(y1, y2) ||
+    //y < min(y3, y4) || y > max(y3, y4)) return NULL;
+
+    // Return the point of intersection
+    res[0] = x;
+    res[1] = y;
+    // find the correct z coordinate :
+    double t;
+    if(u[0] != 0)
+      t = (x - x1)/u[0];
+    else if(u[1] != 0)
+      t = (y - y1)/u[1];
+    else{
+      hppDout(notice,"in linesect there is no unique z value");
+      t=1;
+    }
+
+    res[2] = z1 + t*u[2];
+
+    return res;
+  }
+
   
-  
-  T_Point computeIntersection(CIT_Point subBegin, CIT_Point subEndHull, CIT_Point clipBegin, CIT_Point clipEndHull)
+  T_Point compute2DIntersection(CIT_Point subBegin, CIT_Point subEndHull, CIT_Point clipBegin, CIT_Point clipEndHull)
   {
     T_Point outputList, inputList;
     CIT_Point from = subBegin, to = subEndHull;
@@ -246,7 +311,7 @@ namespace geom
     return inputList;
   }
   
-  T_Point computeIntersection(T_Point subPolygon, T_Point clipPolygon)
+  T_Point compute2DIntersection(T_Point subPolygon, T_Point clipPolygon)
   {
     T_Point outputList, inputList;
     double dirE ,dirS;
@@ -277,7 +342,48 @@ namespace geom
     return outputList;
     
   }
-  
+
+  T_Point compute3DIntersection(T_Point subPolygon, T_Point clipPolygon)
+  {
+    T_Point outputList, inputList;
+    double dirE ,dirS;
+    outputList = subPolygon;
+    for(CIT_Point edge = clipPolygon.begin() ; edge != clipPolygon.end()-1 ; ++edge){
+      inputList = outputList;
+      outputList.clear();
+      CIT_Point s = inputList.end()-1;
+      dirS = isLeft(*edge, *(edge+1),*s);
+      for(CIT_Point e = inputList.begin() ; e != inputList.end() ; ++e){
+        dirE = isLeft(*edge, *(edge+1),*e);
+        if(dirE <= 0 )// e is inside
+	  {
+	    if(dirS > 0) // s not inside
+	      {
+		outputList.insert(outputList.end(),lineSect3D(*s, *e, *edge, *(edge+1)));
+	      }
+	    outputList.insert(outputList.end(),*e);
+	  }else if (dirS <= 0) // s is inside
+	  {
+	    outputList.insert(outputList.end(),lineSect3D(*s, *e, *edge, *(edge+1)));
+	  }
+        s=e;
+        dirS = dirE;
+      }
+
+    }
+    std::ostringstream ss;
+    ss<<"[";
+    for(size_t i = 0; i < outputList.size() ; ++i){
+      ss<<"["<<outputList[i][0]<<","<<outputList[i][1]<<","<<outputList[i][2]<<"]";
+      if(i< (outputList.size() -1))
+        ss<<",";
+    }
+    ss<<"]";
+    hppDout(notice,"intersection3D = "<<ss.str());
+    return outputList;
+
+  }
+
   double distanceToPlane(const fcl::Vec3f& n, double t, const fcl::Vec3f& v)
   {
     return n.dot(v) - t;
@@ -488,51 +594,75 @@ namespace geom
     Point P0;
     TrianglePoints triPlane;
     std::size_t triIndex = 0; // FIXME : always use the first triangle, is it an issue ?
-    triPlane.p1 = plane->vertices[plane->tri_indices[triIndex][0]]; 
-    triPlane.p2 = plane->vertices[plane->tri_indices[triIndex][1]];
-    triPlane.p3 = plane->vertices[plane->tri_indices[triIndex][2]];
-    Pn = TriangleNormal(triPlane);
-    hppDout (info, "normal of plane= " << Pn.transpose ());
-    P0 = triPlane.p1; //FIXME : better point ?
-    Point P1 = triPlane.p2; Point P2 = triPlane.p3; // not used
-    hppDout (info, "p1 of plane= " << P0.transpose ());
-    hppDout (info, "p2 of plane= " << P1.transpose ());
-    hppDout (info, "p3 of plane= " << P2.transpose ());
+    std::size_t numberOfTri = plane->num_tris;
+    hppDout (info, "numberOfTri= " << numberOfTri);
+    bool areaOK;
 
-    for(size_t i = 0 ; i < polygone->num_tris ; i++){ // FIXME : can test 2 times the same line (in both triangles), avoid this ?
-      for(size_t j = 0 ; j < 3 ; j++){
-	Point Pij = polygone->vertices[polygone->tri_indices[i][j]];
-	Point Pijj = polygone->vertices[polygone->tri_indices[i][((j == 2) ? 0 : (j+1))]];
-	hppDout(info,"triangle: " << i << "couple: "<< j);
-	hppDout(info, "Pij" << Pij.transpose ());
-	hppDout(info, "Pijj" << Pijj.transpose ());
-        intersection = intersectSegmentPlane(Pij, Pijj, Pn,P0);
-        if(intersection.size() > 0)
-          res.insert(res.end(),intersection.begin(),intersection.end());
-	else
-	  hppDout(info,"intersection with segment of triangle empty");
+    do {
+      hppDout (info, "triIndex= " << triIndex);
+      triPlane.p1 = plane->vertices[plane->tri_indices[triIndex][0]]; 
+      triPlane.p2 = plane->vertices[plane->tri_indices[triIndex][1]];
+      triPlane.p3 = plane->vertices[plane->tri_indices[triIndex][2]];
+      Pn = TriangleNormal(triPlane);
+      hppDout (info, "normal of plane= " << Pn.transpose ());
+      P0 = triPlane.p1; //FIXME : better point ?
+      Point P1 = triPlane.p2; Point P2 = triPlane.p3; // not used
+      hppDout (info, "p1 of plane= " << P0.transpose ());
+      hppDout (info, "p2 of plane= " << P1.transpose ());
+      hppDout (info, "p3 of plane= " << P2.transpose ());
+
+      for(size_t i = 0 ; i < polygone->num_tris ; i++){ // FIXME : can test 2 times the same line (in both triangles), avoid this ?
+	for(size_t j = 0 ; j < 3 ; j++){
+	  Point Pij = polygone->vertices[polygone->tri_indices[i][j]];
+	  Point Pijj = polygone->vertices[polygone->tri_indices[i][((j == 2) ? 0 : (j+1))]];
+	  //hppDout(info,"triangle: " << i << "couple: "<< j);
+	  //hppDout(info, "Pij" << Pij.transpose ());
+	  //hppDout(info, "Pijj" << Pijj.transpose ());
+	  intersection = intersectSegmentPlane(Pij, Pijj, Pn,P0);
+	  if(intersection.size() > 0)
+	    res.insert(res.end(),intersection.begin(),intersection.end());
+	  //else hppDout(info,"intersection with segment of triangle empty");
+	}
       }
-    }
-    if(res.size() == 0) {
+      hppDout (info, "res size= " << res.size ());
+      if(res.size() == 0) { // not anymore with loop on plane triangles
+	//hppDout(info,"intersection with ROM empty (BECAUSE AFFORDANCE IS WRONG)");
+	//return res;
+	areaOK = false;
+      }
+      else {
+	// ordonate the point in the vector (clockwise) first point and last point are the same
+	sortedRes = convexHull(res.begin(),res.end());
+	//hppDout(notice,"clipped point : ");
+	/*std::ostringstream ss;
+	  ss<<"[";
+	  for(size_t i = 0; i < sortedRes.size() ; ++i){
+	  ss<<"["<<sortedRes[i][0]<<","<<sortedRes[i][1]<<","<<sortedRes[i][2]<<"]";
+	  if(i< (sortedRes.size() -1))
+	  ss<<",";
+	  }
+	  ss<<"]";*/
+	//std::cout<<"intersection : "<<std::endl;
+	//std::cout<<ss.str()<<std::endl;
+	hppDout(notice,"area = "<<area(sortedRes.begin(),sortedRes.end()));
+	areaOK = area(sortedRes.begin(),sortedRes.end()) > 1e-2;
+      }
+      triIndex++;
+    } while (triIndex < numberOfTri && !areaOK);
+    if (!areaOK) {
       hppDout(info,"intersection with ROM empty (BECAUSE AFFORDANCE IS WRONG)");
     }
-    else {
-    // ordonate the point in the vector (clockwise) first point and last point are the same
-    sortedRes = convexHull(res.begin(),res.end());
-    //hppDout(notice,"clipped point : ");
-    /*std::ostringstream ss;
-    ss<<"[";
-    for(size_t i = 0; i < sortedRes.size() ; ++i){
-      ss<<"["<<sortedRes[i][0]<<","<<sortedRes[i][1]<<","<<sortedRes[i][2]<<"]";
-      if(i< (sortedRes.size() -1))
-        ss<<",";
-    }
-    ss<<"]";*/
-    //std::cout<<"intersection : "<<std::endl;
-    //std::cout<<ss.str()<<std::endl;
-    //hppDout(notice,"area = "<<area(sortedRes.begin(),sortedRes.end()));
-    }
     return sortedRes;
+  }
+
+  T_Point convertBVH(BVHModelOBConst_Ptr_t obj){
+    T_Point result;
+    for(int i = 0 ; i < obj->num_vertices ; ++i)
+      {
+	result.push_back(Eigen::Vector3d(obj->vertices[i][0], obj->vertices[i][1], obj->vertices[i][2]));
+      }
+
+    return convexHull(result.begin(),result.end());
   }
 
 } //namespace geom

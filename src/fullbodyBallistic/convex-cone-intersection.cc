@@ -235,13 +235,13 @@ namespace convexCone
 	  zPp = -n2y*yPp/n2z;
 	  xPm = 1;
 	  yPm = -mu*sqrt(n2z*n2z/(n2z*n2z+n2y*n2y));
-	  zPm = -n2y*n2z/yPm;
+	  zPm = -n2y*yPm/n2z;
 	} else { // n2z == 0
 	  if (n2y != 0 && fabs(n2y) > epsilon) {
 	    // case VII
 	    hppDout (info, "case VII");
-	    xPp = 0; yPp = 0; zPp = mu;
-	    xPm = 0; yPm = 0; zPm = -mu;
+	    xPp = 1; yPp = 0; zPp = mu;
+	    xPm = 1; yPm = 0; zPm = -mu;
 	  } else { // n2y == 0
 	    // impossible
 	    hppDout (error, "should not happen, n // n2");
@@ -485,7 +485,7 @@ namespace convexCone
 	  hppDout (info, "cone-circle-plane intersection OK");
 	  return true;
 	} // ny != 0
-	else {
+	else { // ny = 0
 	  hppDout (info, "cone-circle-plane intersection is empty");
 	  return false;
 	}

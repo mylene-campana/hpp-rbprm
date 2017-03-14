@@ -526,7 +526,7 @@ namespace hpp {
       for(model::ObjectVector_t::const_iterator oit = affordances.begin();
           oit != affordances.end(); ++oit, ++i)
       {
-	hppDout (info, "collision obj= " << (*oit)->name ());
+	//hppDout (info, "collision obj= " << (*oit)->name ());
           if(eval)
             sampling::GetCandidates(limb->sampleContainer_, transform, *oit, direction, reports[i], eval);
           else
@@ -536,7 +536,7 @@ namespace hpp {
       for(std::vector<sampling::T_OctreeReport>::const_iterator cit = reports.begin();
           cit != reports.end(); ++cit)
       {
-	hppDout (info, "insert octree collision");
+	//hppDout (info, "insert octree collision");
           finalSet.insert(cit->begin(), cit->end());
       }
       // pick first sample which is collision free

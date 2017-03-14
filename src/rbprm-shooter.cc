@@ -192,7 +192,7 @@ namespace
     {
       unsigned int seed = (unsigned int)(time(NULL));
       //srand (seed);
-      hppDout(notice,"&&&&&& SEED = "<<seed);
+      //hppDout(notice,"&&&&&& SEED = "<<seed);
       RbPrmShooter* ptr = new RbPrmShooter (robot, geometries, affordances,
                                             filter, affFilters, shootLimit, displacementLimit, nbFilterMatch);
       RbPrmShooterPtr_t shPtr (ptr);
@@ -241,6 +241,7 @@ namespace
 	  validator_->addObstacle(*cit);
         }
       this->InitWeightedTriangles(geometries);
+      hppDout (info, "interiorPoint_= " << interiorPoint_);
     }
 
     void RbPrmShooter::InitWeightedTriangles(const model::ObjectVector_t& geometries)
@@ -307,8 +308,9 @@ namespace
       CollisionValidationReport* report;
       ValidationReportPtr_t reportShPtr(new CollisionValidationReport);
       value_type thetaSample = 0;
-      Vec3f normal;
+      Vec3f normal, p;
       hppDout (info, "fullOrientationMode in shooter= " << fullOrientationMode_);
+      hppDout (info, "interiorPoint_ in shooter= " << interiorPoint_);
       bool valid = false;
       while(limit >0 && (!found || !valid))
 	{
@@ -317,14 +319,14 @@ namespace
 	  double r = ((double) rand() / (RAND_MAX));
 	  hppDout (info, "r= " << r);
 	  if(r > 0.5)
-            sampled = &RandomPointIntriangle();
+	    sampled = &RandomPointIntriangle();
 	  else
-            sampled = &WeightedTriangle();
+	    sampled = &WeightedTriangle();
 	  const TrianglePoints& tri = sampled->second;
 	  //http://stackoverflow.com/questions/4778147/sample-random-point-in-triangle
 	  double r1, r2;
 	  r1 = ((double) rand() / (RAND_MAX)); r2 = ((double) rand() / (RAND_MAX));
-	  Vec3f p = (1 - sqrt(r1)) * tri.p1 + (sqrt(r1) * (1 - r2)) * tri.p2
+	  p = (1 - sqrt(r1)) * tri.p1 + (sqrt(r1) * (1 - r2)) * tri.p2
 	    + (sqrt(r1) * r2) * tri.p3;
 	  hppDout (info, "r1= " << r1);
 	  hppDout (info, "r2= " << r2);
@@ -332,6 +334,21 @@ namespace
 	  // get normal even if not in collision...
 	  normal = (tri.p2 - tri.p1).cross(tri.p3 - tri.p1);
 	  normal.normalize();
+	  hppDout (info, "normal= " << normal);
+
+	  // TODO: verify that normal points toward the interiorPoint
+	  // otherwise, invert it
+	  if (interiorPoint_.norm () != 0) {
+	    if ((interiorPoint_ - p).dot (normal) >= 0) {
+	      hppDout (info, "normal is oriented toward interiorPoint");
+	    }
+	    else {
+	      hppDout (info, "normal is NOT oriented toward interiorPoint, invert it");
+	      normal = -normal;
+	    }
+	  } else
+	    hppDout (info, "no interior point has been given");
+
 	  hppDout (info, "normal= " << normal);
 	  //set configuration position to sampled point
 	  SetConfigTranslation(robot_,config, p);
@@ -345,6 +362,7 @@ namespace
 	    for (size_type i=0; i<3; i++) (*config) [index + i] = normal [i];
 	    thetaSample = 2 * M_PI * rand ()/RAND_MAX - M_PI;
 	    (*config) [index + 3] = thetaSample;
+	    // set biased-orientation z or x axis
 	    *config = setOrientation (robot_, *config);
 	  }
 	  else {
@@ -356,60 +374,59 @@ namespace
 	  // no obstacle is reachable
 	  std::size_t limitDis = displacementLimit_;
 	  Vec3f lastDirection = normal; // will be updated if necessary
-	  while(!found && limitDis >0)
-	    {
-	      valid = validator_->trunkValidation_->validate(*config, reportShPtr);
-	      found = valid && validator_->validateRoms(*config, filter_,reportShPtr);
-	      report = static_cast<CollisionValidationReport*>(reportShPtr.get());
+	  while(!found && limitDis >0) {
+	    valid = validator_->trunkValidation_->validate(*config,
+							   reportShPtr);
+	    found = valid && validator_->validateRoms(*config, filter_,
+						      reportShPtr);
+	    report = static_cast<CollisionValidationReport*>(reportShPtr.get());
 
-	      if(valid &!found)
-		{
-		  // try to rotate to reach rom
-		  for(; limitDis>0 && !found; --limitDis)
-		    {
-		      //SampleRotation(eulerSo3_, config, jv);
-		      if (hasECS && fullOrientationMode_) {
-			thetaSample = 2 * M_PI * rand ()/RAND_MAX - M_PI;
-			hppDout (info, "thetaSample= " << thetaSample);
-			for (size_type i=0; i<3; ++i)
-			  (*config) [index + i] = normal [i];
-			(*config) [index + 3] = thetaSample;
-			*config = setOrientation (robot_, *config);
-			hppDout (info, "normal= " << normal);
-		      } else {
-			SampleRotation(eulerSo3_, config, jv);
-			hppDout (info, "random rotation was sampled");
-		      }
-		      hppDout (info, "config= " << displayConfig(*config));
-		      found = validator_->validate(*config, filter_); // NOT WORKING CORRECTLY !!!!!
-
-
-
-		      if(!found)
-			{
-			  hppDout (info, "config unvalid, found false, transl");
-			  Translate(robot_, config, -lastDirection *
-				    1 * ((double) rand() / (RAND_MAX)));
-			}
-		      found = validator_->validate(*config, filter_);
-		      if (!found)
-			hppDout (info, "config unvalid, found false, transl failed");
+	    if(valid &!found)
+	      {
+		// try to rotate to reach rom
+		for(; limitDis>0 && !found; --limitDis)
+		  {
+		    //SampleRotation(eulerSo3_, config, jv);
+		    if (hasECS && fullOrientationMode_) {
+		      thetaSample = 2 * M_PI * rand ()/RAND_MAX - M_PI;
+		      hppDout (info, "thetaSample= " << thetaSample);
+		      for (size_type i=0; i<3; ++i)
+			(*config) [index + i] = normal [i];
+		      (*config) [index + 3] = thetaSample;
+		      *config = setOrientation (robot_, *config);
+		      hppDout (info, "normal= " << normal);
+		    } else {
+		      SampleRotation(eulerSo3_, config, jv);
+		      hppDout (info, "random rotation was sampled");
 		    }
-		  if(!found) break;
-		}
-	      else if (!valid)// move out of collision
-		{
-		  // retrieve Contact information
-		  //lastDirection = -report.result.getContact(0).normal;
-		  // mouve out by penetration depth
-		  // v0 move away from normal
-		  //get normal from collision tri
-		  lastDirection = triangles_[report->result.getContact(0).b2].first;
-		  Translate(robot_,config, lastDirection *
-			    (std::abs(report->result.getContact(0).penetration_depth) +0.03));
-		  limitDis--;
-		}
-	    }
+		    hppDout (info, "config= " << displayConfig(*config));
+		    found = validator_->validate(*config, filter_);
+
+		    if(!found)
+		      {
+			hppDout (info, "config unvalid, found false, transl");
+			Translate(robot_, config, -lastDirection *
+				  1 * ((double) rand() / (RAND_MAX)));
+		      }
+		    found = validator_->validate(*config, filter_);
+		    if (!found)
+		      hppDout (info, "config unvalid, found false, transl failed");
+		  }
+		if(!found) break;
+	      }
+	    else if (!valid)// move out of collision
+	      {
+		// retrieve Contact information
+		//lastDirection = -report.result.getContact(0).normal;
+		// mouve out by penetration depth
+		// v0 move away from normal
+		//get normal from collision tri
+		lastDirection = triangles_[report->result.getContact(0).b2].first;
+		Translate(robot_,config, lastDirection *
+			  (std::abs(report->result.getContact(0).penetration_depth) +0.03));
+		limitDis--;
+	      }
+	  }//while limitDis
 	  // Shoot extra configuration variables
 	  /*for (size_type i=0; i<extraDim; ++i)
 	    {
@@ -440,7 +457,7 @@ namespace
 	  if (!valid)
 	    hppDout (info, "config unvalid, valid false");
 	  limit--;
-	}
+	}// while limit
       if (!found) std::cout << "no config found" << std::endl;
       hppDout(info,"shoot : "<<model::displayConfig(*config));
       return config;

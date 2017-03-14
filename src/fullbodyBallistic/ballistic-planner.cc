@@ -187,10 +187,14 @@ namespace hpp {
           hppDout (info, "forward path is valid");
           roadmap ()->addEdge(roadmap ()->initNode(), *itn, fwdPath);
         }
+	else
+	  hppDout (info, "forward path is NOT valid");
         if (bwdPath) {
           hppDout (info, "backward path is valid");
           roadmap ()->addEdge(*itn, roadmap ()->initNode(), bwdPath);
         }
+	else
+	  hppDout (info, "backward path is NOT valid (directPath can be accepted anyway)");
       } //for qgoals
     }
 

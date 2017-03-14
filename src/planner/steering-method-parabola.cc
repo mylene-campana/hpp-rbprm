@@ -568,6 +568,7 @@ namespace hpp {
       hppDout (info, "alpha: " << alpha);*/
       
       /* Verify that maximal heigh of smaller parab is not out of the bounds */
+      hppDout (info, "Coef and velocities of smaller parabola");
       const vector_t coefsInf = computeCoefficients (alpha_inf_bound, theta,
 						     X_theta, Z, x_theta_0,
 						     z_0);

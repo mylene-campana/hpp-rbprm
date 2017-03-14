@@ -90,6 +90,10 @@ namespace hpp {
 	  fullOrientationMode_ = fullOrientationMode;
 	}
 
+	void interiorPoint (const fcl::Vec3f& interiorPoint) {
+	  interiorPoint_ = interiorPoint;
+	}
+
     public:
 	typedef std::pair<fcl::Vec3f, TrianglePoints> T_TriangleNormal;
         const std::size_t shootLimit_;
@@ -123,6 +127,7 @@ namespace hpp {
         RbPrmShooterWkPtr_t weak_;
         model::DevicePtr_t eulerSo3_;
 	bool fullOrientationMode_;
+	fcl::Vec3f interiorPoint_;
     }; // class RbprmShooter
 /// \}
     } // namespace rbprm
