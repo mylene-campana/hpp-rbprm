@@ -856,7 +856,7 @@ namespace hpp {
       if (stateTop.configuration_.rows())
 	stateFrames.push_back(std::make_pair(lengthTop,stateTop));
       hppDout (info, "number of states (2+offsetTakeoff)= " << stateFrames.size ());
-      //contactState2 = computeOffsetContactConfig (bp, end_,stateFrames, u_offset, false,lengthLanding); // !!! DEBUG ONLY
+      contactState2 = computeOffsetContactConfig (bp, end_,stateFrames, u_offset, false,lengthLanding);
       hppDout (info, "number of states (2+offsets)= " << stateFrames.size ());
       stateFrames.push_back(std::make_pair(bp->length(),end_));
       hppDout (info, "number of states (3+offsets)= " << stateFrames.size ());

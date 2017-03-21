@@ -184,6 +184,7 @@ namespace hpp {
 	  model::DevicePtr_t device = problem.robot();
 	  core::ConstraintSetPtr_t cSet = core::ConstraintSet::create(device,"");
 	  core::ConfigProjectorPtr_t proj = core::ConfigProjector::create(device,"proj", 1e-2, 30);
+	  bool disableConstr;
 
 	  // For verification:
 	  Configuration_t initialLong (from.configuration_.size () + 1);
@@ -233,9 +234,16 @@ namespace hpp {
 		if (normFrom < 1e-4 && normTo < 1e-4) {
 		  // create constraint(s)
 		  proj->add(core::NumericalConstraint::create (constraints::Position::create("", device, effectorJoint, fcl::Vec3f(0,0,0), ppos)));
+		  disableConstr = false;
 		  if (!proj->isSatisfied (endLong)) {
+		    disableConstr = true;
 		    hppDout (error, "End configuration of limbRRT does not satisfy the contact-constraints of the initial config-- POSITION ONLY");
-		    throw projection_error ("End configuration of limbRRT does not satisfy the contact-constraints of the initial config");
+		    //throw projection_error ("End configuration of limbRRT does not satisfy the contact-constraints of the initial config-- POSITION ONLY");
+		  }
+		  if (!proj->isSatisfied (initialLong)) {
+		    disableConstr = true;
+		    hppDout (error, "Initial configuration of limbRRT does not satisfy the contact-constraints of the initial config-- POSITION ONLY");
+		    //throw projection_error ("Initial configuration of limbRRT does not satisfy the contact-constraints of the initial config-- POSITION ONLY");
 		  }
 		  const bool ignoreRotation = to.ignoreRotation_.at(*cit);
 		  hppDout (info, "is rot constraint bypassed ?= " <<ignoreRotation);
@@ -247,8 +255,14 @@ namespace hpp {
 		    hppDout (info, "rot to= " << from.contactRotation_.at(*cit));
 		    proj->add(core::NumericalConstraint::create (constraints::Orientation::create("", device, effectorJoint, rotation, cosntraintsR)));
 		    if (!proj->isSatisfied (endLong)) {
+		      disableConstr = true;
 		      hppDout (error, "End configuration of limbRRT does not satisfy the contact-constraints of the initial config-- POSITION + ROTATION");
-		      throw projection_error ("End configuration of limbRRT does not satisfy the contact-constraints of the initial config-- POSITION + ROTATION");
+		      //throw projection_error ("End configuration of limbRRT does not satisfy the contact-constraints of the initial config-- POSITION + ROTATION");
+		    }
+		    if (!proj->isSatisfied (initialLong)) {
+		      disableConstr = true;
+		      hppDout (error, "Initial configuration of limbRRT does not satisfy the contact-constraints of the initial config-- POSITION + ROTATION");
+		      //throw projection_error ("Initial configuration of limbRRT does not satisfy the contact-constraints of the initial config-- POSITION + ROTATION");
 		    }
 		  }// if rotation
 		}// if norm OK
@@ -257,9 +271,16 @@ namespace hpp {
 	      }// if contact
 	      else
 		hppDout (info, "is actually NOT in contact in from !!");
+
+	      if (!disableConstr) {
+		hppDout (info, "constr not disabled");
+		cSet->addConstraint(proj);
+		problem.constraints(cSet);
+	      } else
+		hppDout (info, "constr disabled");
+
 	    }//for fixed limbs
-	  cSet->addConstraint(proj);
-	  problem.constraints(cSet);
+
 	  hppDout (info, "test end config with configProjector build with initial config");
 	  if (!proj->isSatisfied (endLong)) {
 	    //if (!problem.constraints()->isSatisfied (endLong)) {
@@ -291,59 +312,27 @@ namespace hpp {
         const rbprm::T_Limb& limbs = helper.fullbody_->GetLimbs();
         // get limbs that moved
         std::vector<std::string> variations = to.allVariations(from,extractEffectorsName(limbs));
-	hppDout (info, "variation number: " << variations.size ());
+	hppDout (info, "number of variations: " << variations.size ());
         core::ValidationReportPtr_t validationReport;
 
-	AddContactConstraints(helper, from, to);
+	if (variations.size () != 0) {
+	  AddContactConstraints(helper, from, to);
 	
-        //std::vector<std::string> variations = extractEffectorsName(limbs);
-        for(std::vector<std::string>::const_iterator cit = variations.begin();
-            cit != variations.end(); ++cit)
-	  {
-	    hppDout (info, "variation: " << *cit);
-            SetPathValidation(helper);
-            //DisableUnNecessaryCollisions(helper.rootProblem_, limbs.at(*cit));
-            SetConfigShooter(helper,limbs.at(*cit),rootPath);
-
-            ConfigurationPtr_t start = limbRRTConfigFromDevice(helper, from, 0.);
-            ConfigurationPtr_t end   = limbRRTConfigFromDevice(helper, to  ,rootPath->length());
-	    hppDout (info, "BiRRT planner start: " << displayConfig (from.configuration_));
-	    hppDout (info, "BiRRT planner end: " << displayConfig (to.configuration_));
-	    const model::DevicePtr_t robot = helper.fullbody_->device_;
-
-	    if (!helper.rootProblem_.configValidations ()->validate (*start, validationReport))
-	      hppDout (info, "start config NOT valid");
-	    if (!helper.rootProblem_.configValidations ()->validate (*end, validationReport))
-	      hppDout (info, "end config NOT valid");
-            helper.rootProblem_.initConfig(start);
-	    hppDout (info, "create BiRRT planner");
-            BiRRTPlannerPtr_t planner = BiRRTPlanner::create(helper.rootProblem_);
-            ProblemTargetPtr_t target = problemTarget::GoalConfigurations::create (planner);
-            helper.rootProblem_.target (target);
-            helper.rootProblem_.addGoalConfig(end);
-            //AddContactConstraints(helper, from, to); // END constr never OK ??
-	    //InitConstraints(helper);
-
-	    hppDout (info, "before BiRRT planner solve");
-	    res = planner->solve();
-	    hppDout (info, "after BiRRT planner solve");
-            helper.rootProblem_.resetGoalConfigs();
-	  }
-
-	// if no variation, still solve the problem to keep the contact along the path
-	if (variations.size () == 0) {
-	  hppDout (info, "variation null, limbRRT for each limb anyway!");
-	  for(T_Limb::const_iterator lit = limbs.begin(); lit != limbs.end(); ++lit)
+	  //std::vector<std::string> variations = extractEffectorsName(limbs);
+	  for(std::vector<std::string>::const_iterator cit = variations.begin();
+	      cit != variations.end(); ++cit)
 	    {
-	      hppDout (info, "limb= " << lit->first);
+	      hppDout (info, "variation: " << *cit);
 	      SetPathValidation(helper);
 	      //DisableUnNecessaryCollisions(helper.rootProblem_, limbs.at(*cit));
-	      SetConfigShooter(helper,lit->second,rootPath);
-	      ConfigurationPtr_t start = limbRRTConfigFromDevice(helper, from,0.);
-	      ConfigurationPtr_t end   = limbRRTConfigFromDevice(helper, to ,rootPath->length());
+	      SetConfigShooter(helper,limbs.at(*cit),rootPath);
+
+	      ConfigurationPtr_t start = limbRRTConfigFromDevice(helper, from, 0.);
+	      ConfigurationPtr_t end   = limbRRTConfigFromDevice(helper, to  ,rootPath->length());
 	      hppDout (info, "BiRRT planner start: " << displayConfig (from.configuration_));
 	      hppDout (info, "BiRRT planner end: " << displayConfig (to.configuration_));
 	      const model::DevicePtr_t robot = helper.fullbody_->device_;
+
 	      if (!helper.rootProblem_.configValidations ()->validate (*start, validationReport))
 		hppDout (info, "start config NOT valid");
 	      if (!helper.rootProblem_.configValidations ()->validate (*end, validationReport))
@@ -354,14 +343,52 @@ namespace hpp {
 	      ProblemTargetPtr_t target = problemTarget::GoalConfigurations::create (planner);
 	      helper.rootProblem_.target (target);
 	      helper.rootProblem_.addGoalConfig(end);
-	      //AddContactConstraints(helper, from, to);
-	      //InitConstraints(helper);
 
 	      hppDout (info, "before BiRRT planner solve");
 	      res = planner->solve();
 	      hppDout (info, "after BiRRT planner solve");
 	      helper.rootProblem_.resetGoalConfigs();
 	    }
+
+	  // if no variation, still solve the problem to keep the contact along the path
+	} else {
+	  hppDout (info, "variation null, try straight path!");
+
+	  res = directInterpolation (helper, from, to);
+	  PathValidationPtr_t pathValidation = helper.rootProblem_.pathValidation ();
+	  core::PathPtr_t validPart;
+	  core::PathValidationReportPtr_t pathReport;
+	    
+	  if (!pathValidation->validate (res, false, validPart, pathReport)) {
+	    hppDout (info, "straight path invalid, limbRRT for each limb without constraints");
+	    for(T_Limb::const_iterator lit = limbs.begin(); lit != limbs.end(); ++lit)
+	      {
+		hppDout (info, "limb= " << lit->first);
+		SetPathValidation(helper);
+		//DisableUnNecessaryCollisions(helper.rootProblem_, limbs.at(*cit));
+		SetConfigShooter(helper,lit->second,rootPath);
+		ConfigurationPtr_t start = limbRRTConfigFromDevice(helper, from,0.);
+		ConfigurationPtr_t end   = limbRRTConfigFromDevice(helper, to ,rootPath->length());
+		hppDout (info, "BiRRT planner start: " << displayConfig (from.configuration_));
+		hppDout (info, "BiRRT planner end: " << displayConfig (to.configuration_));
+		const model::DevicePtr_t robot = helper.fullbody_->device_;
+		if (!helper.rootProblem_.configValidations ()->validate (*start, validationReport))
+		  hppDout (info, "start config NOT valid");
+		if (!helper.rootProblem_.configValidations ()->validate (*end, validationReport))
+		  hppDout (info, "end config NOT valid");
+		helper.rootProblem_.initConfig(start);
+		hppDout (info, "create BiRRT planner");
+		BiRRTPlannerPtr_t planner = BiRRTPlanner::create(helper.rootProblem_);
+		ProblemTargetPtr_t target = problemTarget::GoalConfigurations::create (planner);
+		helper.rootProblem_.target (target);
+		helper.rootProblem_.addGoalConfig(end);
+
+		hppDout (info, "before BiRRT planner solve");
+		res = planner->solve();
+		hppDout (info, "after BiRRT planner solve");
+		helper.rootProblem_.resetGoalConfigs();
+	      }
+	  }
 	}
 
 	hppDout (info, "number of subpaths in res= " << res->numberPaths ());
@@ -458,8 +485,8 @@ namespace hpp {
        const PathPtr_t rootPath, const CIT_StateFrame &startState,
        const CIT_StateFrame &endState, const std::size_t numOptimizations)
       {
-	PathVectorPtr_t res[100];
-	bool valid[100];
+	PathVectorPtr_t res[205];
+	bool valid[205];
 	std::size_t distance = std::distance(startState,endState);
 	hppDout(notice,"InterpolateState rootpath distance = "<<distance);
 	assert(distance < 203); // 2*BallInterpMaxInter+3
@@ -484,7 +511,15 @@ namespace hpp {
 	      {
 		//hppDout (info, "optimize partial path");
 		//res[i] = optimize(helper,partialPath, numOptimizations); // this will create subpaths in res[i]
-		res[i] =partialPath;
+		hppDout (info, "partial path from interpolateStates exists");
+		hppDout (info, "numberPaths= " << partialPath->numberPaths ());
+		if (!(partialPath->numberPaths ())) {
+		  hppDout (info, "problem with partialPath from interpolateStates");
+		  hppDout (info, "numberPaths= " << partialPath->numberPaths ());
+		  // use direct interpolation instead ?
+		  partialPath = directInterpolation (helper, a->second, b->second);
+		}
+		res[i] = partialPath;
 		valid[i]=true;
 	      }
 	    else
@@ -572,6 +607,25 @@ namespace hpp {
 	std::size_t numValid = checkPath(distance, valid);
 	return ConcatenateAndResizePath(res, numValid);
       }
+
+      PathVectorPtr_t directInterpolation (LimbRRTHelper& helper,
+					   const State& from, const State& to)
+      {
+	ConfigurationPtr_t start = limbRRTConfigFromDevice(helper, from, 0.);
+	ConfigurationPtr_t end = limbRRTConfigFromDevice(helper, to, helper.rootPath_->length());
+	PathVectorPtr_t res = core::PathVector::create ((*start).size (), (*start).size () - 1);
+	core::Problem& problem = helper.rootProblem_;
+	const DistancePtr_t& distance = problem.distance();
+	const value_type length = (*distance) (from.configuration_, to.configuration_);
+	// build direct interpolation
+	hppDout (info, "before straightPath creation");
+	StraightPathPtr_t path = StraightPath::create (problem.robot (), *start, *end, length);
+	res->appendPath (path);
+	//assert(0);
+	hppDout (info, "direct interpolation for partialPath");
+	return res;
+	}
+
     }// namespace interpolation
   }// namespace rbprm
 }// namespace hpp

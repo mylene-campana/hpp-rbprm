@@ -140,17 +140,22 @@ namespace hpp {
     /// \param to iterator to the final State with its associated keyFrame in the path
     /// \param numOptimizations Number of iterations of the shortcut algorithm to apply between each states
     /// \return the resulting path vector, concatenation of all the interpolation paths between the State
-    core::PathPtr_t HPP_RBPRM_DLLAPI interpolateStates(RbPrmFullBodyPtr_t fullbody,
-                                                             core::ProblemPtr_t referenceProblem,
-                                                             const core::PathPtr_t rootPath,
-                                                             const CIT_StateFrame& startState,
-                                                             const CIT_StateFrame& endState,
-                                                             const std::size_t numOptimizations = 10);
+      core::PathPtr_t HPP_RBPRM_DLLAPI 
+      interpolateStates(RbPrmFullBodyPtr_t fullbody,
+			core::ProblemPtr_t referenceProblem,
+			const core::PathPtr_t rootPath,
+			const CIT_StateFrame& startState,
+			const CIT_StateFrame& endState,
+			const std::size_t numOptimizations = 10);
 
       core::PathVectorPtr_t interpolateStatesinPathVector
       (RbPrmFullBodyPtr_t fullbody, core::ProblemPtr_t referenceProblem,
        const core::PathPtr_t rootPath, const CIT_StateFrame &startState,
        const CIT_StateFrame &endState, const std::size_t numOptimizations);
+
+      // compute a direct path without constraints between the two states
+      // used when classic interpolateStates fails
+      core::PathVectorPtr_t HPP_RBPRM_DLLAPI directInterpolation(LimbRRTHelper& helper, const State& from, const State& to);
 
     } // namespace interpolation
     } // namespace rbprm
