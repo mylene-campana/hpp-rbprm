@@ -284,7 +284,7 @@ namespace hpp {
       for(sampling::T_OctreeReport::const_iterator it = finalSet.begin() ; it != finalSet.end(); ++it){ // ordered by best static value ??
         sampling::Load(*it->sample_, configuration);
         hpp::core::ValidationReportPtr_t valRep (new hpp::core::CollisionValidationReport);
-	hppDout (info, "classic validation test= " << validation->validate(configuration, valRep));
+	//hppDout (info, "classic validation test= " << validation->validate(configuration, valRep));
 	core::CollisionValidationReport* report = static_cast <core::CollisionValidationReport*> (valRep.get());
 	if (!report) {
 	  hppDout (info, "collision with:"<<report->object1->name ());
@@ -388,8 +388,9 @@ namespace hpp {
 		  const fcl::Vec3f& configPos = effectorJoint->currentTransformation ().getTranslation();
 		  hppDout (info, "pos= " << ppos);
 		  hppDout (info, "real effector pos to config= " << configPos);
-		  hppDout (info, "norm= " << (ppos - configPos).norm ());
-		  if ((ppos - configPos).norm () > 1e-4) {
+		  core::value_type posDiffNorm = (ppos - configPos).norm ();
+		  hppDout (info, "norm= " << posDiffNorm);
+		  if (posDiffNorm > 1e-2) {
 		    hppDout (info, "contact refused because of norm");
 		    contactOK = false;
 		  }
@@ -419,8 +420,9 @@ namespace hpp {
 		      const fcl::Vec3f& configPos = effectorJoint->currentTransformation ().getTranslation();
 		      hppDout (info, "pos= " << ppos);
 		      hppDout (info, "real effector pos to config= " << configPos);
-		      hppDout (info, "norm= " << (ppos - configPos).norm ());
-		      if ((ppos - configPos).norm () > 1e-4) {
+		      core::value_type posDiffNorm = (ppos - configPos).norm ();
+		      hppDout (info, "norm= " << posDiffNorm);
+		      if (posDiffNorm > 1e-2) {
 			hppDout (info, "contact refused because of norm");
 			contactOK = false;
 		      }
@@ -435,6 +437,8 @@ namespace hpp {
 			contactOK = true;
 		      }
 		    }
+		    else
+		      hppDout (info, "3DOF contact has collisions");
 		  }
 		}
 	      }

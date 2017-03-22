@@ -45,7 +45,8 @@ namespace hpp {
     (const core::ProblemPtr_t& problem, const RbPrmFullBodyPtr_t robot,
      const hpp::rbprm::State &start, const State& end,
      const core::PathVectorConstPtr_t path) : 
-      path_(path), start_(start), end_(end), problem_ (problem), robot_(robot) 
+      path_(path), start_(start), end_(end), problem_ (problem), robot_(robot),
+      maxIterMaintainContacts_ (100)
 	
     {
       // TODO
@@ -192,8 +193,7 @@ namespace hpp {
     State BallisticInterpolation::computeOffsetContactConfig
     (const BallisticPathPtr_t bp, const State& previousState,
      T_StateFrame &stateFrames, const value_type u_offset,
-     const bool increase_u_offset, value_type& length,
-     const std::size_t maxIter) {
+     const bool increase_u_offset, value_type& length) {
       Configuration_t q_trunk_offset, q_contact_offset(previousState.configuration_), q_interp, result;
       q_trunk_offset = previousState.configuration_; 
       hppDout(notice,"q_trunk_offset = "<<displayConfig(q_trunk_offset));
@@ -241,10 +241,10 @@ namespace hpp {
         return state;
       }
       
-      while (contact_OK && iteration < maxIter && ((((currentLength<bp->length())/3.)&&increase_u_offset) || ((currentLength > (bp->length()*2./3.))&&(!increase_u_offset)))) {
+      while (contact_OK && iteration < maxIterMaintainContacts_ && ((((currentLength<bp->length())/3.)&&increase_u_offset) || ((currentLength > (bp->length()*2./3.))&&(!increase_u_offset)))) {
 	currentLength += u; // u can be negative
         iteration++;
-        hppDout (info, "iteration= " << iteration);
+        hppDout (info, "## iteration= " << iteration);
         hppDout (info, "currentLength = " << currentLength);
         q_trunk_offset = (*bp) (currentLength, success);
 	hppDout (info, "q_trunk_offset= " << displayConfig(q_trunk_offset));

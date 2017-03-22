@@ -409,7 +409,7 @@ namespace hpp {
 	  return partialPath;
         }
 
-        std::size_t checkPath(const std::size_t& distance, bool valid[])
+        std::size_t checkPath(const std::size_t& distance, std::vector<bool> valid)
         {
 	  std::size_t numValid(distance);
 	  for(std::size_t i = 0; i < distance; ++i)
@@ -430,7 +430,7 @@ namespace hpp {
 	  return numValid;
         }
 
-	PathPtr_t ConcatenateAndResizePath (PathVectorPtr_t res[],
+	PathPtr_t ConcatenateAndResizePath (std::vector<PathVectorPtr_t> res,
 					    std::size_t numValid)
         {
 	  PathVectorPtr_t completePath = res[0];
@@ -445,8 +445,8 @@ namespace hpp {
 	  return reducedPath;
 	}
 
-	PathVectorPtr_t ConcatenatePathInPathVector (PathVectorPtr_t res[],
-						     std::size_t numValid)
+	PathVectorPtr_t ConcatenatePathInPathVector
+	(std::vector<PathVectorPtr_t> res, std::size_t numValid)
 	{
 	  //Note: res pathVectors has configs of size +1
 	  const std::size_t ReducedConfigSize = res[0]->outputSize () - 1;
@@ -485,11 +485,10 @@ namespace hpp {
        const PathPtr_t rootPath, const CIT_StateFrame &startState,
        const CIT_StateFrame &endState, const std::size_t numOptimizations)
       {
-	PathVectorPtr_t res[205];
-	bool valid[205];
 	std::size_t distance = std::distance(startState,endState);
+	std::vector<PathVectorPtr_t> res (distance + 1);
+	std::vector<bool> valid (distance + 1);
 	hppDout(notice,"InterpolateState rootpath distance = "<<distance);
-	assert(distance < 203); // 2*BallInterpMaxInter+3
 	// treat each interpolation between two states separatly
 	// in a different thread5
 	//#pragma omp parallel for
@@ -541,10 +540,9 @@ namespace hpp {
        const PathPtr_t rootPath, const CIT_StateFrame &startState,
        const CIT_StateFrame &endState, const std::size_t numOptimizations)
       {
-	PathVectorPtr_t res[100];
-	bool valid[100];
 	std::size_t distance = std::distance(startState,endState);
-	assert(distance < 100);
+	std::vector<PathVectorPtr_t> res (distance + 1);
+	std::vector<bool> valid (distance + 1);
 	// treat each interpolation between two states separatly
 	// in a different thread
 	//#pragma omp parallel for
@@ -579,11 +577,10 @@ namespace hpp {
 				  const CIT_State &endState,
 				  const std::size_t numOptimizations)
       {
-	PathVectorPtr_t res[100];
-	bool valid[100];
 	std::size_t distance = std::distance(startState,endState);
+	std::vector<PathVectorPtr_t> res (distance + 1);
+	std::vector<bool> valid (distance + 1);
 	hppDout(notice,"InterpolateState distance = "<<distance);
-	assert(distance < 100);
 	// treat each interpolation between two states separatly
 	// in a different thread
 #pragma omp parallel for

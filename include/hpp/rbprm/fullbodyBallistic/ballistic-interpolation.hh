@@ -146,6 +146,10 @@ namespace hpp {
 	affMap_ = affMap;
       }
 
+      void setMaxIterMaintainContacts (const size_t maxIter) {
+	maxIterMaintainContacts_ = maxIter;
+      }
+
     protected:
       BallisticInterpolation (const core::ProblemPtr_t &problem,
 			      const RbPrmFullBodyPtr_t robot,
@@ -216,12 +220,12 @@ namespace hpp {
       /// Return the configuration based at u_offset on subpath, trying to 
       /// apply same contacts as in previousState. u is decreased 
       /// (or increased) of u_offset to get closer to previousState 
-      /// until maxIter is reached or when contact cannot be maintained anymore.
+      /// until maxIterMaintainContacts is reached or 
+      /// when contact cannot be maintained anymore.
       State computeOffsetContactConfig
 	(const BallisticPathPtr_t bp, const State &previousState,
 	 T_StateFrame& stateFrames, const core::value_type u_offset,
-	 const bool increase_u_offset, core::value_type &length,
-	 const std::size_t maxIter = 100);
+	 const bool increase_u_offset, core::value_type &length);
 
       /// Return the configuration at the top of the parabola (path),
       /// using extendingPose_ for limbs part if defined,
@@ -306,6 +310,7 @@ namespace hpp {
       affMap_t affMap_;
       std::map<std::string, std::vector<std::string> > affFilters_;
       size_t trunkConfigSize_;
+      size_t maxIterMaintainContacts_;
     }; // class BallisticInterpolation
     
   } // namespace rbprm
