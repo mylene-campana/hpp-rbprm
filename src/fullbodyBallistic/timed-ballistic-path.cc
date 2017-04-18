@@ -120,7 +120,7 @@ namespace hpp {
       // interpolation for the joints are done by ballisticPath
       std::size_t i = 0;
       while (t > times_ [i] && i < times_.size () - 1) i++;
-      hppDout (info, "t= " << t << ", times_["<<i<<"]= " << times_ [i]);
+      //hppDout (info, "t= " << t << ", times_["<<i<<"]= " << times_ [i]);
       // t < times_[i]
       value_type u;
       const core::PathPtr_t pv_i = pathVector_->pathAtRank (i);
@@ -129,8 +129,8 @@ namespace hpp {
       else
 	u = (t - times_[i-1])/(times_[i] - times_[i-1]) * pv_i->length();
       (*pv_i)(result,u);
-      hppDout (info, "u= " << u);
-      hppDout (info, "tmp config= " << displayConfig(result));
+      // hppDout (info, "u= " << u);
+      //hppDout (info, "tmp config= " << displayConfig(result));
       
       // replace with the correct position / orientation for the center
       //const value_type xTheta0 =cos(theta_)*initial[0]+sin(theta_)*initial[1];

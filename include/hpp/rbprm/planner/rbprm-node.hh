@@ -6,7 +6,7 @@
 #include <hpp/rbprm/rbprm-validation-report.hh>
 #include <polytope/stability_margin.h>
 #include <robust-equilibrium-lib/static_equilibrium.hh>
-
+#include <hpp/rbprm/fullbodyBallistic/parabola-library.hh>
 
 namespace hpp {
   namespace core {
@@ -18,6 +18,9 @@ namespace hpp {
     typedef robust_equilibrium::Matrix6X Matrix6X;
     typedef robust_equilibrium::Matrix63 Matrix63;
     typedef robust_equilibrium::Vector6 Vector6;
+
+    using rbprm::library::ContactCones;
+
     class HPP_CORE_DLLAPI RbprmNode : public Node
     {
     public :
@@ -111,9 +114,11 @@ namespace hpp {
 
       int getNumberOfContacts(){return numberOfContacts_;}
 
-      void contactCones (std::vector<fcl::Vec3f>* contactConesPt) {contactConesPt_ = contactConesPt;}
+      void contactCones (ContactCones* contactCones) {
+	contactCones_ = contactCones;
+}
 
-      std::vector<fcl::Vec3f>* contactCones () {return contactConesPt_;}
+      ContactCones* contactCones () {return contactCones_;}
 
     private:
       fcl::Vec3f normal_;
@@ -135,7 +140,7 @@ namespace hpp {
       double Xtheta_;   // for parent node ! not for this node
       double Z_;        // for parent node ! not for this node
       
-      std::vector<fcl::Vec3f>* contactConesPt_;
+      ContactCones* contactCones_;
 
     }; // class
 

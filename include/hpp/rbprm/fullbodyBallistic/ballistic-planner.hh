@@ -99,6 +99,7 @@ namespace hpp {
       const core::RoadmapPtr_t roadmap_;
       const RbPrmFullBodyPtr_t fullRobot_; // for contact generation
       core::vector_t contactSize_; // should depend on the ROM
+      std::map <int, library::ContactCones> nodeContactCones_; // to store contact-cones from node index (instead of using RbprmNodes)  !! problem when reading pointer in CC loop (pointer is OK but data not !)
     };
     /// \}
   } // namespace rbprm

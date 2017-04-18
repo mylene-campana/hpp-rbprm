@@ -340,11 +340,10 @@ namespace hpp {
 	    return contactCones;
 	  }
 
-	//randomnize the collision pair, in order to get a different surface of contact each time
-	// (because only the first one in collision is considered by fcl and put in the report)
-	//problem->configValidations()->randomnizeCollisionPairs(); // REGLER LE PB DU STOCKAGE DE CONES DANS LA ROADMAP AVANT CA
+	//randomnize the collision pair, in order to get a different surface of contact each time (because only the first one in collision is considered by fcl and put in the report)
+	problem->configValidations()->randomnizeCollisionPairs();
       
-	const bool isSkelRobot = robot->name ().compare("skeleton_trunk_flexible") == 0;
+	const bool isSkelRobot = robot->name ().compare("skeleton_trunk") == 0;
 
 	// get the 2 object in contact for each ROM :
 	hppDout(info,"~~ Number of roms in collision : "<<rbReport->ROMReports.size());
@@ -427,6 +426,10 @@ namespace hpp {
 	contactCones.directions_ = Cones;
 	contactCones.positions_ = positions;
 	contactCones.ROMnames_ = ROMnames;
+
+	hppDout(notice,"positions_.size ()= "<< contactCones.positions_.size ());
+	hppDout(notice, "ROMnames_.size ()= "<< contactCones.ROMnames_.size ());
+	hppDout(notice, "ROMnames_[0]= "<< contactCones.ROMnames_[0]);
 
 	return contactCones;
       }

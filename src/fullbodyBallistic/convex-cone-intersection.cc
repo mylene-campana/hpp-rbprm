@@ -1,5 +1,6 @@
 //
-// Authors: Mylene Campana (2016)
+// Copyright (c) 2017 CNRS
+// Authors: Mylene Campana
 //
 // Math tools to compute a convex cone intersection
 // The following functions may be integrated in HPP later
@@ -533,10 +534,13 @@ namespace convexCone
     hppDout (info, "scal_n = " << scal_n );
     hppDout (info, "scal_p = " << scal_p );
     assert (fabs(crossScal/(scal_p*scal_n)) <= 1);
-    phi_cc = 0.5*acos (crossScal/(scal_p*scal_n));
+    const value_type phi_cc_old = 0.5*acos (crossScal/(scal_p*scal_n));
+    const value_type normCrossProd = sqrt(pow(Mplus[1]*Mminus[2] - Mplus[2]*Mminus[1],2) + pow(Mplus[2]*Mminus[0] - Mplus[0]*Mminus[2],2) + pow(Mplus[0]*Mminus[1] - Mplus[1]*Mminus[0],2));
+    phi_cc = 0.5*atan2 (normCrossProd, crossScal);
     *Mplus_border = Mplus;
     *Mminus_border = Mminus;
     hppDout (info, "phi_cc = " << phi_cc);
+    hppDout (info, "phi_cc_old = " << phi_cc_old);
     hppDout (info, "M_border = " << Mplus); hppDout (info, "M_border = " << Mminus); // same line for VIEWER-PLOT
     hppDout (info, "END of border points ---"); // for VIEWER-PLOT
     return phi_cc;
