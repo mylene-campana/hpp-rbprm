@@ -117,7 +117,7 @@ namespace hpp {
       const value_type Z = z_imp - z_0;
       const value_type theta = atan2 (Y, X);
       const value_type x_theta_0 = cos(theta) * x_0 +  sin(theta) * y_0;
-      const value_type x_theta_imp = cos(theta) * x_imp +  sin(theta) * y_imp;
+      const value_type x_theta_imp = cos(theta) * x_imp + sin(theta) * y_imp;
       const value_type X_theta = X*cos(theta) + Y*sin(theta);
       const value_type phi = atan (mu_);
       hppDout (info, "x_0: " << x_0);

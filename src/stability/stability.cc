@@ -240,7 +240,6 @@ const fcl::Vec3f comfcl = comcptr->com();*/
         if(status != LP_STATUS_OPTIMAL)
         {
             if(status == LP_STATUS_INFEASIBLE || status == LP_STATUS_UNBOUNDED)
-                //return 1.1; // completely arbitrary: TODO
                 return -1.1; // completely arbitrary: TODO
             return -std::numeric_limits<double>::max();
         }

@@ -92,7 +92,7 @@ namespace hpp {
       
       hppDout (info, "robotName= " << robotName);
       // quadRobot are 4-legged characters that usually stands on their two feet
-      const bool quadRobot = robotName.compare("skeleton_trunk_flexible") == 0 || robotName.compare("spiderman_trunk") == 0;
+      const bool quadRobot = robotName.compare("skeleton_trunk") == 0 || robotName.compare("spiderman_trunk") == 0;
       const bool almostVertical = nz > 0.707; // arbitrary threshold
       const bool xDir = quadRobot && !almostVertical;
 

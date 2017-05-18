@@ -228,7 +228,7 @@ namespace hpp {
     void RbPrmValidation::addObstacle (const CollisionObjectPtr_t& object)
     {
         trunkValidation_->addObstacle(object);
-		}
+    }
 
     void RbPrmValidation::removeObstacleFromJoint
     (const JointPtr_t& joint, const CollisionObjectPtr_t& obstacle)
