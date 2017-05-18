@@ -191,8 +191,8 @@ namespace
     RbPrmShooterPtr_t RbPrmShooter::create (const model::RbPrmDevicePtr_t& robot, const ObjectVector_t& geometries, const affMap_t& affordances, const std::vector<std::string>& filter, const std::map<std::string, std::vector<std::string> >& affFilters, const std::size_t shootLimit, const std::size_t displacementLimit, const std::size_t nbFilterMatch)
     {
       unsigned int seed = (unsigned int)(time(NULL));
-      //srand (seed);
-      //hppDout(notice,"&&&&&& SEED = "<<seed);
+      srand (seed);
+      hppDout(notice,"&&&&&& SEED = "<<seed);
       RbPrmShooter* ptr = new RbPrmShooter (robot, geometries, affordances,
                                             filter, affFilters, shootLimit, displacementLimit, nbFilterMatch);
       RbPrmShooterPtr_t shPtr (ptr);
@@ -336,7 +336,7 @@ namespace
 	  normal.normalize();
 	  hppDout (info, "normal= " << normal);
 
-	  // TODO: verify that normal points toward the interiorPoint
+	  // Verify that normal points toward the interiorPoint
 	  // otherwise, invert it
 	  if (interiorPoint_.norm () != 0) {
 	    if ((interiorPoint_ - p).dot (normal) >= 0) {
@@ -354,11 +354,6 @@ namespace
 	  SetConfigTranslation(robot_,config, p);
 	  hppDout (info, "config= " << displayConfig (*config));
 	  if (hasECS && fullOrientationMode_) {
-	    if (!validator_->trunkValidation_->validate(*config, reportShPtr)) {
-	      report = static_cast<CollisionValidationReport*>(reportShPtr.get());
-	      Vec3f normal_test = triangles_[report->result.getContact(0).b2].first;
-	      hppDout (info, "normal_test= " << normal_test);
-	    }
 	    for (size_type i=0; i<3; i++) (*config) [index + i] = normal [i];
 	    thetaSample = 2 * M_PI * rand ()/RAND_MAX - M_PI;
 	    (*config) [index + 3] = thetaSample;

@@ -20,12 +20,12 @@
 SET(LIBRARY_NAME ${PROJECT_NAME})
 
 SET(${LIBRARY_NAME}_SOURCES
-	rbprm-shooter.cc ${PROJECT_SOURCE_DIR}/include/hpp/rbprm/rbprm-shooter.hh    # PROBLEM !!!!!!!!!!!!!!!!!!!!!!!!!!!
-	rbprm-validation.cc ${PROJECT_SOURCE_DIR}/include/hpp/rbprm/rbprm-validation.hh
-  rbprm-path-validation.cc ${PROJECT_SOURCE_DIR}/include/hpp/rbprm/rbprm-path-validation.hh
+		rbprm-shooter.cc ${PROJECT_SOURCE_DIR}/include/hpp/rbprm/rbprm-shooter.hh
+		rbprm-validation.cc ${PROJECT_SOURCE_DIR}/include/hpp/rbprm/rbprm-validation.hh
+		rbprm-path-validation.cc ${PROJECT_SOURCE_DIR}/include/hpp/rbprm/rbprm-path-validation.hh
         rbprm-rom-validation.cc ${PROJECT_SOURCE_DIR}/include/hpp/rbprm/rbprm-rom-validation.hh
-	rbprm-device.cc ${PROJECT_SOURCE_DIR}/include/hpp/rbprm/rbprm-device.hh
-	rbprm-limb.cc ${PROJECT_SOURCE_DIR}/include/hpp/rbprm/rbprm-limb.hh
+		rbprm-device.cc ${PROJECT_SOURCE_DIR}/include/hpp/rbprm/rbprm-device.hh
+		rbprm-limb.cc ${PROJECT_SOURCE_DIR}/include/hpp/rbprm/rbprm-limb.hh
         ${PROJECT_SOURCE_DIR}/include/hpp/rbprm/interpolation/time-dependant.hh
         ${PROJECT_SOURCE_DIR}/include/hpp/rbprm/interpolation/interpolation-constraints.hh
         ${PROJECT_SOURCE_DIR}/include/hpp/rbprm/interpolation/time-constraint-helper.hh
@@ -79,6 +79,7 @@ SET(${LIBRARY_NAME}_SOURCES
         fullbodyBallistic/timed-ballistic-path.cc ${PROJECT_SOURCE_DIR}/include/hpp/rbprm/fullbodyBallistic/timed-ballistic-path.hh
         fullbodyBallistic/ballistic-planner.cc ${PROJECT_SOURCE_DIR}/include/hpp/rbprm/fullbodyBallistic/ballistic-planner.hh
 		fullbodyBallistic/convex-cone-intersection.cc ${PROJECT_SOURCE_DIR}/include/hpp/rbprm/fullbodyBallistic/convex-cone-intersection.hh
+		#fullbodyBallistic/angular-momentum-feasibility.cc ${PROJECT_SOURCE_DIR}/include/hpp/rbprm/fullbodyBallistic/angular-momentum-feasibility.hh
 		#projection-shooter.cc ${PROJECT_SOURCE_DIR}/include/hpp/rbprm/projection-shooter.hh
 
   )
