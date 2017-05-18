@@ -113,6 +113,8 @@ namespace hpp {
 	core::value_type mu_; // friction coef
 	core::value_type thetaBefore_; // parabola-plane orientation, for centroidal cone validation
 	core::value_type thetaAfter_; // parabola-plane orientation, for centroidal cone validation
+	std::size_t centroidalConeFails_; // nb of fail of isCentroidalConeValid over all contact samples
+	fcl::Vec3f interiorPoint_;
   
         const core::CollisionValidationPtr_t getCollisionValidation(){return collisionValidation_;}
 

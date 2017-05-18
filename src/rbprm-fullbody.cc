@@ -62,28 +62,36 @@ namespace hpp {
       bool testBefore = true, testAfter = true;
       core::vector_t n (3);
       // Before
-      if (fabs(VfDir.norm ()) > 1e-5) { // else 0 velocity (extremity), bypass
+      if (fabs(VfDir.norm ()) > 1e-5 && thetaBefore != 10) { // else 0 velocity (extremity), bypass
       const core::vector_t n_2DCC_before =
 	  convexCone::compute_convex_cone_inter (cones_vec, thetaBefore, mu);
       if (n_2DCC_before.norm () == 0)
 	return false;
       for (int i = 0; i < 3; i++) n [i] = n_2DCC_before [i+1];
       const core::vector_t Vfdir = -VfDir/VfDir.norm ();
-      const core::value_type a2 = fabs(acos(Vfdir.dot(n)));
+      //const core::value_type a2 = fabs(acos(Vfdir.dot(n)));
+      const core::value_type normCrossProd2 = sqrt(pow(Vfdir[1]*n[2] - Vfdir[2]*n[1],2) + pow(Vfdir[2]*n[0] - Vfdir[0]*n[2],2) + pow(Vfdir[0]*n[1] - Vfdir[1]*n[0],2));
+      const core::value_type crossScal2 = Vfdir.dot(n);
+      const core::value_type a2 = atan2 (normCrossProd2, crossScal2);
+      hppDout (info, "Vfdir= " << Vfdir.transpose ());
       hppDout (info, "phi= " << n_2DCC_before [0]);
       hppDout (info, "a2= " << a2);
       testBefore = a2 < n_2DCC_before [0];
       }
 
       // After
-      if (fabs(V0Dir.norm ()) > 1e-5) { // else 0 velocity (extremity), bypass
+      if (fabs(V0Dir.norm ()) > 1e-5 && thetaAfter != 10) { // else 0 velocity (extremity), bypass
       const core::vector_t n_2DCC_after =
 	convexCone::compute_convex_cone_inter (cones_vec, thetaAfter, mu);
       if (n_2DCC_after.norm () == 0)
 	return false;
       for (int i = 0; i < 3; i++) n [i] = n_2DCC_after [i+1];
       const core::vector_t V0dir = V0Dir/V0Dir.norm ();
-      const core::value_type a1 = fabs(acos(V0dir.dot(n)));
+      //const core::value_type a1 = fabs(acos(V0dir.dot(n)));
+      const core::value_type normCrossProd1 = sqrt(pow(V0dir[1]*n[2] - V0dir[2]*n[1],2) + pow(V0dir[2]*n[0] - V0dir[0]*n[2],2) + pow(V0dir[0]*n[1] - V0dir[1]*n[0],2));
+      const core::value_type crossScal1 = V0dir.dot(n);
+      const core::value_type a1 = atan2 (normCrossProd1, crossScal1);
+      hppDout (info, "V0dir= " << V0dir.transpose ());
       hppDout (info, "phi= " << n_2DCC_after [0]);
       hppDout (info, "a1= " << a1);
       testAfter = a1 < n_2DCC_after [0];
@@ -227,8 +235,15 @@ namespace hpp {
     RbPrmFullBody::RbPrmFullBody (const model::DevicePtr_t& device)
         : device_(device)
         , collisionValidation_(core::CollisionValidation::create(device))
-        , weakPtr_(), noStability_ (true)
+        , weakPtr_(), noStability_ (true), 
+	  mu_ (1.2), thetaBefore_ (0), thetaAfter_ (0),
+	  centroidalConeFails_ (0)
     {
+      V0dir_.resize (3);
+      V0dir_.setZero ();
+      Vfdir_.resize (3);
+      Vfdir_.setZero ();
+      interiorPoint_.setZero ();
         // NOTHING
     }
 
@@ -491,24 +506,25 @@ namespace hpp {
     }
 
 
-    ContactComputationStatus ComputeStableContact(const hpp::rbprm::RbPrmFullBodyPtr_t& body,
-                              State& current,
-                              core::CollisionValidationPtr_t validation,
-                              const std::string& limbId,
-                              const hpp::rbprm::RbPrmLimbPtr_t& limb,
-                              model::ConfigurationIn_t rbconfiguration,
-                              model::ConfigurationOut_t configuration, const model::ObjectVector_t affordances,
-                              const fcl::Vec3f& direction,
-                              fcl::Vec3f& position, fcl::Vec3f& normal, const double robustnessTreshold,
-                              bool contactIfFails = true, bool stableForOneContact = true,
-                              const sampling::heuristic evaluate = 0)
+    ContactComputationStatus ComputeStableContact
+    (const hpp::rbprm::RbPrmFullBodyPtr_t& body,
+     State& current,
+     core::CollisionValidationPtr_t validation,
+     const std::string& limbId,
+     const hpp::rbprm::RbPrmLimbPtr_t& limb,
+     model::ConfigurationIn_t rbconfiguration,
+     model::ConfigurationOut_t configuration, const model::ObjectVector_t affordances,
+     const fcl::Vec3f& direction,
+     fcl::Vec3f& position, fcl::Vec3f& normal, const double robustnessTreshold,
+     bool contactIfFails = true, bool stableForOneContact = true,
+     const sampling::heuristic evaluate = 0)
     {
       hppDout (info, "compute stable contacts");
       // state already stable just find collision free configuration
       if(current.stable)
-      {
-         //if (ComputeCollisionFreeConfiguration(body, current, validation, limb, configuration)) return true;
-      }
+	{
+	  //if (ComputeCollisionFreeConfiguration(body, current, validation, limb, configuration)) return true;
+	}
       fcl::Matrix3f rotation;
       sampling::T_OctreeReport finalSet;
 
@@ -529,71 +545,88 @@ namespace hpp {
       std::vector<sampling::T_OctreeReport> reports(affordances.size());
       for(model::ObjectVector_t::const_iterator oit = affordances.begin();
           oit != affordances.end(); ++oit, ++i)
-      {
-	//hppDout (info, "collision obj= " << (*oit)->name ());
+	{
+	  //hppDout (info, "collision obj= " << (*oit)->name ());
           if(eval)
             sampling::GetCandidates(limb->sampleContainer_, transform, *oit, direction, reports[i], eval);
           else
             sampling::GetCandidates(limb->sampleContainer_, transform, *oit, direction, reports[i]);
-      }
+	}
       // order samples according to EFORT
       for(std::vector<sampling::T_OctreeReport>::const_iterator cit = reports.begin();
           cit != reports.end(); ++cit)
-      {
-	//hppDout (info, "insert octree collision");
+	{
+	  //hppDout (info, "insert octree collision");
           finalSet.insert(cit->begin(), cit->end());
-      }
+	}
       // pick first sample which is collision free
       bool found_sample(false);
       bool unstableContact(false); //set to true in case no stable contact is found
       core::Configuration_t moreRobust;
+      bool inCone;
       double maxRob = -std::numeric_limits<double>::max();
+      double robustness;
       sampling::T_OctreeReport::const_iterator it = finalSet.begin();
       hppDout (info, "finalSet size: " << finalSet.size ());
       for(;!found_sample && it!=finalSet.end(); ++it)
-      {
-	//hppDout (info, "iteration on samples");
+	{
+	  //hppDout (info, "iteration on samples");
           const sampling::OctreeReport& bestReport = *it;
           sampling::Load(*bestReport.sample_, configuration);
           body->device_->currentConfiguration(configuration);
           {
-              normal = bestReport.normal_;
-              position = bestReport.contact_.pos;
-              // the normal is given by the normal of the contacted object
-              const fcl::Vec3f z = limb->effector_->currentTransformation().getRotation() * limb->normal_;
-	      hppDout (info, "limb->normal_= " << limb->normal_);
-	      hppDout (info, "z= " << z);
-              const fcl::Matrix3f alignRotation = tools::GetRotationMatrix(z,normal);
-	      hppDout (info, "normal= " << normal);
-              //rotation = alignRotation * limb->effector_->initialPosition ().getRotation();
-	      rotation = alignRotation * limb->effector_->currentTransformation().getRotation();
-              // Add constraints to resolve Ik
-              core::ConfigProjectorPtr_t proj = core::ConfigProjector::create(body->device_,"proj", 1e-4, 20); // DEBUG, initially: 1e-4, 20
-              // get current normal orientation
-              hpp::tools::LockJointRec(limb->limb_->name(), body->device_->rootJoint(), proj);
-              fcl::Vec3f posOffset = position - rotation * limb->offset_;
-              posOffset = posOffset + normal * epsilon;
-              fcl::Transform3f localFrame, globalFrame;
-              globalFrame.setTranslation(posOffset);
-	      //std::cout << "target " << globalFrame << std::endl;
-	      proj->add(core::NumericalConstraint::create (constraints::Position::create("pos_stable_contact",body->device_, limb->effector_, localFrame, globalFrame, setTranslationConstraints(normal))));//
+	    position = bestReport.contact_.pos;
+	    normal = bestReport.normal_;
+	    hppDout (info, "normal= " << normal);
+	    // the normal is given by the normal of the contacted object
+	    // Verify that normal points toward the interiorPoint
+	    // otherwise, invert it
+	    if (body->interiorPoint_.norm () != 0) {
+	      if ((body->interiorPoint_ - position).dot (normal) >= 0) {
+		hppDout (info, "normal is oriented toward interiorPoint");
+	      }
+	      else {
+		hppDout (info, "normal is NOT oriented toward interiorPoint, invert it");
+		normal = -normal;
+	      }
+	    } else
+	      hppDout (info, "no interior point has been given");
 
-	      if(limb->contactType_ == hpp::rbprm::_6_DOF)
+	    const fcl::Vec3f z = limb->effector_->currentTransformation().getRotation() * limb->normal_;
+	    hppDout (info, "limb->normal_= " << limb->normal_);
+	    hppDout (info, "z= " << z);
+	    const fcl::Matrix3f alignRotation = tools::GetRotationMatrix(z,normal);
+	    hppDout (info, "normal= " << normal);
+	    //rotation = alignRotation * limb->effector_->initialPosition ().getRotation();
+	    rotation = alignRotation * limb->effector_->currentTransformation().getRotation();
+	    // Add constraints to resolve Ik
+	    core::ConfigProjectorPtr_t proj = core::ConfigProjector::create(body->device_,"proj", 1e-4, 20); // DEBUG, initially: 1e-4, 20
+	    // get current normal orientation
+	    hpp::tools::LockJointRec(limb->limb_->name(), body->device_->rootJoint(), proj);
+	    fcl::Vec3f posOffset = position - rotation * limb->offset_;
+	    posOffset = posOffset + normal * epsilon;
+	    fcl::Transform3f localFrame, globalFrame;
+	    globalFrame.setTranslation(posOffset);
+	    //std::cout << "target " << globalFrame << std::endl;
+	    proj->add(core::NumericalConstraint::create (constraints::Position::create("pos_stable_contact",body->device_, limb->effector_, localFrame, globalFrame, setTranslationConstraints(normal))));//
+
+	    hppDout (info, "limbId= " << limbId);
+	    if(limb->contactType_ == hpp::rbprm::_6_DOF)
               {
 		hppDout (info, "6 DOF contact type");
 		proj->add(core::NumericalConstraint::create (constraints::Orientation::create("rot_stable_contact",body->device_, limb->effector_, fcl::Transform3f(rotation), 
 											      //setMaintainRotationConstraints(z))));
-                setRotationConstraints(z)))); // allow z-axis rotation
+											      setRotationConstraints(z)))); // allow z-axis rotation
               } else hppDout (info, "NOT 6 DOF contact type");
     
-              if(proj->apply(configuration))
+	    hppDout (info, "test constraint application on config");
+	    if(proj->apply(configuration))
               {
-		hppDout (info, "in projection test");
                 hpp::core::ValidationReportPtr_t valRep (new hpp::core::CollisionValidationReport);
 		hppDout (info, "tested config for contact= " << displayConfig(configuration));
                 if(validation->validate(configuration, valRep)) // true
-                {
-		  hppDout (info, "config is valid");
+		  {
+		    hppDout (info, "config is valid");
                     // test stability of new configuration
                     bool noStability = body->noStability_;
                     body->device_->currentConfiguration(configuration);
@@ -606,44 +639,43 @@ namespace hpp {
 		    tmp.ignoreRotation_[limbId] = false;
                     tmp.configuration_ = configuration;
                     ++tmp.nbContacts;
-                    double robustness = stability::IsStable(body,tmp);
-		    // tests cones Mylene
-		    core::vector_t V0Dir = body->V0dir_;
-		    core::vector_t VfDir = body->Vfdir_;
-		    const std::size_t indexEC = body->device_->configSize () - body->device_->extraConfigSpace ().dimension ();
-		    bool inCone = true;
-		    if (body->mu_ && (V0Dir.size () > 1 || VfDir.size () > 1) && (body->thetaBefore_ || body->thetaAfter_)) {
-		      hppDout (info, "body->mu_= " << body->mu_);
-		      hppDout (info, "body->thetaBefore_= " << body->thetaBefore_);
-		      hppDout (info, "body->thetaAfter_= " << body->thetaAfter_);
-		      inCone = isCentroidalConeValid (tmp, V0Dir, VfDir, body->thetaBefore_, body->thetaAfter_, body->mu_);
-		      inCone = true; // isCentroidalConeValid not ready yet
-		    } else
-		      hppDout (info, "problem initializing V0 or EC for isCentroidalConeValid");
-		    
 		    if (noStability) {
 		      hppDout (info, "stability bypassed");
 		      robustness = 4000000; // hardcoded to bypass stability
-		    } else
+		    } else {
 		      hppDout (info, "stability computed");
+		      robustness = stability::IsStable(body,tmp);
+		    }
+		    // tests cones Mylene
+		    hppDout (info, "V0Dir= " << body->V0dir_.transpose ());
+		    hppDout (info, "VfDir= " << body->Vfdir_.transpose ());
+		    core::vector_t V0Dir = body->V0dir_;
+		    core::vector_t VfDir = body->Vfdir_;
+		    //const std::size_t indexEC = body->device_->configSize () - body->device_->extraConfigSpace ().dimension ();
+		    inCone = true;
+		    hppDout (info, "body->mu_= " << body->mu_);
+		    hppDout (info, "body->thetaBefore_= " << body->thetaBefore_);
+		    hppDout (info, "body->thetaAfter_= " << body->thetaAfter_);
+		    inCone = isCentroidalConeValid (tmp, V0Dir, VfDir, body->thetaBefore_, body->thetaAfter_, body->mu_);
+		    
                     if(((tmp.nbContacts == 1 && !stableForOneContact) || robustness>=robustnessTreshold) && inCone)
-                    {
+		      {
                         maxRob = std::max(robustness, maxRob);
                         position = limb->effector_->currentTransformation().getTranslation();
                         rotation = limb->effector_->currentTransformation().getRotation();
                         found_sample = true;
-                    }
+		      }
                     // if no stable candidate is found, select best contact
                     // anyway
                     else if((robustness > maxRob) && contactIfFails)
-                    {
+		      {
                         moreRobust = configuration;
                         maxRob = robustness;
                         position = limb->effector_->currentTransformation().getTranslation();
                         rotation = limb->effector_->currentTransformation().getRotation();
                         unstableContact = true;
-                    }
-                }else{
+		      }
+		  }else{
 		  // Debug: check if collision and get colliding objects
 		  core::ValidationReportPtr_t valReport;
 		  validation->validate(configuration, valReport);
@@ -653,26 +685,26 @@ namespace hpp {
 		  hppDout (info, "collision with:"<<report->object1->name ());
 		  hppDout (info, "collision with:"<<report->object2->name ());
 		}                
-              }
-          }
-      }
+              }// if proj->apply
+          }// for sample
+	}
 
       ContactComputationStatus status(NO_CONTACT);
       if(found_sample)
-      {
+	{
           status = STABLE_CONTACT;
           current.stable = true;
-      }
+	}
       else if(unstableContact)
-      {          
+	{          
           status = UNSTABLE_CONTACT;
           configuration = moreRobust;
-      }
+	}
       else
-      {
+	{
           if(!found_sample)
-          {
-	    hppDout (info, "current.configuration_ (before ComputeCollisionFree)= " << displayConfig(current.configuration_));
+	    {
+	      hppDout (info, "current.configuration_ (before ComputeCollisionFree)= " << displayConfig(current.configuration_));
               ComputeCollisionFreeConfiguration(body, current, validation, limb, configuration,robustnessTreshold,false);
 	      current.contacts_[limbId] = false; // limb is not in contact
 	      hppDout (info, "limb= " << limbId);
@@ -680,10 +712,10 @@ namespace hpp {
 	      hppDout (info, "current.configuration_= " << displayConfig(current.configuration_));
 	      core::ValidationReportPtr_t valReport;
 	      hppDout (info, "collision test= " << validation->validate(current.configuration_,valReport));
-          }
-      }
+	    }
+	}
       if(found_sample || unstableContact)
-      {
+	{
           current.contacts_[limbId] = true;
           current.contactNormals_[limbId] = normal;
           current.contactPositions_[limbId] = position;
@@ -693,115 +725,117 @@ namespace hpp {
           current.contactOrder_.push(limbId);
 	  hppDout (info, "found sample or unstableContact -> update state");
 	  hppDout (info, "current.configuration_= " << displayConfig(current.configuration_));
-      }
+	}
       hppDout (info, "ComputeStableContact status= " << status);
       return status;
     }
 
-		hpp::model::ObjectVector_t getAffObjectsForLimb(const std::string& limb,
-			const affMap_t& affordances, const std::map<std::string, std::vector<std::string> >& affFilters)
-		{
-			model::ObjectVector_t affs;
-			std::vector<std::string> affTypes;
-			bool settingFound = false;
-			for (std::map<std::string, std::vector<std::string> >::const_iterator fIt =
-				affFilters.begin (); fIt != affFilters.end (); ++fIt) {
-				std::size_t found = fIt->first.find(limb);
- 			  if (found != std::string::npos) {
-				affTypes = fIt->second;
-				settingFound = true;
-				break;
-				}
-			}
-			if (!settingFound) {
-        // TODO: Keep warning or delete it?
-				std::cout << "No affordance filter setting found for limb " << limb
-					<< ". Has such filter been set?" << std::endl;
-				// Use all AFF OBJECTS as default if no filter setting exists
-				for (affMap_t::const_iterator affordanceIt = affordances.begin ();
-					affordanceIt != affordances.end (); ++affordanceIt) {
-					std::copy (affordanceIt->second.begin (), affordanceIt->second.end (),
-						std::back_inserter (affs));
-				}
-            } else {
-				for (std::vector<std::string>::const_iterator affTypeIt = affTypes.begin ();
-					affTypeIt != affTypes.end (); ++affTypeIt) {
-					affMap_t::const_iterator affIt = affordances.find(*affTypeIt);
-					std::copy (affIt->second.begin (), affIt->second.end (), std::back_inserter (affs));
-				}
-			}
-			if (affs.empty()) {
-			throw std::runtime_error ("No aff objects found for limb " + limb);
-			}
-			return affs;
-		}
-
-    bool RepositionContacts(State& result, const hpp::rbprm::RbPrmFullBodyPtr_t& body,
-			core::CollisionValidationPtr_t validation,
-      model::ConfigurationOut_t config, const affMap_t& affordances,
-      const std::map<std::string, std::vector<std::string> >& affFilters, const fcl::Vec3f& direction,
-			const double robustnessTreshold)
+    hpp::model::ObjectVector_t getAffObjectsForLimb(const std::string& limb,
+						    const affMap_t& affordances, const std::map<std::string, std::vector<std::string> >& affFilters)
     {
-        // replace existing contacts
-        // start with older contact created
-        std::stack<std::string> poppedContacts;
-        std::queue<std::string> oldOrder = result.contactOrder_;
-        std::queue<std::string> newOrder;
-        core::Configuration_t savedConfig = config;
-        std::string nContactName ="";
-        State previous = result;
-        while(!result.stable &&  !oldOrder.empty())
-        {
-            std::string previousContactName = oldOrder.front();
-            std::string groupName = body->GetLimbs().at(previousContactName)->limb_->name();
-            const std::vector<std::string>& group = body->GetGroups().at(groupName);
-            oldOrder.pop();
-            fcl::Vec3f normal, position;
-            core::ConfigurationIn_t save = body->device_->currentConfiguration();
-            bool notFound(true);
-            for(std::vector<std::string>::const_iterator cit = group.begin();
-                notFound && cit != group.end(); ++cit)
-            {
-								hpp::model::ObjectVector_t affs = getAffObjectsForLimb (*cit,
-									affordances, affFilters);
+      model::ObjectVector_t affs;
+      std::vector<std::string> affTypes;
+      bool settingFound = false;
+      for (std::map<std::string, std::vector<std::string> >::const_iterator fIt =
+	     affFilters.begin (); fIt != affFilters.end (); ++fIt) {
+	std::size_t found = fIt->first.find(limb);
+	if (found != std::string::npos) {
+	  affTypes = fIt->second;
+	  settingFound = true;
+	  break;
+	}
+      }
+      if (!settingFound) {
+        // TODO: Keep warning or delete it?
+	std::cout << "No affordance filter setting found for limb " << limb
+		  << ". Has such filter been set?" << std::endl;
+	// Use all AFF OBJECTS as default if no filter setting exists
+	for (affMap_t::const_iterator affordanceIt = affordances.begin ();
+	     affordanceIt != affordances.end (); ++affordanceIt) {
+	  std::copy (affordanceIt->second.begin (), affordanceIt->second.end (),
+		     std::back_inserter (affs));
+	}
+      } else {
+	for (std::vector<std::string>::const_iterator affTypeIt = affTypes.begin ();
+	     affTypeIt != affTypes.end (); ++affTypeIt) {
+	  affMap_t::const_iterator affIt = affordances.find(*affTypeIt);
+	  std::copy (affIt->second.begin (), affIt->second.end (), std::back_inserter (affs));
+	}
+      }
+      if (affs.empty()) {
+	throw std::runtime_error ("No aff objects found for limb " + limb);
+      }
+      return affs;
+    }
 
-                if(ComputeStableContact(body, result, validation, *cit, body->GetLimbs().at(*cit),save, config,
-                	affs, direction, position, normal, robustnessTreshold, false)
-                  == STABLE_CONTACT)
-                {
-                    nContactName = *cit;
-                    notFound = false;
-                }
-                else
-                {
-                    result = previous;
-                    config = savedConfig;
-                }
-            }
-            if(notFound)
+    bool RepositionContacts(State& result, 
+			    const hpp::rbprm::RbPrmFullBodyPtr_t& body,
+			    core::CollisionValidationPtr_t validation,
+			    model::ConfigurationOut_t config, 
+			    const affMap_t& affordances,
+			    const std::map<std::string, std::vector<std::string> >& affFilters, const fcl::Vec3f& direction,
+			    const double robustnessTreshold)
+    {
+      // replace existing contacts
+      // start with older contact created
+      std::stack<std::string> poppedContacts;
+      std::queue<std::string> oldOrder = result.contactOrder_;
+      std::queue<std::string> newOrder;
+      core::Configuration_t savedConfig = config;
+      std::string nContactName ="";
+      State previous = result;
+      while(!result.stable &&  !oldOrder.empty())
+        {
+	  std::string previousContactName = oldOrder.front();
+	  std::string groupName = body->GetLimbs().at(previousContactName)->limb_->name();
+	  const std::vector<std::string>& group = body->GetGroups().at(groupName);
+	  oldOrder.pop();
+	  fcl::Vec3f normal, position;
+	  core::ConfigurationIn_t save = body->device_->currentConfiguration();
+	  bool notFound(true);
+	  for(std::vector<std::string>::const_iterator cit = group.begin();
+	      notFound && cit != group.end(); ++cit)
             {
-                config = savedConfig;
-                result.configuration_ = savedConfig;
-                poppedContacts.push(previousContactName);
-                body->device_->currentConfiguration(save);
+	      hpp::model::ObjectVector_t affs = getAffObjectsForLimb (*cit,
+								      affordances, affFilters);
+
+	      if(ComputeStableContact(body, result, validation, *cit, body->GetLimbs().at(*cit),save, config,
+				      affs, direction, position, normal, robustnessTreshold, false)
+		 == STABLE_CONTACT)
+                {
+		  nContactName = *cit;
+		  notFound = false;
+                }
+	      else
+                {
+		  result = previous;
+		  config = savedConfig;
+                }
+            }
+	  if(notFound)
+            {
+	      config = savedConfig;
+	      result.configuration_ = savedConfig;
+	      poppedContacts.push(previousContactName);
+	      body->device_->currentConfiguration(save);
             }
         }
-        while(!poppedContacts.empty())
+      while(!poppedContacts.empty())
         {
-            newOrder.push(poppedContacts.top());
-            poppedContacts.pop();
+	  newOrder.push(poppedContacts.top());
+	  poppedContacts.pop();
         }
-        while(!oldOrder.empty())
+      while(!oldOrder.empty())
         {
-            newOrder.push(oldOrder.front());
-            oldOrder.pop();
+	  newOrder.push(oldOrder.front());
+	  oldOrder.pop();
         }
-        if(result.stable)
+      if(result.stable)
         {
-            newOrder.push(nContactName);
+	  newOrder.push(nContactName);
         }
-        result.contactOrder_ = newOrder;
-        return result.stable;
+      result.contactOrder_ = newOrder;
+      return result.stable;
     }
 
     hpp::rbprm::State ComputeContacts
@@ -828,7 +862,7 @@ namespace hpp {
 	      hppDout (info, "limb= " << lit->first << "contact status= " << result.contacts_[lit->first]);
             }
             result.nbContacts = result.contactNormals_.size();
-        }
+	  }
 
 	// display contacting limbs for debug
 	for(rbprm::T_Limb::const_iterator lit = body->GetLimbs().begin();lit != body->GetLimbs().end(); ++lit){
@@ -841,6 +875,13 @@ namespace hpp {
         // reload previous configuration
         body->device_->currentConfiguration(save);
 	result = initializeExtraConfigs (body, result);
+	hppDout (info, "body->mu_= " << body->mu_);
+	hppDout (info, "body->thetaBefore_= " << body->thetaBefore_);
+	hppDout (info, "body->thetaAfter_= " << body->thetaAfter_);
+	hppDout (info, "config= " << displayConfig(result.configuration_));
+	if(!isCentroidalConeValid (result, body->V0dir_, body->Vfdir_, body->thetaBefore_, body->thetaAfter_, body->mu_))
+	  body->centroidalConeFails_++;
+	hppDout (info, "body->centroidalConeFails_= " << body->centroidalConeFails_);
         return result;
     }
 
@@ -943,6 +984,15 @@ namespace hpp {
       } else
 	hppDout(info,"NOT contacting limbs: " << lit->first);
     }
+
+    /*if (body->mu_ && (body->V0dir_.size () > 1 || body->Vfdir_.size () > 1) && (body->thetaBefore_ || body->thetaAfter_)) {
+      hppDout (info, "body->mu_= " << body->mu_);
+      hppDout (info, "body->thetaBefore_= " << body->thetaBefore_);
+      hppDout (info, "body->thetaAfter_= " << body->thetaAfter_);
+      if(!isCentroidalConeValid (result, body->V0dir_, body->Vfdir_, body->thetaBefore_, body->thetaAfter_, body->mu_))
+	body->centroidalConeFails_++;
+      hppDout (info, "body->centroidalConeFails_= " << body->centroidalConeFails_);
+      }*/
 
     // reload previous configuration
     // no stable contact was found / limb maintained
