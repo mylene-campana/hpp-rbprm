@@ -135,6 +135,12 @@ namespace hpp {
       hppDout (info, "X_theta: " << X_theta);
       hppDout (info, "phi: " << phi);
 
+      if (X_theta == 0) { // TODO ! deal with this case
+	hppDout (info, "Cannot jump just vertically");
+	problem_->parabolaResults_ [0] ++;
+	return core::PathPtr_t ();
+      }
+
       /* 5th constraint: first cone */
       value_type delta1;
       if (1000 * (q1 (index) * q1 (index) + q1 (index+1) * q1 (index+1))
@@ -407,6 +413,12 @@ namespace hpp {
       hppDout (info, "x_theta_imp: " << x_theta_imp);
       hppDout (info, "X_theta: " << X_theta);
       hppDout (info, "phi: " << phi);
+
+      if (X_theta == 0) { // TODO ! deal with this case
+	hppDout (info, "Cannot jump just vertically");
+	problem_->parabolaResults_ [0] ++;
+	return core::PathPtr_t ();
+      }
 
       /* Compute 2D Convex-Cones */
       hppDout (info, "cones1, number of directions= " << cones1->directions_.size ()); // verif
@@ -694,7 +706,12 @@ namespace hpp {
       
       
       const value_type X_theta = X*cos(theta) + Y*sin(theta);
-      
+
+      if (X_theta == 0) { // TODO ! deal with this case
+	hppDout (info, "Cannot jump just vertically");
+	return core::PathPtr_t ();
+      }
+     
       const value_type x_theta_0_dot = sqrt((g_ * X_theta * X_theta)
                                             /(2 * (X_theta*tan(alpha) - Z)));
       const value_type inv_x_th_dot_0_sq = 1/(x_theta_0_dot*x_theta_0_dot);
