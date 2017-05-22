@@ -707,13 +707,33 @@ namespace hpp {
       
       const value_type X_theta = X*cos(theta) + Y*sin(theta);
 
-      if (X_theta == 0) { // TODO ! deal with this case
-	hppDout (info, "Cannot jump just vertically");
-	return core::PathPtr_t ();
+      if (X_theta == 0) {
+	hppDout (info, "WARNING: jump just vertically");
+	// To deal with the "vertical jump" case, there are two parameters:
+	// initial vertical velocity and jump duration
+	// we return a solution arriving at goal with zero speed
+	if (z_imp > z_0) {
+	  const value_type z_0_dot = sqrt(2*Z*g_);
+	  vector_t coefs_vertical (7);
+	  coefs_vertical [0] = 0; // z(t) equation here, not z(x)
+	  coefs_vertical [1] = 0;
+	  coefs_vertical [2] = 0;
+	  coefs_vertical [3] = theta;
+	  coefs_vertical [4] = 0;
+	  coefs_vertical [5] = z_0_dot;
+	  coefs_vertical [6] = z_0;
+	  const value_type length_z = z_imp - z_0;
+	  ParabolaPathPtr_t pp_vertical = ParabolaPath::create (device_.lock (), q1, *qnew, length_z, coefs_vertical);
+	  return pp_vertical; // not really a parabola tho
+	}
+	else {
+	  hppDout (info, "Cannot jump just vertically down");
+	  return core::PathPtr_t ();
+	}
       }
      
       const value_type x_theta_0_dot = sqrt((g_ * X_theta * X_theta)
-                                            /(2 * (X_theta*tan(alpha) - Z)));
+					    /(2 * (X_theta*tan(alpha) - Z)));
       const value_type inv_x_th_dot_0_sq = 1/(x_theta_0_dot*x_theta_0_dot);
       //const value_type v = sqrt((1 + tan(alpha)*tan(alpha))) * x_theta_0_dot;
       //hppDout (notice, "v: " << v);
