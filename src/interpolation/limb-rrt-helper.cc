@@ -184,7 +184,8 @@ namespace hpp {
 	  model::DevicePtr_t device = problem.robot();
 	  core::ConstraintSetPtr_t cSet = core::ConstraintSet::create(device,"");
 	  core::ConfigProjectorPtr_t proj = core::ConfigProjector::create(device,"proj", 1e-2, 30);
-	  bool disableConstr;
+	  bool disableConstr = true;
+	  bool atLeastOneConstr = false;
 
 	  // For verification:
 	  Configuration_t initialLong (from.configuration_.size () + 1);
@@ -200,6 +201,7 @@ namespace hpp {
 	  for(std::vector<std::string>::const_iterator cit = fixed.begin();
 	      cit != fixed.end(); ++cit)
 	    {
+	      hppDout (info, "create projector");
 	      proj = core::ConfigProjector::create(device,"proj", 1e-2, 30);
 	      hppDout (info, "fixed contact: " << *cit);
 	      RbPrmLimbPtr_t limb = helper.fullbody_->GetLimbs().at(*cit);
@@ -212,7 +214,7 @@ namespace hpp {
 	      
 		const fcl::Transform3f& transform =  effectorJoint->currentTransformation ();
 
-		hppDout (info, "create contact position constraint");
+		hppDout (info, "effector joint= " << limb->effector_->name());
 		hppDout (info, "pos from= " << ppos);
 		hppDout (info, "pos to= " << ppos_to);
 
@@ -233,6 +235,7 @@ namespace hpp {
 
 		if (normFrom < 1e-4 && normTo < 1e-4) {
 		  // create constraint(s)
+		  hppDout (info, "create contact position constraint");
 		  proj->add(core::NumericalConstraint::create (constraints::Position::create("", device, effectorJoint, fcl::Vec3f(0,0,0), ppos)));
 		  disableConstr = false;
 		  if (!proj->isSatisfied (endLong)) {
@@ -274,12 +277,20 @@ namespace hpp {
 
 	      if (!disableConstr) {
 		hppDout (info, "constr not disabled");
-		cSet->addConstraint(proj);
-		problem.constraints(cSet);
+		//cSet->addConstraint(proj);     // DEBUG !!!
+		atLeastOneConstr = true;
+		hppDout (info, "constr not added because DEBUG");
 	      } else
 		hppDout (info, "constr disabled");
 
 	    }//for fixed limbs
+
+	  if (atLeastOneConstr) {
+	    hppDout (info, "add all new constraints to problem");
+	    //problem.constraints(cSet);         // DEBUG !!!
+	  } else {
+	    hppDout (info, "NO new constraint to add to problem");
+	  }
 
 	  hppDout (info, "test end config with configProjector build with initial config");
 	  if (!proj->isSatisfied (endLong)) {
@@ -316,7 +327,7 @@ namespace hpp {
         core::ValidationReportPtr_t validationReport;
 
 	if (variations.size () != 0) {
-	  AddContactConstraints(helper, from, to);
+	  //AddContactConstraints(helper, from, to);  // DEBUG !!
 	
 	  //std::vector<std::string> variations = extractEffectorsName(limbs);
 	  for(std::vector<std::string>::const_iterator cit = variations.begin();
@@ -348,7 +359,8 @@ namespace hpp {
 	      res = planner->solve();
 	      hppDout (info, "after BiRRT planner solve");
 	      helper.rootProblem_.resetGoalConfigs();
-	    }
+	      hppDout (info, "helper.rootProblem_.nbPathPlannerFails_= " << helper.rootProblem_.nbPathPlannerFails_);
+	    }// for variations
 
 	  // if no variation, still solve the problem to keep the contact along the path
 	} else {
@@ -387,10 +399,10 @@ namespace hpp {
 		res = planner->solve();
 		hppDout (info, "after BiRRT planner solve");
 		helper.rootProblem_.resetGoalConfigs();
-	      }
-	  }
-	}
-
+		hppDout (info, "helper.rootProblem_.nbPathPlannerFails_= " << helper.rootProblem_.nbPathPlannerFails_);
+	      }// for limbs
+	  }// if straight-path invalid
+	}// if no variation
 	hppDout (info, "number of subpaths in res= " << res->numberPaths ());
         return res;
       }
@@ -508,6 +520,9 @@ namespace hpp {
 	    PathVectorPtr_t partialPath = interpolateStates(helper, a->second, b->second);
 	    if(partialPath)
 	      {
+		if (helper.rootProblem_.nbPathPlannerFails_ > 0)
+		  referenceProblem->nbPathPlannerFails_++;
+		hppDout (info, "referenceProblem->nbPathPlannerFails_= " << referenceProblem->nbPathPlannerFails_);
 		//hppDout (info, "optimize partial path");
 		//res[i] = optimize(helper,partialPath, numOptimizations); // this will create subpaths in res[i]
 		hppDout (info, "partial path from interpolateStates exists");
@@ -531,6 +546,7 @@ namespace hpp {
 	std::size_t numValid = checkPath(distance, valid);
 	hppDout (info, "ConcatenatePath");
 	hppDout (info, "distance= " << distance << " numValid= " << numValid);
+	hppDout (info, "referenceProblem->nbPathPlannerFails_= " << referenceProblem->nbPathPlannerFails_);
 	// numValid is the index of the last existing path in pathVector
 	return ConcatenatePathInPathVector (res, numValid);
       }
@@ -611,7 +627,7 @@ namespace hpp {
 	ConfigurationPtr_t start = limbRRTConfigFromDevice(helper, from, 0.);
 	ConfigurationPtr_t end = limbRRTConfigFromDevice(helper, to, helper.rootPath_->length());
 	PathVectorPtr_t res = core::PathVector::create ((*start).size (), (*start).size () - 1);
-	core::Problem& problem = helper.rootProblem_;
+	Problem& problem = helper.rootProblem_;
 	const DistancePtr_t& distance = problem.distance();
 	const value_type length = (*distance) (from.configuration_, to.configuration_);
 	// build direct interpolation

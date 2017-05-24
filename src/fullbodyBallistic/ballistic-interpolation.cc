@@ -254,8 +254,8 @@ namespace hpp {
 	  dir = - dir;
 	}
 	hppDout (info, "dir computeOffsetContactConfig= " << dir);
-        state = rbprm::ComputeContacts(lastState,robot_,q_trunk_offset, affMap_, affFilters_, dir,contactMaintained,multipleBreaks,allowFailureMaintainContacts,0., nbTries6DOF);
-	//state = rbprm::ComputeContacts(previousState,robot_,q_trunk_offset, affMap_, affFilters_, dir,contactMaintained,multipleBreaks,allowFailureMaintainContacts,0.); // ALWAYS USE FIRST STATE AS REF
+        state = rbprm::ComputeContacts(lastState,robot_,q_trunk_offset, affMap_, affFilters_, dir,contactMaintained,multipleBreaks,allowFailureMaintainContacts,0., nbTries6DOF); // USE PREVIOUS STATE AS REF
+	//state = rbprm::ComputeContacts(previousState,robot_,q_trunk_offset, affMap_, affFilters_, dir,contactMaintained,multipleBreaks,allowFailureMaintainContacts,0., nbTries6DOF); // ALWAYS USE FIRST STATE AS REF
 	hppDout (info, "config after maintainContacts= " << displayConfig(state.configuration_));
 	hppDout (info, "## contactMaintained = " << contactMaintained);
 
@@ -330,7 +330,6 @@ namespace hpp {
 	    contact_OK = false;
 	  }
 	} // if contactOK
-        hppDout (info, "q_contact_offset= " << displayConfig (q_contact_offset));
       }//while
       hppDout (info, "-- contact broken or max number of iterations reached");
       hppDout (info, "-- or last computed state was invalid (not added)");
@@ -444,13 +443,15 @@ namespace hpp {
       hppDout(info, "contact configuration = "<<displayConfig(contactPose));
       size_t minIndex = robot->device_->configSize();
       // replace the limbs not used for contact with their configuration in flexionPose_
+      hppDout (info, "nbContacts = " << state.nbContacts);
       for( rbprm::T_Limb::const_iterator lit = robot->GetLimbs().begin();lit != robot->GetLimbs().end(); ++lit){
-        hppDout(notice,"Contact Pose, LIST OF LIMBS  : "<< lit->first << "contact = "<<(state.contacts_.find(lit->first) != state.contacts_.end()));
+        hppDout(notice,"ComputeContactPose, LIST OF LIMBS  : "<< lit->first << "contact = "<<(state.contacts_.find(lit->first) != state.contacts_.end()));
         if(lit->second->limb_->rankInConfiguration() < minIndex){
           hppDout(notice," Min index = "<<lit->second->limb_->rankInConfiguration()) ;         
           minIndex = lit->second->limb_->rankInConfiguration();
         }
-        if( (state.contacts_.find(lit->first) == state.contacts_.end())){ // limb is not in contact
+	hppDout (info, "is in contact ? " <<  state.contacts_.at(lit->first));
+        if(!state.contacts_.at(lit->first)) { // if limb is not in contact
           useAllLimb = false;
           hppDout(notice," Not in contact, index config : "<<lit->second->limb_->rankInConfiguration()<<" -> "<<lit->second->effector_->rankInConfiguration());
           for(int i = lit->second->limb_->rankInConfiguration() ; i < lit->second->effector_->rankInConfiguration() ; i++){
@@ -537,8 +538,10 @@ namespace hpp {
           if(std::find(contactingLimbs.begin(),contactingLimbs.end(),lit->first) == contactingLimbs.end()) {
             hppDout(notice," Not in contact, index config : "<<lit->second->limb_->rankInConfiguration()<<" -> "<<lit->second->effector_->rankInConfiguration());
             for(int i = lit->second->limb_->rankInConfiguration() ; i < lit->second->effector_->rankInConfiguration() ; i++){
-	      if(increase_u_offset && takeoffContactPose_.size () != 0)
+	      if(increase_u_offset && takeoffContactPose_.size () != 0) {
 		qtmp[i] = takeoffContactPose_[i];
+		hppDout (info, "use takeoffContactPose");
+	      }
 	      else if (!increase_u_offset && landingContactPose_.size () != 0)
 		qtmp[i] = landingContactPose_[i];
             }
@@ -694,7 +697,7 @@ namespace hpp {
 	if (problem_->configValidations ()->validate (q2contact, validationReport))
 	  state2.configuration_ = q2contact; // sometimes, state2.configuration_ is "a little" in collision whereas q2contact is not
 	else {
-	  hppDout (info, "q2contact is abnormally in collision, retry state2");
+	  hppDout (info, "q2contact is in collision, try state2");
 	  if (!problem_->configValidations ()->validate (state2.configuration_, validationReport))
 	    throw std::runtime_error ("q2contact and state2 are abnormally in collision");
 	  else
