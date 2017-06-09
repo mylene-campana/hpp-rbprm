@@ -237,7 +237,7 @@ namespace hpp {
         , collisionValidation_(core::CollisionValidation::create(device))
         , weakPtr_(), noStability_ (true), 
 	  mu_ (1.2), thetaBefore_ (0), thetaAfter_ (0),
-	  centroidalConeFails_ (0)
+	  centroidalConeFails_ (0), comProj_ (false)
     {
       V0dir_.resize (3);
       V0dir_.setZero ();

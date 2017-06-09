@@ -19,6 +19,7 @@
 #include <hpp/rbprm/interpolation/limb-rrt-path.hh>
 #include <hpp/model/device.hh>
 #include <hpp/model/configuration.hh>
+#include <hpp/core/config-projector.hh>
 #include <hpp/rbprm/fullbodyBallistic/ballistic-path.hh>
 
 using namespace hpp::core;
@@ -100,6 +101,29 @@ namespace hpp {
       return (b-a)* normalizedValue + a;
     }
 
+    // taken from time-constraint-utils
+    void UpdateConstraints(core::ConfigurationOut_t configuration,
+			   core::ConfigProjectorPtr_t projector,
+			   const T_TimeDependant& tds,
+			   const std::size_t pathDofRank)
+    {
+      const core::value_type y = configuration[pathDofRank];
+      for (CIT_TimeDependant cit = tds.begin ();
+	   cit != tds.end (); ++cit)
+        {
+	  (*cit)(y, configuration);
+        }
+      projector->updateRightHandSide ();
+    }
+
+    void LimbRRTPath::updateConstraints(core::ConfigurationOut_t configuration) const
+    {
+      if (constraints() && constraints()->configProjector ())
+        {
+	  UpdateConstraints(configuration, constraints()->configProjector (), tds_, pathDofRank_);
+        }
+    }
+
     bool LimbRRTPath::impl_compute (ConfigurationOut_t result,
 				     value_type param) const
     {
@@ -144,6 +168,7 @@ namespace hpp {
             result[i] = q_root[i];
           }
         }
+	updateConstraints(result); // as in time-constraint-path, for COM
         return true;
     }
 

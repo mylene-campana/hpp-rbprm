@@ -158,9 +158,7 @@ namespace hpp {
       }
       /// Copy constructor
       LimbRRTSteering (const LimbRRTSteering& other) :
-    SteeringMethod (other), pathDofRank_(other.pathDofRank_), weak_ ()
-      {
-      }
+	SteeringMethod (other), pathDofRank_(other.pathDofRank_), weak_ (), tds_(other.tds_) {}
 
       /// Store weak pointer to itself
       void init (LimbRRTSteeringWkPtr_t weak)
@@ -173,6 +171,10 @@ namespace hpp {
       const std::size_t pathDofRank_;
       LimbRRTSteeringWkPtr_t weak_;
       const BallisticPathPtr_t bp_;
+
+    public:
+      T_TimeDependant tds_;
+
     }; // SteeringMethodStraight
     /// \}
   } // namespace interpolation

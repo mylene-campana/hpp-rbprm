@@ -25,6 +25,7 @@
 # include <hpp/rbprm/rbprm-device.hh>
 # include <hpp/core/path.hh>
 # include <hpp/core/problem.hh>
+#include <hpp/rbprm/interpolation/limb-rrt-steering.hh>
 
 # include <vector>
 # include <map>
@@ -55,8 +56,34 @@ namespace hpp {
          core::PathPlannerPtr_t planner_;
          core::PathPtr_t rootPath_;
 	 core::ConfigProjectorPtr_t proj_;
+	 LimbRRTSteeringPtr_t steeringMethod_;
     };
 
+      template<class Reference>
+      struct VecRightSide : public RightHandSideFunctor
+      {
+	VecRightSide (const core::PathPtr_t ref, const int dim = 3, const bool times_ten = false) : ref_(ref), dim_(dim), times_ten_(times_ten)
+	{}
+        ~VecRightSide(){}
+        virtual void operator() (constraints::vectorOut_t output,
+				 const constraints::value_type& normalized_input, model::ConfigurationOut_t /*conf*/) const
+        {
+          const std::pair<core::value_type, core::value_type>& tR (ref_->timeRange());
+          constraints::value_type unNormalized = (tR.second-tR.first)* normalized_input + tR.first;
+          if(times_ten_)
+	    {
+              output = ref_->operator ()(unNormalized).head(dim_) * (10000) ;
+	    }
+          else
+	    {
+	      output = ref_->operator ()(unNormalized).head(dim_) ;
+	    }
+        }
+        const Reference ref_;
+        const int dim_;
+        const bool times_ten_;
+      };
+      
 
 
     /// Runs the LimbRRT to create a kinematic, continuous,

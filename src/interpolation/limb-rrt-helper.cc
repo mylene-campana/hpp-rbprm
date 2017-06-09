@@ -19,13 +19,12 @@
 #include <hpp/rbprm/interpolation/limb-rrt-helper.hh>
 #include <hpp/rbprm/interpolation/limb-rrt-shooter.hh>
 #include <hpp/rbprm/interpolation/limb-rrt-path-validation.hh>
-#include <hpp/rbprm/interpolation/limb-rrt-steering.hh>
 #include <hpp/core/steering-method-straight.hh>
 #include <hpp/core/problem-target/goal-configurations.hh>
 #include <hpp/core/bi-rrt-planner.hh>
 #include <hpp/core/config-validations.hh>
 #include <hpp/core/random-shortcut.hh>
-#include <hpp/core/constraint-set.hh>>
+#include <hpp/core/constraint-set.hh>
 #include <hpp/constraints/generic-transformation.hh>
 #include <hpp/constraints/position.hh>
 #include <hpp/constraints/orientation.hh>
@@ -37,6 +36,9 @@
 #include <hpp/rbprm/fullbodyBallistic/ballistic-path.hh>
 #include <hpp/rbprm/tools.hh>
 #include <hpp/constraints/relative-com.hh>
+#include <hpp/constraints/symbolic-calculus.hh>
+#include <hpp/constraints/symbolic-function.hh>
+//#include <hpp/rbprm/interpolation/interpolation-constraints.hh> // not compatible with current limbRRT implementation
 
 namespace hpp {
   using namespace core;
@@ -84,7 +86,8 @@ namespace hpp {
         BallisticPathPtr_t bp = boost::dynamic_pointer_cast<BallisticPath>(rootPath);
         hppDout(notice,"test last root index helper = "<<bp->lastRootIndex());
         if(bp){
-          rootProblem_.steeringMethod(LimbRRTSteering::create(&rootProblem_,fullBodyDevice_->configSize()-1,bp));
+	  steeringMethod_ = LimbRRTSteering::create(&rootProblem_,fullBodyDevice_->configSize()-1,bp);
+          rootProblem_.steeringMethod(steeringMethod_);
           hppDout(notice,"create steering method with ballistic path.");
         }
         else{
@@ -93,7 +96,6 @@ namespace hpp {
         }
 	rootProblem_.plannerIterLimit (referenceProblem->plannerIterLimit ());
 	hppDout (info, "initial plannerIterLimit_ (from referenceProblem)= " << rootProblem_.plannerIterLimit ());
-          
       }
 
       namespace
@@ -170,15 +172,25 @@ namespace hpp {
 	  return res;
 	}
 
+	typedef constraints::PointCom PointCom;
+	typedef constraints::CalculusBaseAbstract<PointCom::ValueType_t, PointCom::JacobianType_t> s_t;
+	typedef constraints::SymbolicFunction<s_t> PointComFunction;
+	typedef constraints::SymbolicFunction<s_t>::Ptr_t PointComFunctionPtr_t;
 
-	/*void AddComConstraints(LimbRRTHelper& helper,
+	void AddComConstraints(LimbRRTHelper& helper,
 			       const State& from, const State& to) {
 	  Configuration_t start = from.configuration_;
 	  Configuration_t end = to.configuration_;
-	  const fcl::Vec3f fromTarget;
-	  for (int i = 0; i < 3; i++) fromTarget [i] = start [i];
-	  const fcl::Vec3f toTarget;
-	  for (int i = 0; i < 3; i++) toTarget [i] = end [i];
+	  fcl::Vec3f initTarget;
+	  for (int i = 0; i < 3; i++) initTarget [i] = start [i];
+	  /*fcl::Vec3f toTarget;
+	    for (int i = 0; i < 3; i++) toTarget [i] = end [i];*/
+	  // for verification:
+	  Configuration_t initialLong (start.size () + 1);
+	  for (std::size_t i = 0; i < start.size (); i++)
+	    initialLong [i] = start [i];
+	  initialLong [start.size ()] = 0;
+
 	  model::DevicePtr_t device = helper.rootProblem_.robot();
 	  core::ComparisonTypePtr_t equals = core::Equality::create ();
 	  core::ConfigProjectorPtr_t& proj = helper.proj_;
@@ -191,13 +203,16 @@ namespace hpp {
 	  comEq->nonConstRightHandSide() = initTarget * 10000;
 	  proj->add(comEq);
 	  proj->updateRightHandSide();
-	  //helper.steeringMethod_->tds_.push_back(TimeDependant(comEq, boost::shared_ptr<VecRightSide<Reference> >(new VecRightSide<Reference> (ref, 3, true))));
+	  // const Reference &ref; // typically the ref path
+	  //const RightHandSideFunctorPtr_t rhs = boost::shared_ptr<VecRightSide<Reference> >(new VecRightSide<Reference> (ref, 3, true)); // 2nd argument of time-dependant
+	  const RightHandSideFunctorPtr_t rhs = boost::shared_ptr<VecRightSide<PathPtr_t> >(new VecRightSide<PathPtr_t> (helper.rootPath_, 3, true));
+	  helper.steeringMethod_->tds_.push_back(TimeDependant(comEq, rhs));
 
-	  if (!proj->isSatisfied (start)) {
-	    hppDout (error, "End configuration of limbRRT does not satisfy the contact+COM constraints of the initial config");
-	    throw projection_error ("End configuration of limbRRT does not satisfy the contact+COM constraints of the initial config");
-	  }
-	  }*/
+	  /*if (!proj->isSatisfied (initialLong)) {
+	    hppDout (error, "Start configuration of limbRRT does not satisfy the contact+COM constraints");
+	    throw projection_error ("Start configuration of limbRRT does not satisfy the contact+COM constraints");
+	    }*/
+	}
 
     
 	void AddContactConstraints(LimbRRTHelper& helper, const State& from,
@@ -358,7 +373,12 @@ namespace hpp {
         std::vector<std::string> variations = to.allVariations(from,extractEffectorsName(limbs));
 	hppDout (info, "number of variations: " << variations.size ());
         core::ValidationReportPtr_t validationReport;
+	hppDout (info, "Adding contact constraint LimbRRT ---- ");
 	AddContactConstraints(helper, from, to);
+	if (helper.fullbody_->comProj_) {
+	  hppDout (info, "Adding COM constraint LimbRRT ---- ");
+	  AddComConstraints(helper, from, to);
+	}
 	
 	hppDout (info, "Try direct path");
 	res = directInterpolation (helper, from, to);
@@ -622,20 +642,10 @@ namespace hpp {
 	ConfigurationPtr_t end = limbRRTConfigFromDevice(helper, to, helper.rootPath_->length());
 	PathVectorPtr_t res = core::PathVector::create ((*start).size (), (*start).size () - 1);
 	Problem& problem = helper.rootProblem_;
-	//const DistancePtr_t& distance = problem.distance();
-	//const value_type length = (*distance) (from.configuration_, to.configuration_);
 	// build direct interpolation
 	hppDout (info, "direct interpolation, before path creation");
-	//StraightPathPtr_t path = StraightPath::create (problem.robot (), *start, *end, length);
-	//BallisticPathPtr_t bp = boost::dynamic_pointer_cast<BallisticPath>(helper.rootPath_);
-	//if (!bp) hppDout (error, "fail to cast rootPath to bp path");
-	//const std::size_t pathDofRank = ;
-	// use the limb-rrt-steering instead of path ?
-	//LimbRRTPathPtr_t path = LimbRRTPath::create (problem.robot (), *start, *end, helper.rootPath_->length(), helper.constraints (), pathDofRank, bp);
-	SteeringMethodPtr_t sm = problem.steeringMethod ();
-	PathPtr_t path = (*sm) (*start, *end);
+	PathPtr_t path = (*(helper.steeringMethod_)) (*start, *end);
 	res->appendPath (path);
-	//assert(0);
 	hppDout (info, "direct interpolation for partialPath");
 	return res;
       }

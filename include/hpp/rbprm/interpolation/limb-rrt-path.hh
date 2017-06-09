@@ -24,6 +24,7 @@
 # include <hpp/core/path.hh>
 #include <hpp/rbprm/fullbodyBallistic/ballistic-path.hh>
 #include <hpp/util/debug.hh>
+#include <hpp/rbprm/interpolation/time-dependant.hh>
 
 namespace hpp {
   namespace rbprm {
@@ -260,12 +261,15 @@ namespace hpp {
 	   const model::value_type normalizedValue) const;
 
       private:
+	void updateConstraints(core::ConfigurationOut_t configuration) const;
+
 	core::DevicePtr_t device_;
 	core::Configuration_t initial_;
 	core::Configuration_t end_;
 
       public:
 	const std::size_t pathDofRank_;
+	const T_TimeDependant tds_;
 
       private:
 	LimbRRTPathWkPtr_t weak_;
