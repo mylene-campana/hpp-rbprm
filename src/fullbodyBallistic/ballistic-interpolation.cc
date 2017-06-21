@@ -351,8 +351,6 @@ namespace hpp {
 	}
       }
 
-      // TODO: fix the interpolation on non-contacting limbs along stateFrames
-      // create the "interpolation" ?? or directly manual-straight-one !
 	const int nbStateFrames = stateFramesTmp.size ();
 	Configuration_t config0 = stateFramesTmp [0].second.configuration_;
 	Configuration_t configLast = stateFramesTmp [nbStateFrames - 1].second.configuration_;
@@ -371,8 +369,8 @@ namespace hpp {
 	  hppDout (info, "normalized step 1 = " << (step - config0Length)/LengthDiff0Last);
 	  
 	  hppDout (info, "fake state= " << displayConfig(stateFramesTmp [i].second.configuration_));
-	  // WARNING: should not interpolate that way the quaterion !
-	  Configuration_t refLimbConfig = (configLastLength - step)/LengthDiff0Last * config0 + (step - config0Length)/LengthDiff0Last * configLast;
+	  Configuration_t refLimbConfig (robot_->device_->configSize ());
+	  model::interpolate (robot_->device_, config0, configLast, (step - config0Length)/LengthDiff0Last, refLimbConfig);
 	  Configuration_t interpolatedLimbsConfig = replaceNonContactingLimbConfig(stateFramesTmp [i].second, refLimbConfig);
 	  hppDout (info, "refLimbConfig (pure interpolation)= " << displayConfig(refLimbConfig));
 	  hppDout (info, "config before interpolation" << displayConfig(stateFramesTmp [i].second.configuration_));
@@ -386,25 +384,6 @@ namespace hpp {
 	  stateFrames.push_back(stateFramesTmp [i]);
 	}
 	hppDout (info, "number of frames in stateFrames after pushing contact-cones= " << stateFrames.size ());
-
-	/*// previous code should handle this case
-	  if (!increase_u_offset) {
-	const int nbReverseFrames = reverseFrames.size ();
-	Configuration_t configRev0 = reverseFrames [0].second.configuration_;
-	const value_type config0Length = reverseFrames [0].first;
-	Configuration_t configRevLast = reverseFrames [nbReverseFrames - 1].second.configuration_;
-	hppDout (info, "configRev0= " << displayConfig(configRev0));
-	hppDout (info, "configRevLast= " << displayConfig(configRevLast));
-	for (int i = nbReverseFrames - 1; i >= 0; i--) { // no std::size_t
-	  const value_type step = reverseFrames[i].first;
-	  Configuration_t refLimbConfig = (config0Length - step)/config0Length * configRev0 + step/config0Length * configRevLast;
-	  Configuration_t interpolatedLimbsConfig = replaceNonContactingLimbConfig(reverseFrames [i].second, refLimbConfig);
-	  hppDout (info, "push reverse state length= " << reverseFrames[i].first);
-	  hppDout (info, "state= " << displayConfig(reverseFrames[i].second.configuration_));
-	  stateFrames.push_back(reverseFrames [i]); // to set the length
-	  stateFrames [stateFrames.size () - 1].second.configuration_ = interpolatedLimbsConfig;
-	}
-	}*/
 
       hppDout (info, "lastState= " << displayConfig(lastState.configuration_));
       hppDout (info, "previousLength= " << previousLength);
