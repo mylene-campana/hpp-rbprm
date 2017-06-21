@@ -58,7 +58,7 @@ namespace hpp {
     {
         assert (device);
         assert (length >= 0);
-        hppDout(warning,"SHOULD NOT USE THIS CCONSTRUCTOR !");
+        hppDout(warning,"SHOULD NOT USE THIS CONSTRUCTOR !");
     }
     
     LimbRRTPath::LimbRRTPath (const DevicePtr_t& device,
@@ -72,13 +72,31 @@ namespace hpp {
         device_ (device), initial_ (init), end_ (end),
         pathDofRank_(pathDofRank),rootPath_(bp)
     {
-        assert (device);
-        assert (length >= 0);
-        lastRootIndex_ = bp->lastRootIndex();
+      assert (device);
+      assert (length >= 0);
+      lastRootIndex_ = bp->lastRootIndex();
+    }
+
+    LimbRRTPath::LimbRRTPath (const DevicePtr_t& device,
+			      ConfigurationIn_t init,
+			      ConfigurationIn_t end,
+			      value_type length,
+			      ConstraintSetPtr_t constraints,
+			      const std::size_t pathDofRank,
+			      BallisticPathPtr_t bp,
+			      const T_TimeDependant& tds) :
+      parent_t (interval_t (0, length), device->configSize (),
+		device->numberDof (), constraints),
+      device_ (device), initial_ (init), end_ (end),
+      pathDofRank_(pathDofRank),rootPath_(bp), tds_(tds)
+    {
+      assert (device);
+      assert (length >= 0);
+      lastRootIndex_ = bp->lastRootIndex();
     }
 
     LimbRRTPath::LimbRRTPath (const LimbRRTPath& path) :
-        parent_t (path), device_ (path.device_), initial_ (path.initial_),
+      parent_t (path), device_ (path.device_), initial_ (path.initial_),
         end_ (path.end_), pathDofRank_(path.pathDofRank_),rootPath_(path.rootPath_),lastRootIndex_(path.lastRootIndex_)
     {
     }
@@ -108,18 +126,26 @@ namespace hpp {
 			   const std::size_t pathDofRank)
     {
       const core::value_type y = configuration[pathDofRank];
+      hppDout (info, "line abscissa in path y= " << y);
       for (CIT_TimeDependant cit = tds.begin ();
 	   cit != tds.end (); ++cit)
         {
 	  (*cit)(y, configuration);
+	  hppDout (info, "config at y= " << model::displayConfig(configuration));
         }
-      projector->updateRightHandSide ();
+      hppDout (info, "update projector RHS");
+      projector->updateRightHandSide (); // do not take config as param ??
     }
 
     void LimbRRTPath::updateConstraints(core::ConfigurationOut_t configuration) const
     {
+      hppDout (info, "check if constraints can be updated");
+      hppDout (info, "constraints()= " << constraints());
+      if (constraints())
+	hppDout (info, "constraints()->configProjector()= " << constraints()->configProjector());
       if (constraints() && constraints()->configProjector ())
         {
+	  hppDout (info, "constraints and projector found");
 	  UpdateConstraints(configuration, constraints()->configProjector (), tds_, pathDofRank_);
         }
     }
@@ -168,6 +194,7 @@ namespace hpp {
             result[i] = q_root[i];
           }
         }
+	hppDout (info, "update RHS for COM-constraint");
 	updateConstraints(result); // as in time-constraint-path, for COM
         return true;
     }
@@ -200,6 +227,45 @@ namespace hpp {
     {
       return device_;
     }
+
+    void LimbRRTPath::checkPath () const
+    {
+      Configuration_t initc = initial();
+      Configuration_t endc = end();
+      hppDout (info, "initial= " << model::displayConfig(initc));
+      hppDout (info, "end= " << model::displayConfig(endc));
+      updateConstraints(initc);
+      if (constraints()) {
+        if (!constraints()->isSatisfied (initial())) {            
+	  //std::cout << "init conf " <<  initc << std::endl;
+	  /*device_->currentConfiguration(initc);
+	    device_->computeForwardKinematics();
+	    std::cout << "rf_foot_joint  " << std::endl;
+	    std::cout <<  device_->getJointByName("rf_foot_joint")->currentTransformation().getTranslation() << std::endl;
+
+	    std::cout << "lf_foot_joint "  << std::endl;
+	    std::cout <<  device_->getJointByName("lf_foot_joint")->currentTransformation().getTranslation() << std::endl;
+
+	    std::cout << "rh_foot_joint  " << std::endl;
+	    std::cout <<  device_->getJointByName("rh_foot_joint")->currentTransformation().getTranslation() << std::endl;
+
+	    std::cout << "lh_foot_joint  " << std::endl;
+	    std::cout <<  device_->getJointByName("lh_foot_joint")->currentTransformation().getTranslation() << std::endl;*/
+          hppDout (error, initial().transpose ());
+          throw projection_error ("Initial configuration of path does not satisfy the constraints");
+        }
+      }
+      updateConstraints(endc);
+      if (constraints()) {
+        if (!constraints()->isSatisfied (end())) {
+	  //std::cout << "end conf " <<  initc << std::endl;
+          hppDout (error, end().transpose ());
+          throw projection_error ("End configuration of path does not satisfy "
+				  "the constraints");
+        }
+      }
+    }
+
   } //   namespace interpolation
   } //   namespace rbprm
 } // namespace hpp

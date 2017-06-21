@@ -210,7 +210,7 @@ namespace hpp {
       lastState = previousState;
       value_type currentLength, previousLength;
       value_type u;
-      T_StateFrame reverseFrame;
+      T_StateFrame reverseFrames, stateFramesTmp;
       core::ValidationReportPtr_t validationReport;
       const bool allowFailureMaintainContacts = true;
       const std::size_t nbTries6DOF = 5; // allow to try 5 times the 6DOF constraint before trying 3DOF instead
@@ -232,6 +232,7 @@ namespace hpp {
         currentLength = bp->length();
       }
       previousLength = currentLength;
+      hppDout (info, "previousLength= " << previousLength);
      
       q_interp = (*bp) (currentLength, success);
       
@@ -239,6 +240,13 @@ namespace hpp {
         hppDout (info, "no cushion effect asked, return interpolated config");
         state.configuration_ = q_interp;
         return state;
+      }
+
+      // push previousState in stateFrame to correctly replace and interpolate limbs
+      if (increase_u_offset) {
+	stateFramesTmp.push_back(std::make_pair(0,previousState)); // add intermediate state
+      } else {
+	reverseFrames.push_back(std::make_pair(previousLength,previousState)); // add intermediate state
       }
       
       while (contact_OK && iteration < maxIterMaintainContacts_ && ((((currentLength<bp->length())/3.)&&increase_u_offset) || ((currentLength > (bp->length()*2./3.))&&(!increase_u_offset)))) {
@@ -302,7 +310,7 @@ namespace hpp {
 	  lastfixedLimb = fixedLimb;
 
 	  //replace limbs that are accurate, trunkDOF with contactPose value, EC
-	  state = replaceAccurateTrunkAndLimbs (state, q_trunk_offset, increase_u_offset, contactingLimbs, lastfixedLimb); // NO USE OF LASTSTATE ??
+	  state = replaceAccurateTrunkAndFakeLimbs (state, q_trunk_offset, increase_u_offset, contactingLimbs, lastfixedLimb); // NO USE OF LASTSTATE ??
 
 	  bool isValid = problem_->configValidations ()->validate (state.configuration_, validationReport);
 	  hppDout (info, "isValid state= " << isValid);
@@ -316,11 +324,11 @@ namespace hpp {
 	    if (increase_u_offset) {
 	      hppDout (info, "takeoff contact state is pushed in stack");
 	      hppDout (info, "config pushed= " << displayConfig(state.configuration_));
-	      stateFrames.push_back(std::make_pair(currentLength,state)); // add intermediate state
+	      stateFramesTmp.push_back(std::make_pair(currentLength,state)); // add intermediate state
 	    } else {
 	      hppDout (info, "landing contact state is pushed in stack");
 	      hppDout (info, "config pushed= " << displayConfig(state.configuration_));
-	      reverseFrame.push_back(std::make_pair(currentLength,state)); // add intermediate state
+	      reverseFrames.push_back(std::make_pair(currentLength,state)); // add intermediate state
 	    }
 	    lastState = state;
 	    previousLength = currentLength; // only updated if contact was OK
@@ -335,11 +343,68 @@ namespace hpp {
       hppDout (info, "-- or last computed state was invalid (not added)");
 
       // push reverseStateFrames into stateFrames in correct order
-      for (int i = reverseFrame.size () - 1; i >= 0; i--) { // no std::size_t
-	hppDout (info, "push reverse state length= " << reverseFrame[i].first);
-	hppDout (info, "state= " << displayConfig(reverseFrame[i].second.configuration_));
-	stateFrames.push_back(reverseFrame [i]);
+      if (!increase_u_offset) {
+	for (int i = reverseFrames.size () - 1; i >= 0; i--) { // no std::size_t
+	  hppDout (info, "push reverse state length= " << reverseFrames[i].first);
+	  hppDout (info, "state= " << displayConfig(reverseFrames[i].second.configuration_));
+	  stateFramesTmp.push_back(reverseFrames [i]); // to set the length
+	}
       }
+
+      // TODO: fix the interpolation on non-contacting limbs along stateFrames
+      // create the "interpolation" ?? or directly manual-straight-one !
+	const int nbStateFrames = stateFramesTmp.size ();
+	Configuration_t config0 = stateFramesTmp [0].second.configuration_;
+	Configuration_t configLast = stateFramesTmp [nbStateFrames - 1].second.configuration_;
+	const value_type config0Length = stateFramesTmp [0].first;
+	const value_type configLastLength = stateFramesTmp [nbStateFrames - 1].first;
+	const value_type LengthDiff0Last = configLastLength - config0Length;
+	hppDout (info, "config0= " << displayConfig(config0));
+	hppDout (info, "configLast= " << displayConfig(configLast));
+	hppDout (info, "config0Length= " << config0Length);
+	hppDout (info, "configLastLength= " << configLastLength);
+	for (int i = 1; i < nbStateFrames - 1; i++) {
+	  const value_type step = stateFramesTmp [i].first;
+	  hppDout (info, "i= " << i);
+	  hppDout (info, "step= " << step);
+	  hppDout (info, "normalized step 0 = " << (configLastLength - step)/LengthDiff0Last);
+	  hppDout (info, "normalized step 1 = " << (step - config0Length)/LengthDiff0Last);
+	  
+	  hppDout (info, "fake state= " << displayConfig(stateFramesTmp [i].second.configuration_));
+	  // WARNING: should not interpolate that way the quaterion !
+	  Configuration_t refLimbConfig = (configLastLength - step)/LengthDiff0Last * config0 + (step - config0Length)/LengthDiff0Last * configLast;
+	  Configuration_t interpolatedLimbsConfig = replaceNonContactingLimbConfig(stateFramesTmp [i].second, refLimbConfig);
+	  hppDout (info, "refLimbConfig (pure interpolation)= " << displayConfig(refLimbConfig));
+	  hppDout (info, "config before interpolation" << displayConfig(stateFramesTmp [i].second.configuration_));
+	  hppDout (info, "interpolatedLimbsConfig (replaced)= " << displayConfig(interpolatedLimbsConfig));
+	  hppDout (info, "stateFramesTmp [i].first= " << stateFramesTmp [i].first);
+	  stateFramesTmp [i].second.configuration_ = interpolatedLimbsConfig;
+	  hppDout (info, "stateFramesTmp [i].second.configuration_= " << displayConfig(stateFramesTmp [i].second.configuration_));
+	}
+	hppDout (info, "number of frames in stateFrames before pushing contact-cones= " << stateFrames.size ());
+	for (int i = 0; i < nbStateFrames; i++) {
+	  stateFrames.push_back(stateFramesTmp [i]);
+	}
+	hppDout (info, "number of frames in stateFrames after pushing contact-cones= " << stateFrames.size ());
+
+	/*// previous code should handle this case
+	  if (!increase_u_offset) {
+	const int nbReverseFrames = reverseFrames.size ();
+	Configuration_t configRev0 = reverseFrames [0].second.configuration_;
+	const value_type config0Length = reverseFrames [0].first;
+	Configuration_t configRevLast = reverseFrames [nbReverseFrames - 1].second.configuration_;
+	hppDout (info, "configRev0= " << displayConfig(configRev0));
+	hppDout (info, "configRevLast= " << displayConfig(configRevLast));
+	for (int i = nbReverseFrames - 1; i >= 0; i--) { // no std::size_t
+	  const value_type step = reverseFrames[i].first;
+	  Configuration_t refLimbConfig = (config0Length - step)/config0Length * configRev0 + step/config0Length * configRevLast;
+	  Configuration_t interpolatedLimbsConfig = replaceNonContactingLimbConfig(reverseFrames [i].second, refLimbConfig);
+	  hppDout (info, "push reverse state length= " << reverseFrames[i].first);
+	  hppDout (info, "state= " << displayConfig(reverseFrames[i].second.configuration_));
+	  stateFrames.push_back(reverseFrames [i]); // to set the length
+	  stateFrames [stateFrames.size () - 1].second.configuration_ = interpolatedLimbsConfig;
+	}
+	}*/
 
       hppDout (info, "lastState= " << displayConfig(lastState.configuration_));
       hppDout (info, "previousLength= " << previousLength);
@@ -439,7 +504,7 @@ namespace hpp {
     
     Configuration_t computeContactPose(const State& state, Configuration_t contactPose, rbprm::RbPrmFullBodyPtr_t robot){
       Configuration_t q = state.configuration_;
-      bool useAllLimb = true;
+      //bool useAllLimb = true;
       hppDout(info, "contact configuration = "<<displayConfig(contactPose));
       size_t minIndex = robot->device_->configSize();
       // replace the limbs not used for contact with their configuration in flexionPose_
@@ -452,21 +517,21 @@ namespace hpp {
         }
 	hppDout (info, "is in contact ? " <<  state.contacts_.at(lit->first));
         if(!state.contacts_.at(lit->first)) { // if limb is not in contact
-          useAllLimb = false;
+          //useAllLimb = false;
           hppDout(notice," Not in contact, index config : "<<lit->second->limb_->rankInConfiguration()<<" -> "<<lit->second->effector_->rankInConfiguration());
           for(int i = lit->second->limb_->rankInConfiguration() ; i < lit->second->effector_->rankInConfiguration() ; i++){
             q[i] = contactPose[i];
           }
         } 
       }
-      // replace the trunkDOF with contactPose value : ( 7 because we suppose we always work with freeflyer as root ....)
-      if(!useAllLimb){
+      // ALWAYS replace the trunkDOF with contactPose value : ( 7 because we suppose we always work with freeflyer as root ....)
+      //if(!useAllLimb) {
 	hppDout (info, "in compute contact-pose, modify also trunk DOF");
 	hppDout (info, "minIndex= " << minIndex); // maybe be out of bounds
         for (size_t i = 7 ; i < minIndex; i++){
           q[i] = contactPose[i];
         }
-      }
+	//}
       return q;
     }
  
@@ -510,7 +575,36 @@ namespace hpp {
 	  return emptyLimb;
     }
 
-    State BallisticInterpolation::replaceAccurateTrunkAndLimbs
+
+
+    core::Configuration_t BallisticInterpolation::replaceNonContactingLimbConfig(State state, const core::Configuration_t refLimbConfig) {
+      core::Configuration_t qtmp (state.configuration_);
+      for( rbprm::T_Limb::const_iterator lit = robot_->GetLimbs().begin();lit != robot_->GetLimbs().end(); ++lit){
+        hppDout(notice,"LIST OF LIMBS : "<< lit->first << " contact = "<<state.contacts_[lit->first]);
+	// PROBLEM TO FIX: ALL LIMBS MUST BE ADDED (even those not usefull)
+        if(!state.contacts_[lit->first]) { // limb is NOT in contact
+	  hppDout(notice," Not in contact, index config : "<<lit->second->limb_->rankInConfiguration()<<" -> "<<lit->second->effector_->rankInConfiguration());
+	  for(int i = lit->second->limb_->rankInConfiguration() ; i < lit->second->effector_->rankInConfiguration() ; i++)
+	    qtmp[i] = refLimbConfig [i];
+	  hppDout (info, "test limb replacement for contact poses");
+	  hppDout (info, "qtmp (before replace)= " << displayConfig(state.configuration_));
+	  hppDout (info, "qtmp (after replace)= " << displayConfig(qtmp));
+	}
+      }//for
+
+      // also trunk dofs ?
+      hppDout (info, "test trunk replacement for contact poses");
+      hppDout (info, "qtmp (before replace)= " << displayConfig(qtmp));
+      for (size_t i = 7 ; i < trunkConfigSize_ ; i++) { // no EC
+	qtmp[i] = refLimbConfig[i];
+      }
+      hppDout (info, "qtmp (after replace)= " << displayConfig(qtmp));
+      return qtmp;
+    }
+
+
+
+    State BallisticInterpolation::replaceAccurateTrunkAndFakeLimbs
     (const State& refState, const core::Configuration_t refTrunk,
      const bool increase_u_offset,
      const std::vector<std::string> contactingLimbs,
@@ -526,45 +620,27 @@ namespace hpp {
       // take limb-configs from contact if contact succeeded, 
       // from interp otherwise.
       // replace the limbs not used for contact with their configuration in flexionPose_
-      size_t minIndex = robot_->device_->configSize();
       core::ValidationReportPtr_t report;
       core::Configuration_t qtmp (state.configuration_);
-      for( rbprm::T_Limb::const_iterator lit = robot_->GetLimbs().begin();lit != robot_->GetLimbs().end(); ++lit){
-        hppDout(notice,"LIST OF LIMBS : "<< lit->first << " contact = "<<state.contacts_[lit->first]);
-        if(lit->second->limb_->rankInConfiguration() < minIndex){
-          minIndex =lit->second->limb_->rankInConfiguration();
-        }
-        if(!state.contacts_[lit->first]){ // limb was in contact in refState
-          if(std::find(contactingLimbs.begin(),contactingLimbs.end(),lit->first) == contactingLimbs.end()) {
-            hppDout(notice," Not in contact, index config : "<<lit->second->limb_->rankInConfiguration()<<" -> "<<lit->second->effector_->rankInConfiguration());
-            for(int i = lit->second->limb_->rankInConfiguration() ; i < lit->second->effector_->rankInConfiguration() ; i++){
-	      if(increase_u_offset && takeoffContactPose_.size () != 0) {
-		qtmp[i] = takeoffContactPose_[i];
-		hppDout (info, "use takeoffContactPose");
-	      }
-	      else if (!increase_u_offset && landingContactPose_.size () != 0)
-		qtmp[i] = landingContactPose_[i];
-            }
-            if(robot_->getLimbcollisionValidations().at(lit->first)->validate(qtmp,report)) {
-	      hppDout (info, "state with contactPose LIMB DOF is valid, DOF kept");
-              state.configuration_ = qtmp;
-	    }
-          }
-        }
-      }//for
+      if(increase_u_offset && takeoffContactPose_.size () != 0) {
+	qtmp = replaceNonContactingLimbConfig(state, takeoffContactPose_);
+	hppDout (info, "use takeoffContactPose");
+      }
+      if(!increase_u_offset && landingContactPose_.size () != 0) {
+	qtmp = replaceNonContactingLimbConfig(state, landingContactPose_);
+	hppDout (info, "use landingContactPose");
+      }
 
       // replace the trunkDOF with contactPose value : (we suppose we always work with freeflyer as root ....)
-      // (mylene)NO! this is wrong because trunk was planned before
-      // trunk DOF should be the value on the parab
-      hppDout (info, "using takeoffContactPose and landing for trunk DOF");
-      hppDout (info, "minIndex= " << minIndex);
+      // this is wrong because trunk was planned before, but more esthetic
+      /*hppDout (info, "using takeoffContactPose and landing for trunk DOF");
       hppDout (info, "trunkConfigSize_= " << trunkConfigSize_); // no EC
       for (size_t i = 7 ; i < trunkConfigSize_ ; i++) {
 	if(increase_u_offset && takeoffContactPose_.size () != 0)
 	  qtmp[i] = takeoffContactPose_[i];
 	else if (!increase_u_offset && landingContactPose_.size () != 0)
 	  qtmp[i] = landingContactPose_[i];
-      }
+	  }*/
       if(robot_->getCollisionValidation()->validate(qtmp,report)){
 	hppDout (info, "state with contactPose TRUNK DOF is valid, DOF kept");
         state.configuration_ = qtmp;
@@ -932,6 +1008,7 @@ namespace hpp {
     core::Configuration_t BallisticInterpolation::computeFlexionContactPose (const State& state) {
       const std::string robotName = robot_->device_->name ();
       if (robotName.compare ("spiderman") == 0) {
+	hppDout (info,"for jumperman robot, use either flexion or takeoff pose");
 	const std::size_t nbContacts = state.nbContacts;
 	hppDout (info, "nbContacts= " << nbContacts);
 	/* DEBUG since cannot create contacts with hands !!

@@ -130,6 +130,14 @@ namespace hpp {
 	return landingContactPose_;
       }
 
+      void flexionFinalPose (const core::Configuration_t flexionFinalPose) {
+	flexionFinalPose_ = flexionFinalPose;
+      }
+
+      core::Configuration_t flexionFinalPose () {
+	return flexionFinalPose_;
+      }
+
       std::map<std::string, std::vector<std::string> > affordanceFilters () {
 	return affFilters_;
       }
@@ -281,10 +289,10 @@ namespace hpp {
       rbprm::RbPrmLimbPtr_t findLimbInCollision
 	(const core::ValidationReportPtr_t validationReport);
 
-      /// Replace the limbs not used for contact with their configuration in flexionPose_
+      /// NO ! Replace the limbs not used for contact with their configuration in flexionPose_
       /// Replace the trunkDOF with contactPose value : (we suppose we always work with freeflyer as root)
       /// set EC of lastState from trunk config
-      State replaceAccurateTrunkAndLimbs
+      State replaceAccurateTrunkAndFakeLimbs
 	(const State& refState,  const core::Configuration_t refTrunk,
 	 const bool increase_u_offset,
 	 const std::vector<std::string> contactingLimbs,
@@ -293,6 +301,9 @@ namespace hpp {
       /// Create a state which contacts corresponds to the given contact-cones
       State createStateFromCone (const State previousState,
 				 library::ContactCones cone);
+
+      /// Replace all non-contacting limb configs with given reference config
+      core::Configuration_t replaceNonContactingLimbConfig(State state, const core::Configuration_t refLimbConfig);
       
     private:
       const core::PathVectorConstPtr_t path_;
@@ -306,6 +317,7 @@ namespace hpp {
       core::Configuration_t flexionPose_; // parabola extremity
       core::Configuration_t takeoffContactPose_; // when releasing contact
       core::Configuration_t landingContactPose_; // when starting contact
+      core::Configuration_t flexionFinalPose_; // last flexion pose
       size_t lastRootIndex_;
       affMap_t affMap_;
       std::map<std::string, std::vector<std::string> > affFilters_;

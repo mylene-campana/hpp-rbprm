@@ -183,13 +183,6 @@ namespace hpp {
 	  Configuration_t end = to.configuration_;
 	  fcl::Vec3f initTarget;
 	  for (int i = 0; i < 3; i++) initTarget [i] = start [i];
-	  /*fcl::Vec3f toTarget;
-	    for (int i = 0; i < 3; i++) toTarget [i] = end [i];*/
-	  // for verification:
-	  Configuration_t initialLong (start.size () + 1);
-	  for (std::size_t i = 0; i < start.size (); i++)
-	    initialLong [i] = start [i];
-	  initialLong [start.size ()] = 0;
 
 	  model::DevicePtr_t device = helper.rootProblem_.robot();
 	  core::ComparisonTypePtr_t equals = core::Equality::create ();
@@ -198,20 +191,16 @@ namespace hpp {
 	  comComp->add (device->rootJoint());
 	  //comComp->add (device->getJointByName("romeo/base_joint_xyz"));
 	  comComp->computeMass ();
-	  PointComFunctionPtr_t comFunc = PointComFunction::create ("COM-walkgen", device, 10000 * PointCom::create (comComp));
+	  PointComFunctionPtr_t comFunc = PointComFunction::create ("COM-ballistic", device, 10000 * PointCom::create (comComp));
 	  NumericalConstraintPtr_t comEq = NumericalConstraint::create (comFunc, equals);
+	  hppDout (info, "set rightHandSide for COM-constraint");
 	  comEq->nonConstRightHandSide() = initTarget * 10000;
 	  proj->add(comEq);
 	  proj->updateRightHandSide();
-	  // const Reference &ref; // typically the ref path
-	  //const RightHandSideFunctorPtr_t rhs = boost::shared_ptr<VecRightSide<Reference> >(new VecRightSide<Reference> (ref, 3, true)); // 2nd argument of time-dependant
 	  const RightHandSideFunctorPtr_t rhs = boost::shared_ptr<VecRightSide<PathPtr_t> >(new VecRightSide<PathPtr_t> (helper.rootPath_, 3, true));
+	  hppDout (info, "update steering method RHS tds for COM-constraint");
 	  helper.steeringMethod_->tds_.push_back(TimeDependant(comEq, rhs));
-
-	  /*if (!proj->isSatisfied (initialLong)) {
-	    hppDout (error, "Start configuration of limbRRT does not satisfy the contact+COM constraints");
-	    throw projection_error ("Start configuration of limbRRT does not satisfy the contact+COM constraints");
-	    }*/
+	  hppDout (info, "adding COM-constraint finished --");
 	}
 
     
@@ -385,9 +374,10 @@ namespace hpp {
 	PathValidationPtr_t pathValidation = helper.rootProblem_.pathValidation ();
 	core::PathPtr_t validPart;
 	core::PathValidationReportPtr_t pathReport;
-	    
+	
+	hppDout (info, "Test direct path");
 	if (!pathValidation->validate (res, false, validPart, pathReport)) {
-	  hppDout (info, "straight path invalid, limbRRT for each limb without constraints");
+	  hppDout (info, "direct path invalid, limbRRT for each limb without constraints");
 	  for(T_Limb::const_iterator lit = limbs.begin(); lit != limbs.end(); ++lit)
 	    {
 	      hppDout (info, "limb= " << lit->first);
@@ -417,6 +407,8 @@ namespace hpp {
 	      hppDout (info, "helper.rootProblem_.nbPathPlannerFails_= " << helper.rootProblem_.nbPathPlannerFails_);
 	    }// for limbs
 	}// if straight-path invalid
+	else
+	  hppDout (info, "direct path was valid");
 	hppDout (info, "number of subpaths in res= " << res->numberPaths ());
         return res;
       }

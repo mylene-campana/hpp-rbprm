@@ -110,6 +110,28 @@ namespace hpp {
 	  return shPtr;
 	}
 
+	/// Create instance and return shared pointer
+	/// \param device Robot corresponding to configurations
+	/// \param init, end Start and end configurations of the path
+	/// \param length Distance between the configurations.
+	/// \param constraints the path is subject to
+	static LimbRRTPathPtr_t create (const core::DevicePtr_t& device,
+					core::ConfigurationIn_t init,
+					core::ConfigurationIn_t end,
+					core::value_type length,
+					core::ConstraintSetPtr_t constraints,
+					const std::size_t pathDofRank,
+					BallisticPathPtr_t bp,
+					const T_TimeDependant& tds)
+	{
+	  LimbRRTPath* ptr = new LimbRRTPath (device, init, end, length,
+					      constraints, pathDofRank,bp,tds);
+	  LimbRRTPathPtr_t shPtr (ptr);
+	  ptr->init (shPtr);
+	  ptr->checkPath ();
+	  return shPtr;
+	}
+
 	/// Create copy and return shared pointer
 	/// \param path path to copy
 	static LimbRRTPathPtr_t createCopy (const LimbRRTPathPtr_t& path)
@@ -199,6 +221,8 @@ namespace hpp {
 	  return end_;
 	}
 
+	virtual void checkPath () const;
+
       protected:
 	/// Print path in a stream
 	virtual std::ostream& print (std::ostream &os) const
@@ -227,10 +251,10 @@ namespace hpp {
 		     core::ConstraintSetPtr_t constraints, const std::size_t pathDofRank);
       
 	/// Constructor with constraints
-	LimbRRTPath (const core::DevicePtr_t& robot, core::ConfigurationIn_t init,
-		     core::ConfigurationIn_t end, core::value_type length,
-		     core::ConstraintSetPtr_t constraints, const std::size_t pathDofRank, BallisticPathPtr_t bp);
-      
+	LimbRRTPath (const core::DevicePtr_t& robot, core::ConfigurationIn_t init,core::ConfigurationIn_t end, core::value_type length, core::ConstraintSetPtr_t constraints, const std::size_t pathDofRank, BallisticPathPtr_t bp);
+	
+	LimbRRTPath (const core::DevicePtr_t& robot, core::ConfigurationIn_t init,core::ConfigurationIn_t end, core::value_type length, core::ConstraintSetPtr_t constraints, const std::size_t pathDofRank, BallisticPathPtr_t bp, const T_TimeDependant& tds);
+	
 
 	/// Copy constructor
 	LimbRRTPath (const LimbRRTPath& path);
