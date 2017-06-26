@@ -261,7 +261,7 @@ namespace
             a = (startState+i);
             b = (startState+i+1);
             Helper_T helper(fullbody, shooterFactory, constraintFactory, referenceProblem, pathGetter(a,b),error_treshold);
-            helper.SetConstraints(get(a), get(b));
+            helper.SetConstraints(get(a), get(b)); // SetComRRTConstraints::operator ()  (will call CreateContactConstraints and CreateComConstraint)
             PathVectorPtr_t partialPath = helper.Run(get(a), get(b));
             if(partialPath)
             {

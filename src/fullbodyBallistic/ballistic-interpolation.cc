@@ -357,33 +357,17 @@ namespace hpp {
 	const value_type config0Length = stateFramesTmp [0].first;
 	const value_type configLastLength = stateFramesTmp [nbStateFrames - 1].first;
 	const value_type LengthDiff0Last = configLastLength - config0Length;
-	hppDout (info, "config0= " << displayConfig(config0));
-	hppDout (info, "configLast= " << displayConfig(configLast));
-	hppDout (info, "config0Length= " << config0Length);
-	hppDout (info, "configLastLength= " << configLastLength);
 	for (int i = 1; i < nbStateFrames - 1; i++) {
 	  const value_type step = stateFramesTmp [i].first;
-	  hppDout (info, "i= " << i);
-	  hppDout (info, "step= " << step);
-	  hppDout (info, "normalized step 0 = " << (configLastLength - step)/LengthDiff0Last);
-	  hppDout (info, "normalized step 1 = " << (step - config0Length)/LengthDiff0Last);
-	  
-	  hppDout (info, "fake state= " << displayConfig(stateFramesTmp [i].second.configuration_));
 	  Configuration_t refLimbConfig (robot_->device_->configSize ());
 	  model::interpolate (robot_->device_, config0, configLast, (step - config0Length)/LengthDiff0Last, refLimbConfig);
 	  Configuration_t interpolatedLimbsConfig = replaceNonContactingLimbConfig(stateFramesTmp [i].second, refLimbConfig);
-	  hppDout (info, "refLimbConfig (pure interpolation)= " << displayConfig(refLimbConfig));
-	  hppDout (info, "config before interpolation" << displayConfig(stateFramesTmp [i].second.configuration_));
-	  hppDout (info, "interpolatedLimbsConfig (replaced)= " << displayConfig(interpolatedLimbsConfig));
-	  hppDout (info, "stateFramesTmp [i].first= " << stateFramesTmp [i].first);
+
 	  stateFramesTmp [i].second.configuration_ = interpolatedLimbsConfig;
-	  hppDout (info, "stateFramesTmp [i].second.configuration_= " << displayConfig(stateFramesTmp [i].second.configuration_));
 	}
-	hppDout (info, "number of frames in stateFrames before pushing contact-cones= " << stateFrames.size ());
 	for (int i = 0; i < nbStateFrames; i++) {
 	  stateFrames.push_back(stateFramesTmp [i]);
 	}
-	hppDout (info, "number of frames in stateFrames after pushing contact-cones= " << stateFrames.size ());
 
       hppDout (info, "lastState= " << displayConfig(lastState.configuration_));
       hppDout (info, "previousLength= " << previousLength);
@@ -565,9 +549,6 @@ namespace hpp {
 	  hppDout(notice," Not in contact, index config : "<<lit->second->limb_->rankInConfiguration()<<" -> "<<lit->second->effector_->rankInConfiguration());
 	  for(int i = lit->second->limb_->rankInConfiguration() ; i < lit->second->effector_->rankInConfiguration() ; i++)
 	    qtmp[i] = refLimbConfig [i];
-	  hppDout (info, "test limb replacement for contact poses");
-	  hppDout (info, "qtmp (before replace)= " << displayConfig(state.configuration_));
-	  hppDout (info, "qtmp (after replace)= " << displayConfig(qtmp));
 	}
       }//for
 

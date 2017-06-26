@@ -177,10 +177,8 @@ namespace hpp {
 	typedef constraints::SymbolicFunction<s_t> PointComFunction;
 	typedef constraints::SymbolicFunction<s_t>::Ptr_t PointComFunctionPtr_t;
 
-	void AddComConstraints(LimbRRTHelper& helper,
-			       const State& from, const State& to) {
-	  Configuration_t start = from.configuration_;
-	  Configuration_t end = to.configuration_;
+	void AddComConstraints(LimbRRTHelper& helper, core::PathPtr_t ref) {
+	  Configuration_t start = ref->initial ();
 	  fcl::Vec3f initTarget;
 	  for (int i = 0; i < 3; i++) initTarget [i] = start [i];
 
@@ -197,8 +195,8 @@ namespace hpp {
 	  comEq->nonConstRightHandSide() = initTarget * 10000;
 	  proj->add(comEq);
 	  proj->updateRightHandSide();
-	  const RightHandSideFunctorPtr_t rhs = boost::shared_ptr<VecRightSide<PathPtr_t> >(new VecRightSide<PathPtr_t> (helper.rootPath_, 3, true));
-	  hppDout (info, "update steering method RHS tds for COM-constraint");
+	  const RightHandSideFunctorPtr_t rhs = boost::shared_ptr<VecRightSide<PathPtr_t> >(new VecRightSide<PathPtr_t> (ref, 3, true));
+	  hppDout (info, "push tds in SM for COM-constraint");
 	  helper.steeringMethod_->tds_.push_back(TimeDependant(comEq, rhs));
 	  hppDout (info, "adding COM-constraint finished --");
 	}
@@ -366,11 +364,12 @@ namespace hpp {
 	AddContactConstraints(helper, from, to);
 	if (helper.fullbody_->comProj_) {
 	  hppDout (info, "Adding COM constraint LimbRRT ---- ");
-	  AddComConstraints(helper, from, to);
-	}
+	  AddComConstraints(helper, helper.rootPath_);
+	} // called in interpolateStatesinPathVector instead
 	
+	InitConstraints(helper); // for the helper.rootProblem_
 	hppDout (info, "Try direct path");
-	res = directInterpolation (helper, from, to);
+	res = directInterpolation (helper, from, to); // not considering COM ?
 	PathValidationPtr_t pathValidation = helper.rootProblem_.pathValidation ();
 	core::PathPtr_t validPart;
 	core::PathValidationReportPtr_t pathReport;
@@ -522,6 +521,12 @@ namespace hpp {
 	    hppDout (info, "create local helper");
 	    LimbRRTHelper helper(fullbody, referenceProblem,
 				 rootPath->extract(core::interval_t(a->first, b->first)));
+	    //helper.SetConstraints(get(a), get(b)); // should have an equivalent of this    -> SetComRRTConstraints::operator ()   -> so basically call ComConstraints creation
+	    /*if (helper.fullbody_->comProj_) {
+	      hppDout (info, "Adding COM constraint LimbRRT ---- ");
+	      AddComConstraints (helper, helper.rootPath_);
+	      }*/ // called in interpolateStates instead
+
 	    hppDout (info, "create partial path from interpolateStates");
 	    PathVectorPtr_t partialPath = interpolateStates(helper, a->second, b->second);
 	    if(partialPath)

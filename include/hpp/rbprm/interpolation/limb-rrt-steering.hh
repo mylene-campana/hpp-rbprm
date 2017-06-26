@@ -120,8 +120,9 @@ namespace hpp {
           //hppDout(notice,"create path with ballistic root");
           BallisticPathPtr_t bpExtract =  BallisticPath::create(bp_->device(),q11,q22,length,bp_->coefficients());
           bpExtract->lastRootIndex(bp_->lastRootIndex());
+	  // create path considering tds for potential COM constraint
           path = LimbRRTPath::create
-            (problem_->robot(), q11, q22, length, c, pathDofRank_,bpExtract);
+            (problem_->robot(), q11, q22, length, c, pathDofRank_,bpExtract,tds_);
         }
         else{
           hppDout(notice,"create path without root path");

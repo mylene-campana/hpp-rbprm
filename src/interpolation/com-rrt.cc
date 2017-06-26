@@ -115,14 +115,18 @@ using namespace core;
 
     core::Configuration_t projectOnCom(RbPrmFullBodyPtr_t fullbody, core::ProblemPtr_t referenceProblem, const State& model, const fcl::Vec3f& targetCom, bool &success)
     {
+      hppDout (info, "Start projectOnCom -----");
         core::PathPtr_t unusedPath(StraightPath::create(fullbody->device_,model.configuration_, model.configuration_,0));
         ComRRTShooterFactory unusedFactory(unusedPath);
         SetComRRTConstraints constraintFactory;
         ComRRTHelper helper(fullbody, unusedFactory, constraintFactory, referenceProblem,unusedPath, 0.001);
+	hppDout (info, "Create contact constraints -----");
         CreateContactConstraints<ComRRTHelper>(helper,model,model);
+	hppDout (info, "Create COM constraint -----");
         CreateComConstraint<ComRRTHelper,core::PathPtr_t>(helper, helper.refPath_,targetCom);
         Configuration_t res(helper.fullBodyDevice_->configSize());
         res.head(model.configuration_.rows()) = model.configuration_;
+	hppDout (info, "Apply projector from COM+contact constraints -----");
         if(helper.proj_->apply(res))
         {
             success = true;

@@ -130,11 +130,11 @@ namespace hpp {
       for (CIT_TimeDependant cit = tds.begin ();
 	   cit != tds.end (); ++cit)
         {
-	  (*cit)(y, configuration);
+	  (*cit)(y, configuration); // will update the rhs of function
 	  hppDout (info, "config at y= " << model::displayConfig(configuration));
         }
       hppDout (info, "update projector RHS");
-      projector->updateRightHandSide (); // do not take config as param ??
+      projector->updateRightHandSide ();
     }
 
     void LimbRRTPath::updateConstraints(core::ConfigurationOut_t configuration) const
