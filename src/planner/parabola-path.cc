@@ -224,7 +224,7 @@ namespace hpp {
       const value_type theta = coefficients_ (3);
       value_type x1 = cos(theta) * q1 (0)  + sin(theta) * q1 (1); // x_theta_0
       value_type x2 = cos(theta) * q2 (0) + sin(theta) * q2 (1); // x_theta_imp
-      hppDout(notice,"xTheta0 = "<<x1 << " , "<<coefficients_[6]<<"   xThetaImp = "<<x2);
+      //hppDout(notice,"xTheta0 = "<<x1 << " , "<<coefficients_[6]<<"   xThetaImp = "<<x2);
 
       // Define integration bounds
       if (x1 > x2) { // re-order integration bounds
@@ -240,7 +240,7 @@ namespace hpp {
                        + 0.166666667*lengthFunction (x1 + (i+1)*dx ));
         // apparently, 1/6 and 2/3 are not recognized as floats ...
       }
-      hppDout (notice, "length = " << length);
+      //hppDout (notice, "length = " << length);
       return length;
     }
 

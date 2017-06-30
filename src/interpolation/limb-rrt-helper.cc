@@ -38,7 +38,7 @@
 #include <hpp/constraints/relative-com.hh>
 #include <hpp/constraints/symbolic-calculus.hh>
 #include <hpp/constraints/symbolic-function.hh>
-//#include <hpp/rbprm/interpolation/interpolation-constraints.hh> // not compatible with current limbRRT implementation
+//#include <hpp/rbprm/interpolation/interpolation-constraints.hh> // not compatible with current limbRRT implementation, same with com-rrt.hh
 
 namespace hpp {
   using namespace core;
@@ -184,7 +184,6 @@ namespace hpp {
 
 	  model::DevicePtr_t device = helper.rootProblem_.robot();
 	  core::ComparisonTypePtr_t equals = core::Equality::create ();
-	  core::ConfigProjectorPtr_t& proj = helper.proj_;
 	  model::CenterOfMassComputationPtr_t comComp = model::CenterOfMassComputation::create (device);
 	  comComp->add (device->rootJoint());
 	  //comComp->add (device->getJointByName("romeo/base_joint_xyz"));
@@ -193,8 +192,8 @@ namespace hpp {
 	  NumericalConstraintPtr_t comEq = NumericalConstraint::create (comFunc, equals);
 	  hppDout (info, "set rightHandSide for COM-constraint");
 	  comEq->nonConstRightHandSide() = initTarget * 10000;
-	  proj->add(comEq);
-	  proj->updateRightHandSide();
+	  helper.proj_->add(comEq);
+	  helper.proj_->updateRightHandSide();
 	  const RightHandSideFunctorPtr_t rhs = boost::shared_ptr<VecRightSide<PathPtr_t> >(new VecRightSide<PathPtr_t> (ref, 3, true));
 	  hppDout (info, "push tds in SM for COM-constraint");
 	  helper.steeringMethod_->tds_.push_back(TimeDependant(comEq, rhs));
@@ -214,10 +213,6 @@ namespace hpp {
 	  std::vector<std::string> fixed = to.fixedContacts(from);
 	  core::Problem& problem = helper.rootProblem_;
 	  model::DevicePtr_t device = problem.robot();
-	  core::ConstraintSetPtr_t cSet = core::ConstraintSet::create(device,"");
-	  core::ConfigProjectorPtr_t proj = core::ConfigProjector::create(device,"proj", 1e-2, 30);
-	  bool disableConstr = true;
-	  bool atLeastOneConstr = false;
 
 	  // For verification:
 	  Configuration_t initialLong (from.configuration_.size () + 1);
@@ -233,8 +228,6 @@ namespace hpp {
 	  for(std::vector<std::string>::const_iterator cit = fixed.begin();
 	      cit != fixed.end(); ++cit)
 	    {
-	      hppDout (info, "create projector");
-	      proj = core::ConfigProjector::create(device,"proj", 1e-2, 30);
 	      hppDout (info, "fixed contact: " << *cit);
 	      RbPrmLimbPtr_t limb = helper.fullbody_->GetLimbs().at(*cit);
 	      const bool isInContact = from.contacts_.at(*cit);
@@ -270,16 +263,13 @@ namespace hpp {
 		if (normFrom < 1e-4 && normTo < 1e-4) {
 		  // create constraint(s)
 		  hppDout (info, "create contact position constraint");
-		  proj->add(core::NumericalConstraint::create (constraints::Position::create("", device, effectorJoint, fcl::Vec3f(0,0,0), ppos)));
+		  helper.proj_->add(core::NumericalConstraint::create (constraints::Position::create("", device, effectorJoint, fcl::Vec3f(0,0,0), ppos)));
 		  hppDout (info, "after proj->add");
-		  disableConstr = false;
-		  if (!proj->isSatisfied (endLong)) {
-		    disableConstr = true;
+		  if (!helper.proj_->isSatisfied (endLong)) {
 		    hppDout (error, "End configuration of limbRRT does not satisfy the contact-constraints of the initial config-- POSITION ONLY");
 		    //throw projection_error ("End configuration of limbRRT does not satisfy the contact-constraints of the initial config-- POSITION ONLY");
 		  }
-		  if (!proj->isSatisfied (initialLong)) {
-		    disableConstr = true;
+		  if (!helper.proj_->isSatisfied (initialLong)) {
 		    hppDout (error, "Initial configuration of limbRRT does not satisfy the contact-constraints of the initial config-- POSITION ONLY");
 		    //throw projection_error ("Initial configuration of limbRRT does not satisfy the contact-constraints of the initial config-- POSITION ONLY");
 		  }
@@ -291,14 +281,12 @@ namespace hpp {
 		    const fcl::Matrix3f& rotation = from.contactRotation_.at(*cit);
 		    hppDout (info, "rot from= " << rotation);
 		    hppDout (info, "rot to= " << from.contactRotation_.at(*cit));
-		    proj->add(core::NumericalConstraint::create (constraints::Orientation::create("", device, effectorJoint, rotation, cosntraintsR)));
-		    if (!proj->isSatisfied (endLong)) {
-		      disableConstr = true;
+		    helper.proj_->add(core::NumericalConstraint::create (constraints::Orientation::create("", device, effectorJoint, rotation, cosntraintsR)));
+		    if (!helper.proj_->isSatisfied (endLong)) {
 		      hppDout (error, "End configuration of limbRRT does not satisfy the contact-constraints of the initial config-- POSITION + ROTATION");
 		      //throw projection_error ("End configuration of limbRRT does not satisfy the contact-constraints of the initial config-- POSITION + ROTATION");
 		    }
-		    if (!proj->isSatisfied (initialLong)) {
-		      disableConstr = true;
+		    if (!helper.proj_->isSatisfied (initialLong)) {
 		      hppDout (error, "Initial configuration of limbRRT does not satisfy the contact-constraints of the initial config-- POSITION + ROTATION");
 		      //throw projection_error ("Initial configuration of limbRRT does not satisfy the contact-constraints of the initial config-- POSITION + ROTATION");
 		    }
@@ -309,26 +297,10 @@ namespace hpp {
 	      }// if contact
 	      else
 		hppDout (info, "is actually NOT in contact in from !!");
-
-	      if (!disableConstr) {
-		hppDout (info, "constr not disabled");
-		cSet->addConstraint(proj);     // DEBUG !!!
-		atLeastOneConstr = true;
-		hppDout (info, "constr not added because DEBUG");
-	      } else
-		hppDout (info, "constr disabled");
-
 	    }//for fixed limbs
 
-	  if (atLeastOneConstr) {
-	    hppDout (info, "add all new constraints to problem");
-	    problem.constraints(cSet);         // DEBUG !!!
-	  } else {
-	    hppDout (info, "NO new constraint to add to problem");
-	  }
-
 	  hppDout (info, "test end config with configProjector build with initial config");
-	  if (!proj->isSatisfied (endLong)) {
+	  if (!helper.proj_->isSatisfied (endLong)) {
 	    //if (!problem.constraints()->isSatisfied (endLong)) {
 	    hppDout (error, "End configuration of limbRRT does not satisfy the contact-constraints of the goal config");
 	    throw projection_error ("End configuration of limbRRT does not satisfy the contact-constraints of the goal config");
@@ -364,9 +336,9 @@ namespace hpp {
 	AddContactConstraints(helper, from, to);
 	if (helper.fullbody_->comProj_) {
 	  hppDout (info, "Adding COM constraint LimbRRT ---- ");
-	  AddComConstraints(helper, helper.rootPath_);
+	  //AddComConstraints(helper, helper.rootPath_); // DEBUG !!
 	} // called in interpolateStatesinPathVector instead
-	
+
 	InitConstraints(helper); // for the helper.rootProblem_
 	hppDout (info, "Try direct path");
 	res = directInterpolation (helper, from, to); // not considering COM ?
@@ -515,17 +487,14 @@ namespace hpp {
 	    CIT_StateFrame a, b;
 	    a = (startState+i);
 	    b = (startState+i+1);
+	    // if needed, project states with contact and COM constraints // DEBUG VISUAL
+
 	    hppDout (info, "extract path");
 	    PathPtr_t extractedPath = rootPath->extract(core::interval_t(a->first, b->first));
 	    hppDout(notice," extracted path length = "<<extractedPath->length());
 	    hppDout (info, "create local helper");
 	    LimbRRTHelper helper(fullbody, referenceProblem,
 				 rootPath->extract(core::interval_t(a->first, b->first)));
-	    //helper.SetConstraints(get(a), get(b)); // should have an equivalent of this    -> SetComRRTConstraints::operator ()   -> so basically call ComConstraints creation
-	    /*if (helper.fullbody_->comProj_) {
-	      hppDout (info, "Adding COM constraint LimbRRT ---- ");
-	      AddComConstraints (helper, helper.rootPath_);
-	      }*/ // called in interpolateStates instead
 
 	    hppDout (info, "create partial path from interpolateStates");
 	    PathVectorPtr_t partialPath = interpolateStates(helper, a->second, b->second);
@@ -559,7 +528,8 @@ namespace hpp {
 	hppDout (info, "distance= " << distance << " numValid= " << numValid);
 	hppDout (info, "referenceProblem->nbPathPlannerFails_= " << referenceProblem->nbPathPlannerFails_);
 	// numValid is the index of the last existing path in pathVector
-	return ConcatenatePathInPathVector (res, numValid);
+	PathVectorPtr_t result = ConcatenatePathInPathVector (res, numValid);
+	return result;
       }
 
       PathPtr_t interpolateStates
@@ -646,7 +616,6 @@ namespace hpp {
 	hppDout (info, "direct interpolation for partialPath");
 	return res;
       }
-
     }// namespace interpolation
   }// namespace rbprm
 }// namespace hpp

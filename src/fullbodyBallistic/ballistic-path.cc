@@ -116,21 +116,11 @@ namespace hpp {
       // manual interpolation since joint not available with index...
       const std::size_t freeflyerDim = 3 + dimSO3;
       const bool hasInternalDof = nbConfig > ecsDim + freeflyerDim;
-      const value_type maxVal = 0; // because here initial_ = end_ ...
+      hppDout (info, "freeflyerDim= " << freeflyerDim);
       if (hasInternalDof) {
-        
+        hppDout (info, "path has internal Dof");
         if(!limbPath_){
           for (core::size_type i = freeflyerDim; i<nbConfig-ecsDim; i++) {
-            /* monopod leg interpolation
-	       if (u <= u_max) {
-	       const value_type u_prime = u / u_max;
-	       result (i) = (1 - u_prime) * initial_ (i) + u_prime * maxVal;
-	       }
-	       else {
-	       const value_type u_prime = (u - u_max) / (1 - u_max);
-	       result (i) = (1 - u_prime) * maxVal + u_prime * end_ (i);
-	       }*/
-            /* classical interpolation for robot trunk and limbs */
             result (i) = (1 - u) * initial_ (i) + u * end_ (i);
           }
         }else{
@@ -140,7 +130,7 @@ namespace hpp {
           }
         }
       }
-      /* Normal vector interpolation (avoid NaN) */
+      /* Normal vector (extra-config) interpolation (avoid NaN) */
       for (std::size_t k = 0; k < ecsDim; k++)
       result (nbConfig - ecsDim + k) = (1 - u) *
 	initial_(nbConfig - ecsDim + k) + u*end_(nbConfig - ecsDim + k);

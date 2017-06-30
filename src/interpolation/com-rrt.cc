@@ -135,6 +135,8 @@ using namespace core;
         {
             success = false;
         }
+	//State res_state = model;
+	//res_state.configuration_ = res.head(res.rows()-1);
         return res.head(res.rows()-1);
     }
 

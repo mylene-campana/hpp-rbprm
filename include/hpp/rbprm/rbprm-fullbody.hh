@@ -99,6 +99,8 @@ namespace hpp {
         /// \return whether the heuristic has been added. False is returned if a heuristic with that name already exists.
         bool AddHeuristic(const std::string& name, const sampling::heuristic func);
 
+	size_t lastRootIndex ();
+
     public:
         typedef std::map<std::string, std::vector<std::string> > T_LimbGroup;
 

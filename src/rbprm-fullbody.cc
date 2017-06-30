@@ -247,6 +247,18 @@ namespace hpp {
         // NOTHING
     }
 
+    size_t RbPrmFullBody::lastRootIndex () {
+      size_t lastRootIndex = device_->configSize();
+      for (rbprm::T_Limb::const_iterator lit = GetLimbs().begin();lit != GetLimbs().end(); ++lit){
+        hppDout(notice,"LIST OF LIMBS : "<< lit->first);
+        if(lit->second->limb_->rankInConfiguration() < lastRootIndex){
+          lastRootIndex = lit->second->limb_->rankInConfiguration();
+        }
+      }
+      hppDout(notice,"Last root index = "<<lastRootIndex);
+      return lastRootIndex;
+    }
+
     // assumes unit direction
     std::vector<bool> setMaintainRotationConstraints(const fcl::Vec3f&) // direction)
     {

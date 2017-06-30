@@ -46,18 +46,12 @@ namespace hpp {
      const hpp::rbprm::State &start, const State& end,
      const core::PathVectorConstPtr_t path) : 
       path_(path), start_(start), end_(end), problem_ (problem), robot_(robot),
-      maxIterMaintainContacts_ (100)
+      maxIterMaintainContacts_ (100), lastRootIndex_ (robot->lastRootIndex()),
+      numberOfAdds_ (150)
 	
     {
       // TODO
-      lastRootIndex_ = robot_->device_->configSize();
-      for( rbprm::T_Limb::const_iterator lit = robot_->GetLimbs().begin();lit != robot_->GetLimbs().end(); ++lit){
-        hppDout(notice,"LIST OF LIMBS : "<< lit->first);
-        if(lit->second->limb_->rankInConfiguration() < lastRootIndex_){
-          lastRootIndex_ = lit->second->limb_->rankInConfiguration();
-        }
-      }
-      hppDout(notice,"Last root index = "<<lastRootIndex_);
+      
     }
 
     // ========================================================================
@@ -868,11 +862,12 @@ namespace hpp {
       T_PathVectorBP resultPairVector;
       robot_->noStability_ = true; // disable stability for waypoints
       State contactState1,contactState2,stateTop;
-      T_StateFrame stateFrames;
+      T_StateFrame stateFrames, stateFramesTmp;
       value_type lengthTop,lengthTakeoff,lengthLanding,lengthLanding6DOF,lengthTakeoff6DOF;
       const core::PathPtr_t path = path_->pathAtRank (0);
       const value_type pathLength = path->length ();
       const vector_t pathCoefs = path->coefficients ();
+      const ParabolaPathPtr_t pp = boost::dynamic_pointer_cast<ParabolaPath>(path);
       core::ValidationReportPtr_t validationReport;
       trunkConfigSize_ = path->initial ().size () - 4;
 
@@ -888,14 +883,61 @@ namespace hpp {
       hppDout (info, "end_ validity: " << problem_->configValidations ()->validate (end_.configuration_, validationReport));
 
       stateFrames.clear();
+      stateFramesTmp.clear();
       stateFrames.push_back(std::make_pair(0,start_));
       hppDout (info, "number of states (1)= " << stateFrames.size ());
       contactState1 = computeOffsetContactConfig (bp, start_,stateFrames, u_offset, true,lengthTakeoff);
       hppDout (info, "number of states (1+offsetTakeoff)= " << stateFrames.size ());
+
+      if (robot_->comProj_) { // add states for interpolation
+	const value_type contactLength = pp->computeLength (qStart ,contactState1.configuration_);
+	const value_type contactToTopLength = pp->computeLength (contactState1.configuration_, stateTop.configuration_);
+	const BallisticPathPtr_t bp_add = BallisticPath::create (robot_->device_, contactState1.configuration_, stateTop.configuration_, contactToTopLength, pathCoefs, lastRootIndex_);
+	const value_type step = contactToTopLength / numberOfAdds_;
+	bool success;
+	State state_add;
+	for (int i = 1; i < numberOfAdds_; i++) {
+	  const value_type currentLength = step * i;
+	  Configuration_t config = (*bp_add) (currentLength, success);
+	  if (problem_->configValidations ()->validate (config, validationReport)) {
+	    state_add.configuration_ = config;
+	    stateFrames.push_back(std::make_pair(currentLength,state_add));
+	  }
+	  else
+	    hppDout (info, "additional state not added because of collisions");
+	  stateFrames.push_back(std::make_pair(currentLength,state_add));
+	}
+      }
+
       if (stateTop.configuration_.rows())
 	stateFrames.push_back(std::make_pair(lengthTop,stateTop));
       hppDout (info, "number of states (2+offsetTakeoff)= " << stateFrames.size ());
-      contactState2 = computeOffsetContactConfig (bp, end_,stateFrames, u_offset, false,lengthLanding);
+
+      contactState2 = computeOffsetContactConfig (bp, end_,stateFramesTmp, u_offset, false,lengthLanding);
+
+      if (robot_->comProj_) { // add states for interpolation
+	const value_type TopToContactLength = pp->computeLength (stateTop.configuration_, contactState2.configuration_);
+	hppDout (info, "lengthTop= " << lengthTop);
+	const BallisticPathPtr_t bp_add = BallisticPath::create (robot_->device_, stateTop.configuration_, contactState2.configuration_, TopToContactLength, pathCoefs, lastRootIndex_);
+	const value_type step = TopToContactLength / numberOfAdds_;
+	bool success;
+	State state_add;
+	for (int i = 1; i < numberOfAdds_; i++) {
+	  const value_type currentLength = step * i;
+	  Configuration_t config = (*bp_add) (currentLength, success);
+	  if (problem_->configValidations ()->validate (config, validationReport)) {
+	    state_add.configuration_ = config;
+	    stateFrames.push_back(std::make_pair(currentLength,state_add));
+	  }
+	  else
+	    hppDout (info, "additional state not added because of collisions");
+	  stateFrames.push_back(std::make_pair(currentLength,state_add));
+	}
+      }
+      for (int i = 0; i < stateFramesTmp.size (); i++) { // add contact-reversed
+	stateFrames.push_back (stateFramesTmp [i]);
+      }
+
       hppDout (info, "number of states (2+offsets)= " << stateFrames.size ());
       stateFrames.push_back(std::make_pair(bp->length(),end_));
       hppDout (info, "number of states (3+offsets)= " << stateFrames.size ());

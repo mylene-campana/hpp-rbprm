@@ -323,6 +323,7 @@ namespace hpp {
       std::map<std::string, std::vector<std::string> > affFilters_;
       size_t trunkConfigSize_;
       size_t maxIterMaintainContacts_;
+      int numberOfAdds_; // number of additionnal states between top and contacts, for manual interpolation of the COM
     }; // class BallisticInterpolation
     
   } // namespace rbprm

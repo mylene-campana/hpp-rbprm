@@ -135,14 +135,22 @@ namespace hpp {
         }
       hppDout (info, "update projector RHS");
       projector->updateRightHandSide ();
+      // Debug
+      bool isConstrSatisfied = projector->isSatisfied (configuration);
+      hppDout (info, "is constraint satisfied = " << isConstrSatisfied);
+      if (!isConstrSatisfied) {
+	core::Configuration_t test (configuration.size ());
+	hppDout (info, "try to apply constraint");
+	isConstrSatisfied = projector->apply (test);
+	hppDout (info, "is constraint satisfied = " << isConstrSatisfied);
+	hppDout (info, "test = " << model::displayConfig(test));
+      }
     }
 
     void LimbRRTPath::updateConstraints(core::ConfigurationOut_t configuration) const
     {
       hppDout (info, "check if constraints can be updated");
-      hppDout (info, "constraints()= " << constraints());
       if (constraints())
-	hppDout (info, "constraints()->configProjector()= " << constraints()->configProjector());
       if (constraints() && constraints()->configProjector ())
         {
 	  hppDout (info, "constraints and projector found");
@@ -251,7 +259,6 @@ namespace hpp {
 
 	    std::cout << "lh_foot_joint  " << std::endl;
 	    std::cout <<  device_->getJointByName("lh_foot_joint")->currentTransformation().getTranslation() << std::endl;*/
-          hppDout (error, initial().transpose ());
           throw projection_error ("Initial configuration of path does not satisfy the constraints");
         }
       }
@@ -259,9 +266,7 @@ namespace hpp {
       if (constraints()) {
         if (!constraints()->isSatisfied (end())) {
 	  //std::cout << "end conf " <<  initc << std::endl;
-          hppDout (error, end().transpose ());
-          throw projection_error ("End configuration of path does not satisfy "
-				  "the constraints");
+          throw projection_error ("End configuration of path does not satisfy the constraints");
         }
       }
     }
