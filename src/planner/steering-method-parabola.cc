@@ -576,11 +576,11 @@ namespace hpp {
       // for demo only :
      /* alpha = alpha_inf_bound + 0.1*(alpha_sup_bound - alpha_inf_bound);
       if(alpha < 0)
-          alpha = 0;
-      hppDout (info, "alpha: " << alpha);*/
+      alpha = 0;*/
+      hppDout (info, "alpha: " << alpha);
       
       /* Verify that maximal heigh of smaller parab is not out of the bounds */
-      hppDout (info, "Coef and velocities of smaller parabola");
+      hppDout (info, "Coef and velocities of smallest parabola");
       const vector_t coefsInf = computeCoefficients (alpha_inf_bound, theta,
 						     X_theta, Z, x_theta_0,
 						     z_0);
@@ -593,6 +593,7 @@ namespace hpp {
       }
 
       /* Compute Parabola coefficients */
+      hppDout (info, "Coef and velocities of selected parabola");
       vector_t coefs = computeCoefficients (alpha, theta, X_theta, Z, 
 					    x_theta_0, z_0);
       hppDout (info, "coefs: " << coefs.transpose ());

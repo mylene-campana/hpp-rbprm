@@ -116,9 +116,7 @@ namespace hpp {
       // manual interpolation since joint not available with index...
       const std::size_t freeflyerDim = 3 + dimSO3;
       const bool hasInternalDof = nbConfig > ecsDim + freeflyerDim;
-      hppDout (info, "freeflyerDim= " << freeflyerDim);
       if (hasInternalDof) {
-        hppDout (info, "path has internal Dof");
         if(!limbPath_){
           for (core::size_type i = freeflyerDim; i<nbConfig-ecsDim; i++) {
             result (i) = (1 - u) * initial_ (i) + u * end_ (i);

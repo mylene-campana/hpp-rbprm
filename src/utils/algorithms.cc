@@ -586,6 +586,26 @@ namespace geom
     return res;
   }
 
+  double computeTriangleArea (const TrianglePoints tri) {
+    const Point P1 = tri.p1; const Point P2 = tri.p2; const Point P3 = tri.p3;
+    Eigen::Matrix<double,3,3> mat1;
+    mat1 (0,0) = P1[0]; mat1 (0,1) = P2[0]; mat1 (0,2) = P3[0];
+    mat1 (1,0) = P1[1]; mat1 (1,1) = P2[1]; mat1 (1,2) = P3[1];
+    mat1 (2,0) = 1; mat1 (2,1) = 1; mat1 (2,2) = 1;
+    const double det1 = mat1.determinant ();
+    Eigen::Matrix<double,3,3> mat2;
+    mat2 (0,0) = P1[1]; mat1 (0,1) = P2[1]; mat1 (0,2) = P3[1];
+    mat2 (1,0) = P1[2]; mat1 (1,1) = P2[2]; mat1 (1,2) = P3[2];
+    mat2 (2,0) = 1; mat1 (2,1) = 1; mat1 (2,2) = 1;
+    const double det2 = mat2.determinant ();
+    Eigen::Matrix<double,3,3> mat3;
+    mat3 (0,0) = P1[3]; mat3 (0,1) = P2[3]; mat3 (0,2) = P3[3];
+    mat3 (1,0) = P1[0]; mat3 (1,1) = P2[0]; mat3 (1,2) = P3[0];
+    mat3 (2,0) = 1; mat3 (2,1) = 1; mat3 (2,2) = 1;
+    const double det3 = mat3.determinant ();
+    const double area = 0.5*sqrt (det1*det1 + det2*det2 + det3*det3);
+    return area;
+  }
 
   T_Point intersectPolygonePlane(BVHModelOBConst_Ptr_t polygone, BVHModelOBConst_Ptr_t plane, Eigen::Ref<Point> Pn){
     T_Point res, sortedRes;
@@ -619,8 +639,10 @@ namespace geom
 	  //hppDout(info, "Pij" << Pij.transpose ());
 	  //hppDout(info, "Pijj" << Pijj.transpose ());
 	  intersection = intersectSegmentPlane(Pij, Pijj, Pn,P0);
-	  if(intersection.size() > 0)
+	  if(intersection.size() > 0) {
+	    //double area = computeTriangleArea (polygone->tri_indices[i]); //MY
 	    res.insert(res.end(),intersection.begin(),intersection.end());
+	  }
 	  //else hppDout(info,"intersection with segment of triangle empty");
 	}
       }
